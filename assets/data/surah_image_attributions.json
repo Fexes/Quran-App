@@ -1,0 +1,572 @@
+[
+  {
+    "surahNumber": 1,
+    "surahName": "Al-Fatihah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_1.jpeg"
+  },
+  {
+    "surahNumber": 2,
+    "surahName": "Al-Baqarah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_2.jpeg"
+  },
+  {
+    "surahNumber": 3,
+    "surahName": "Aal-E-Imran",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_3.jpeg"
+  },
+  {
+    "surahNumber": 4,
+    "surahName": "An-Nisa",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_4.jpeg"
+  },
+  {
+    "surahNumber": 5,
+    "surahName": "Al-Ma’idah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_5.jpeg"
+  },
+  {
+    "surahNumber": 6,
+    "surahName": "Al-An’am",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_6.jpeg"
+  },
+  {
+    "surahNumber": 7,
+    "surahName": "Al-A’raf",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_7.jpeg"
+  },
+  {
+    "surahNumber": 8,
+    "surahName": "Al-Anfal",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_8.jpeg"
+  },
+  {
+    "surahNumber": 9,
+    "surahName": "At-Tawbah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_9.jpeg"
+  },
+  {
+    "surahNumber": 10,
+    "surahName": "Yunus",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_10.jpeg"
+  },
+  {
+    "surahNumber": 11,
+    "surahName": "Hud",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_11.jpeg"
+  },
+  {
+    "surahNumber": 12,
+    "surahName": "Yusuf",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_12.jpeg"
+  },
+  {
+    "surahNumber": 13,
+    "surahName": "Ar-Ra’d",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_13.jpeg"
+  },
+  {
+    "surahNumber": 14,
+    "surahName": "Ibrahim",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_14.jpeg"
+  },
+  {
+    "surahNumber": 15,
+    "surahName": "Al-Hijr",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_15.jpeg"
+  },
+  {
+    "surahNumber": 16,
+    "surahName": "An-Nahl",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_16.jpeg"
+  },
+  {
+    "surahNumber": 17,
+    "surahName": "Al-Isra",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_17.jpeg"
+  },
+  {
+    "surahNumber": 18,
+    "surahName": "Al-Kahf",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_18.jpeg"
+  },
+  {
+    "surahNumber": 19,
+    "surahName": "Maryam",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_19.jpeg"
+  },
+  {
+    "surahNumber": 20,
+    "surahName": "Ta-Ha",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_20.jpeg"
+  },
+  {
+    "surahNumber": 21,
+    "surahName": "Al-Anbiya",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_21.jpeg"
+  },
+  {
+    "surahNumber": 22,
+    "surahName": "Al-Hajj",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_22.jpeg"
+  },
+  {
+    "surahNumber": 23,
+    "surahName": "Al-Mu’minun",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_23.jpeg"
+  },
+  {
+    "surahNumber": 24,
+    "surahName": "An-Nur",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_24.jpeg"
+  },
+  {
+    "surahNumber": 25,
+    "surahName": "Al-Furqan",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_25.jpeg"
+  },
+  {
+    "surahNumber": 26,
+    "surahName": "Ash-Shu’ara",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_26.jpeg"
+  },
+  {
+    "surahNumber": 27,
+    "surahName": "An-Naml",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_27.jpeg"
+  },
+  {
+    "surahNumber": 28,
+    "surahName": "Al-Qasas",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_28.jpeg"
+  },
+  {
+    "surahNumber": 29,
+    "surahName": "Al-Ankabut",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_29.jpeg"
+  },
+  {
+    "surahNumber": 30,
+    "surahName": "Ar-Rum",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_30.jpeg"
+  },
+  {
+    "surahNumber": 31,
+    "surahName": "Luqman",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_31.jpeg"
+  },
+  {
+    "surahNumber": 32,
+    "surahName": "As-Sajdah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_32.jpeg"
+  },
+  {
+    "surahNumber": 33,
+    "surahName": "Al-Ahzab",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_33.jpeg"
+  },
+  {
+    "surahNumber": 34,
+    "surahName": "Saba",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_34.jpeg"
+  },
+  {
+    "surahNumber": 35,
+    "surahName": "Fatir",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_35.jpeg"
+  },
+  {
+    "surahNumber": 36,
+    "surahName": "Ya-Sin",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_36.jpeg"
+  },
+  {
+    "surahNumber": 37,
+    "surahName": "As-Saffat",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_37.jpeg"
+  },
+  {
+    "surahNumber": 38,
+    "surahName": "Sad",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_38.jpeg"
+  },
+  {
+    "surahNumber": 39,
+    "surahName": "Az-Zumar",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_39.jpeg"
+  },
+  {
+    "surahNumber": 40,
+    "surahName": "Ghafir",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_40.jpeg"
+  },
+  {
+    "surahNumber": 41,
+    "surahName": "Fussilat",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_41.jpeg"
+  },
+  {
+    "surahNumber": 42,
+    "surahName": "Ash-Shura",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_42.jpeg"
+  },
+  {
+    "surahNumber": 43,
+    "surahName": "Az-Zukhruf",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_43.jpeg"
+  },
+  {
+    "surahNumber": 44,
+    "surahName": "Ad-Dukhan",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_44.jpeg"
+  },
+  {
+    "surahNumber": 45,
+    "surahName": "Al-Jathiyah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_45.jpeg"
+  },
+  {
+    "surahNumber": 46,
+    "surahName": "Al-Ahqaf",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_46.jpeg"
+  },
+  {
+    "surahNumber": 47,
+    "surahName": "Muhammad",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_47.jpeg"
+  },
+  {
+    "surahNumber": 48,
+    "surahName": "Al-Fath",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_48.jpeg"
+  },
+  {
+    "surahNumber": 49,
+    "surahName": "Al-Hujurat",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_49.jpeg"
+  },
+  {
+    "surahNumber": 50,
+    "surahName": "Qaf",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_50.jpeg"
+  },
+  {
+    "surahNumber": 51,
+    "surahName": "Adh-Dhariyat",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_51.jpeg"
+  },
+  {
+    "surahNumber": 52,
+    "surahName": "At-Tur",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_52.jpeg"
+  },
+  {
+    "surahNumber": 53,
+    "surahName": "An-Najm",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_53.jpeg"
+  },
+  {
+    "surahNumber": 54,
+    "surahName": "Al-Qamar",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_54.jpeg"
+  },
+  {
+    "surahNumber": 55,
+    "surahName": "Ar-Rahman",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_55.jpeg"
+  },
+  {
+    "surahNumber": 56,
+    "surahName": "Al-Waqi’ah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_56.jpeg"
+  },
+  {
+    "surahNumber": 57,
+    "surahName": "Al-Hadid",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_57.jpeg"
+  },
+  {
+    "surahNumber": 58,
+    "surahName": "Al-Mujadilah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_58.jpeg"
+  },
+  {
+    "surahNumber": 59,
+    "surahName": "Al-Hashr",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_59.jpeg"
+  },
+  {
+    "surahNumber": 60,
+    "surahName": "Al-Mumtahanah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_60.jpeg"
+  },
+  {
+    "surahNumber": 61,
+    "surahName": "As-Saff",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_61.jpeg"
+  },
+  {
+    "surahNumber": 62,
+    "surahName": "Al-Jumu’ah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_62.jpeg"
+  },
+  {
+    "surahNumber": 63,
+    "surahName": "Al-Munafiqun",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_63.jpeg"
+  },
+  {
+    "surahNumber": 64,
+    "surahName": "At-Taghabun",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_64.jpeg"
+  },
+  {
+    "surahNumber": 65,
+    "surahName": "At-Talaq",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_65.jpeg"
+  },
+  {
+    "surahNumber": 66,
+    "surahName": "At-Tahrim",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_66.jpeg"
+  },
+  {
+    "surahNumber": 67,
+    "surahName": "Al-Mulk",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_67.jpeg"
+  },
+  {
+    "surahNumber": 68,
+    "surahName": "Al-Qalam",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_68.jpeg"
+  },
+  {
+    "surahNumber": 69,
+    "surahName": "Al-Haqqah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_69.jpeg"
+  },
+  {
+    "surahNumber": 70,
+    "surahName": "Al-Ma’arij",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_70.jpeg"
+  },
+  {
+    "surahNumber": 71,
+    "surahName": "Nuh",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_71.jpeg"
+  },
+  {
+    "surahNumber": 72,
+    "surahName": "Al-Jinn",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_72.jpeg"
+  },
+  {
+    "surahNumber": 73,
+    "surahName": "Al-Muzzammil",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_73.jpeg"
+  },
+  {
+    "surahNumber": 74,
+    "surahName": "Al-Muddaththir",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_74.jpeg"
+  },
+  {
+    "surahNumber": 75,
+    "surahName": "Al-Qiyamah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_75.jpeg"
+  },
+  {
+    "surahNumber": 76,
+    "surahName": "Al-Insan",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_76.jpeg"
+  },
+  {
+    "surahNumber": 77,
+    "surahName": "Al-Mursalat",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_77.jpeg"
+  },
+  {
+    "surahNumber": 78,
+    "surahName": "An-Naba",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_78.jpeg"
+  },
+  {
+    "surahNumber": 79,
+    "surahName": "An-Nazi’at",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_79.jpeg"
+  },
+  {
+    "surahNumber": 80,
+    "surahName": "Abasa",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_80.jpeg"
+  },
+  {
+    "surahNumber": 81,
+    "surahName": "At-Takwir",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_81.jpeg"
+  },
+  {
+    "surahNumber": 82,
+    "surahName": "Al-Infitar",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_82.jpeg"
+  },
+  {
+    "surahNumber": 83,
+    "surahName": "Al-Mutaffifin",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_83.jpeg"
+  },
+  {
+    "surahNumber": 84,
+    "surahName": "Al-Inshiqaq",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_84.jpeg"
+  },
+  {
+    "surahNumber": 85,
+    "surahName": "Al-Buruj",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_85.jpeg"
+  },
+  {
+    "surahNumber": 86,
+    "surahName": "At-Tariq",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_86.jpeg"
+  },
+  {
+    "surahNumber": 87,
+    "surahName": "Al-A’la",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_87.jpeg"
+  },
+  {
+    "surahNumber": 88,
+    "surahName": "Al-Ghashiyah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_88.jpeg"
+  },
+  {
+    "surahNumber": 89,
+    "surahName": "Al-Fajr",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_89.jpeg"
+  },
+  {
+    "surahNumber": 90,
+    "surahName": "Al-Balad",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_90.jpeg"
+  },
+  {
+    "surahNumber": 91,
+    "surahName": "Ash-Shams",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_91.jpeg"
+  },
+  {
+    "surahNumber": 92,
+    "surahName": "Al-Layl",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_92.jpeg"
+  },
+  {
+    "surahNumber": 93,
+    "surahName": "Ad-Duha",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_93.jpeg"
+  },
+  {
+    "surahNumber": 94,
+    "surahName": "Ash-Sharh",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_94.jpeg"
+  },
+  {
+    "surahNumber": 95,
+    "surahName": "At-Tin",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_95.jpeg"
+  },
+  {
+    "surahNumber": 96,
+    "surahName": "Al-Alaq",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_96.jpeg"
+  },
+  {
+    "surahNumber": 97,
+    "surahName": "Al-Qadr",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_97.jpeg"
+  },
+  {
+    "surahNumber": 98,
+    "surahName": "Al-Bayyinah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_98.jpeg"
+  },
+  {
+    "surahNumber": 99,
+    "surahName": "Az-Zalzalah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_99.jpeg"
+  },
+  {
+    "surahNumber": 100,
+    "surahName": "Al-Adiyat",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_100.jpeg"
+  },
+  {
+    "surahNumber": 101,
+    "surahName": "Al-Qari’ah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_101.jpeg"
+  },
+  {
+    "surahNumber": 102,
+    "surahName": "At-Takathur",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_102.jpeg"
+  },
+  {
+    "surahNumber": 103,
+    "surahName": "Al-Asr",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_103.jpeg"
+  },
+  {
+    "surahNumber": 104,
+    "surahName": "Al-Humazah",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_104.jpeg"
+  },
+  {
+    "surahNumber": 105,
+    "surahName": "Al-Fil",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_105.jpeg"
+  },
+  {
+    "surahNumber": 106,
+    "surahName": "Quraysh",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_106.jpeg"
+  },
+  {
+    "surahNumber": 107,
+    "surahName": "Al-Ma’un",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_107.jpeg"
+  },
+  {
+    "surahNumber": 108,
+    "surahName": "Al-Kawthar",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_108.jpeg"
+  },
+  {
+    "surahNumber": 109,
+    "surahName": "Al-Kafirun",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_109.jpeg"
+  },
+  {
+    "surahNumber": 110,
+    "surahName": "An-Nasr",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_110.jpeg"
+  },
+  {
+    "surahNumber": 111,
+    "surahName": "Al-Masad",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_111.jpeg"
+  },
+  {
+    "surahNumber": 112,
+    "surahName": "Al-Ikhlas",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_112.jpeg"
+  },
+  {
+    "surahNumber": 113,
+    "surahName": "Al-Falaq",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_113.jpeg"
+  },
+  {
+    "surahNumber": 114,
+    "surahName": "An-Nas",
+    "assetPath": "http://coreinfinite.tech/quran_cover/cover_114.jpeg"
+  }
+]

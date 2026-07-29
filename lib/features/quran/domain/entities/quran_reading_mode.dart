@@ -1,0 +1,1 @@
+enum QuranAyahTextLayout { combined, separated }

@@ -1,0 +1,1 @@
+City search data derived from GeoNames (https://www.geonames.org/), licensed under CC BY 4.0. Dataset: cities15000 and countryInfo.
