@@ -281,6 +281,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTitle => 'Settings';
 
   @override
+  String get readingPreferencesTitle => 'Reading & language';
+
+  @override
+  String get downloadsDataTitle => 'Downloads & data';
+
+  @override
+  String get arabicScriptTitle => 'Arabic script';
+
+  @override
+  String get offlineDownloadsTitle => 'Offline downloads';
+
+  @override
+  String get offlineDownloadsSubtitle => 'Recitations, translations & tafsir';
+
+  @override
+  String get contentSourcesTitle => 'Content sources';
+
+  @override
+  String get readingLanguagesSubtitle => 'Quran, tafsir, Hadith & Azkar';
+
+  @override
+  String get textAppearanceTitle => 'Text appearance';
+
+  @override
   String get settingsSubtitle =>
       'Personalize language, theme, and reading comfort.';
 
@@ -291,16 +315,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeTitle => 'Theme';
 
   @override
-  String get themeWhite => 'White';
-
-  @override
   String get themeLight => 'Light';
 
   @override
   String get themeDark => 'Dark';
-
-  @override
-  String get themeBlack => 'Black';
 
   @override
   String get languageTitle => 'Language';
@@ -365,6 +383,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get prayerJournalTitle => 'Prayer & fasting journal';
+
+  @override
+  String get fastingJournalTitle => 'Fasting journal';
 
   @override
   String get worshipToolsTitle => 'Worship tools';

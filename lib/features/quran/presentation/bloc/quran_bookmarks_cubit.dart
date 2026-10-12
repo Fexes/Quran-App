@@ -19,9 +19,18 @@ class QuranBookmarksCubit extends Cubit<QuranBookmarksState> {
   final QuranRepository _repository;
   final QuranBookmarkCollectionsRepository? _collectionRepository;
   final QuranTranslationRepository? _translationRepository;
+  int _loadRequest = 0;
 
   Future<void> load() async {
-    emit(state.copyWith(status: QuranBookmarksStatus.loading));
+    if (isClosed) return;
+    final request = ++_loadRequest;
+    final hasContent = state.status == QuranBookmarksStatus.success;
+    emit(
+      state.copyWith(
+        status: hasContent ? state.status : QuranBookmarksStatus.loading,
+        isRefreshing: hasContent,
+      ),
+    );
     try {
       final bookmarks = await _repository.getBookmarks();
       final collections =
@@ -58,6 +67,7 @@ class QuranBookmarksCubit extends Cubit<QuranBookmarksState> {
             surah: surah,
             ayah: ayah,
             translation: selectedText ?? ayah.translation,
+            createdAt: bookmark.createdAt,
             translationResource: selectedText == null
                 ? null
                 : selectedTranslation,
@@ -65,25 +75,31 @@ class QuranBookmarksCubit extends Cubit<QuranBookmarksState> {
           ),
         );
       }
-      emit(
-        QuranBookmarksState(
-          status: QuranBookmarksStatus.success,
-          bookmarks: state.selectedCollectionId == null
-              ? summaries
-              : summaries
-                    .where(
-                      (item) => item.collectionId == state.selectedCollectionId,
-                    )
-                    .toList(growable: false),
-          collections: collections,
-          selectedCollectionId: state.selectedCollectionId,
-        ),
+      if (isClosed || request != _loadRequest) return;
+      assert(
+        summaries.map((item) => item.ayah.verseKey).toSet().length ==
+            summaries.length,
       );
-    } catch (error) {
       emit(
         state.copyWith(
-          status: QuranBookmarksStatus.failure,
-          errorMessage: error.toString(),
+          status: QuranBookmarksStatus.success,
+          bookmarks: summaries,
+          collections: collections,
+          clearSelectedCollection: !collections.any(
+            (item) => item.id == state.selectedCollectionId,
+          ),
+          isRefreshing: false,
+        ),
+      );
+    } catch (_) {
+      if (isClosed || request != _loadRequest) return;
+      emit(
+        state.copyWith(
+          status: hasContent
+              ? QuranBookmarksStatus.success
+              : QuranBookmarksStatus.failure,
+          isRefreshing: false,
+          errorMessage: 'Bookmarks could not be refreshed. Please try again.',
         ),
       );
     }
@@ -96,10 +112,13 @@ class QuranBookmarksCubit extends Cubit<QuranBookmarksState> {
         clearSelectedCollection: collectionId == null,
       ),
     );
-    await load();
   }
 
-  Future<void> createCollection(
+  void search(String query) => emit(state.copyWith(query: query));
+
+  void sortBy(QuranBookmarkSort sort) => emit(state.copyWith(sort: sort));
+
+  Future<bool> createCollection(
     String name, {
     String description = '',
     int colorValue = 0xFF2E7D5B,
@@ -107,30 +126,65 @@ class QuranBookmarksCubit extends Cubit<QuranBookmarksState> {
   }) async {
     final repository = _collectionRepository;
     if (repository == null || name.trim().isEmpty) {
-      return;
+      return false;
     }
-    await repository.createBookmarkCollection(
-      name: name,
-      description: description,
-      colorValue: colorValue,
-      iconCodePoint: iconCodePoint,
-    );
-    await load();
+    return _update(() async {
+      await repository.createBookmarkCollection(
+        name: name,
+        description: description,
+        colorValue: colorValue,
+        iconCodePoint: iconCodePoint,
+      );
+    });
   }
 
-  Future<void> moveBookmark(String verseKey, String collectionId) async {
-    await _collectionRepository?.moveBookmarkToCollection(
-      verseKey: verseKey,
-      collectionId: collectionId,
-    );
-    await load();
-  }
+  Future<bool> moveBookmark(String verseKey, String collectionId) =>
+      _update(() async {
+        await _collectionRepository?.moveBookmarkToCollection(
+          verseKey: verseKey,
+          collectionId: collectionId,
+        );
+      });
 
-  Future<void> deleteCollection(String collectionId) async {
+  Future<bool> deleteCollection(String collectionId) => _update(() async {
     await _collectionRepository?.deleteBookmarkCollection(collectionId);
-    if (state.selectedCollectionId == collectionId) {
-      emit(state.copyWith(clearSelectedCollection: true));
+  });
+
+  Future<bool> removeBookmark(QuranBookmarkSummary bookmark) =>
+      _update(() async {
+        if (await _repository.isBookmarked(
+          surahNumber: bookmark.surah.number,
+          ayahNumber: bookmark.ayah.number,
+        )) {
+          await _repository.toggleBookmark(
+            surahNumber: bookmark.surah.number,
+            ayahNumber: bookmark.ayah.number,
+          );
+        }
+      });
+
+  Future<bool> _update(Future<void> Function() action) async {
+    if (isClosed || state.isUpdating) return false;
+    emit(state.copyWith(isUpdating: true));
+    try {
+      await action();
+      await load();
+      return true;
+    } catch (_) {
+      if (!isClosed) {
+        emit(
+          state.copyWith(
+            errorMessage: 'Changes could not be saved. Please try again.',
+          ),
+        );
+      }
+      return false;
+    } finally {
+      if (!isClosed) {
+        emit(
+          state.copyWith(isUpdating: false, errorMessage: state.errorMessage),
+        );
+      }
     }
-    await load();
   }
 }

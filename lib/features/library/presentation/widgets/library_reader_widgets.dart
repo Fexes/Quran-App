@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/animated_expansion.dart';
+import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/reader_text_size_control.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/theme/quran_theme_cubit.dart';
 import '../../../../core/theme/quran_theme_state.dart';
 import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/app_sheet.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
 import '../../../quran/presentation/widgets/quran_translation_text.dart';
 
@@ -43,21 +47,26 @@ class LibraryTranslationBody extends StatelessWidget {
     required this.text,
     required this.themeState,
     this.resource,
+    this.languageCode,
   });
 
   final String text;
   final QuranThemeState themeState;
   final QuranTranslationResource? resource;
+  final String? languageCode;
 
   @override
   Widget build(BuildContext context) {
     return QuranTranslationText(
       text: text,
       resource: resource,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        fontSize: 15 * themeState.quranTranslationFontScale,
-        color: QuranTheme.subText(context, 0.82),
-        height: 1.48,
+      style: QuranTheme.translationStyle(
+        Theme.of(context).textTheme.bodyMedium?.copyWith(
+          fontSize: 15 * themeState.quranTranslationFontScale,
+          color: QuranTheme.subText(context, 0.82),
+          height: 1.48,
+        ),
+        languageCode ?? resource?.resolvedLanguageCode,
       ),
     );
   }
@@ -70,18 +79,13 @@ class LibraryTranslationUnavailable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: QuranTheme.surfaceVariant(context).withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
-        border: Border.all(color: QuranTheme.outline(context)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Text(
         'Translation not available in $languageLabel.',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
           color: QuranTheme.subText(context, 0.72),
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w400,
         ),
       ),
     );
@@ -110,72 +114,82 @@ class LibraryReaderActionBar extends StatelessWidget {
   final VoidCallback onSource;
   final VoidCallback onDetails;
 
+  static double bottomClearance(BuildContext context) =>
+      96 +
+      MediaQuery.textScalerOf(context).scale(14) * 1.4 +
+      MediaQuery.paddingOf(context).bottom;
+
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      radius: QuranTheme.radiusDock,
-      prominent: true,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
+    return SafeArea(
+      top: false,
+      child: PremiumSurface(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        radius: QuranTheme.radiusDock,
+        prominent: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontSize: 14,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _LibraryActionButton(
-                  tooltip: isBookmarked ? 'Remove save' : 'Save',
-                  icon: isBookmarked
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                  onTap: onBookmark,
-                ),
-                _LibraryActionButton(
-                  tooltip: 'Note',
-                  icon: Icons.edit_note_rounded,
-                  onTap: onNote,
-                ),
-                _LibraryActionButton(
-                  tooltip: 'Copy',
-                  icon: Icons.copy_rounded,
-                  onTap: onCopy,
-                ),
-                _LibraryActionButton(
-                  tooltip: 'Share',
-                  icon: Icons.ios_share_rounded,
-                  onTap: onShare,
-                ),
-                _LibraryActionButton(
-                  tooltip: 'Source',
-                  icon: Icons.info_outline_rounded,
-                  onTap: onSource,
-                ),
-                _LibraryActionButton(
-                  tooltip: 'Details',
-                  icon: Icons.more_horiz_rounded,
-                  onTap: onDetails,
-                ),
-              ],
+            const SizedBox(height: 4),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _LibraryActionButton(
+                    tooltip: isBookmarked ? 'Remove save' : 'Save',
+                    icon: isBookmarked
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    onTap: onBookmark,
+                  ),
+                  _LibraryActionButton(
+                    tooltip: 'Note',
+                    icon: Icons.edit_note_rounded,
+                    onTap: onNote,
+                  ),
+                  _LibraryActionButton(
+                    tooltip: 'Copy',
+                    icon: Icons.copy_rounded,
+                    onTap: onCopy,
+                  ),
+                  _LibraryActionButton(
+                    tooltip: 'Share',
+                    icon: Icons.ios_share_rounded,
+                    onTap: onShare,
+                  ),
+                  _LibraryActionButton(
+                    tooltip: 'Source',
+                    icon: Icons.info_outline_rounded,
+                    onTap: onSource,
+                  ),
+                  _LibraryActionButton(
+                    tooltip: 'Details',
+                    icon: Icons.more_horiz_rounded,
+                    onTap: onDetails,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class LibraryReaderSettingsSheet extends StatelessWidget {
+class LibraryReaderSettingsSheet extends StatefulWidget {
   const LibraryReaderSettingsSheet({
     super.key,
     required this.languageLabel,
@@ -198,148 +212,92 @@ class LibraryReaderSettingsSheet extends StatelessWidget {
   final ValueChanged<bool>? onExplanationChanged;
 
   @override
-  Widget build(BuildContext context) {
-    return PremiumSurface(
-      margin: const EdgeInsets.all(12),
-      radius: QuranTheme.radiusSheet,
-      prominent: true,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-      child: BlocBuilder<QuranThemeCubit, QuranThemeState>(
-        builder: (context, themeState) {
-          return SafeArea(
-            top: false,
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Reader settings',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Close',
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Translation'),
-                  subtitle: Text(languageLabel),
-                  value: showTranslation,
-                  onChanged: onTranslationChanged,
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.language_rounded),
-                  title: const Text('Translation language'),
-                  subtitle: Text(languageLabel),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: onLanguageTap,
-                ),
-                if (showTransliteration != null &&
-                    onTransliterationChanged != null)
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Transliteration'),
-                    value: showTransliteration!,
-                    onChanged: onTransliterationChanged,
-                  ),
-                if (showExplanation != null && onExplanationChanged != null)
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Explanation'),
-                    value: showExplanation!,
-                    onChanged: onExplanationChanged,
-                  ),
-                const SizedBox(height: 8),
-                _FontScaleControl(
-                  title: 'Arabic text size',
-                  value: themeState.quranArabicFontScale,
-                  onChanged: (value) => context
-                      .read<QuranThemeCubit>()
-                      .setQuranArabicFontScale(value),
-                ),
-                const SizedBox(height: 10),
-                _FontScaleControl(
-                  title: 'Translation text size',
-                  value: themeState.quranTranslationFontScale,
-                  onChanged: (value) => context
-                      .read<QuranThemeCubit>()
-                      .setQuranTranslationFontScale(value),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+  State<LibraryReaderSettingsSheet> createState() =>
+      _LibraryReaderSettingsSheetState();
 }
 
-class _FontScaleControl extends StatelessWidget {
-  const _FontScaleControl({
-    required this.title,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String title;
-  final double value;
-  final ValueChanged<double> onChanged;
+class _LibraryReaderSettingsSheetState
+    extends State<LibraryReaderSettingsSheet> {
+  late bool _translation = widget.showTranslation;
+  late bool _transliteration = widget.showTransliteration ?? false;
+  late bool _explanation = widget.showExplanation ?? false;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
-        border: Border.all(color: QuranTheme.outline(context)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    return AppSheet(
+      title: 'Reader settings',
+      child: BlocBuilder<QuranThemeCubit, QuranThemeState>(
+        builder: (context, themeState) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Translation'),
+                subtitle: Text(widget.languageLabel),
+                value: _translation,
+                onChanged: (value) {
+                  setState(() => _translation = value);
+                  widget.onTranslationChanged(value);
+                },
+              ),
+              AnimatedExpansion(
+                expanded: _translation,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const AppIcon(Icons.language_rounded),
+                  title: const Text('Translation language'),
+                  subtitle: Text(widget.languageLabel),
+                  trailing: const AppIcon(Icons.chevron_right_rounded),
+                  onTap: widget.onLanguageTap,
                 ),
               ),
-              Text('${(value * 100).round()}%'),
-            ],
-          ),
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => onChanged(value - 0.05),
-                icon: const Icon(Icons.remove_rounded),
+              if (widget.showTransliteration != null &&
+                  widget.onTransliterationChanged != null)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Transliteration'),
+                  value: _transliteration,
+                  onChanged: (value) {
+                    setState(() => _transliteration = value);
+                    widget.onTransliterationChanged!(value);
+                  },
+                ),
+              if (widget.showExplanation != null &&
+                  widget.onExplanationChanged != null)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Explanation'),
+                  value: _explanation,
+                  onChanged: (value) {
+                    setState(() => _explanation = value);
+                    widget.onExplanationChanged!(value);
+                  },
+                ),
+              const SizedBox(height: 8),
+              ReaderTextSizeControl(
+                title: 'Arabic text size',
+                value: themeState.quranArabicFontScale,
+                onChanged: (value) => context
+                    .read<QuranThemeCubit>()
+                    .setQuranArabicFontScale(value),
               ),
-              Expanded(
-                child: Slider(
-                  value: value.clamp(0.82, 1.42).toDouble(),
-                  min: 0.82,
-                  max: 1.42,
-                  divisions: 12,
-                  onChanged: onChanged,
+              AnimatedExpansion(
+                expanded: _translation,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: ReaderTextSizeControl(
+                    title: 'Translation text size',
+                    value: themeState.quranTranslationFontScale,
+                    onChanged: (value) => context
+                        .read<QuranThemeCubit>()
+                        .setQuranTranslationFontScale(value),
+                  ),
                 ),
               ),
-              IconButton(
-                onPressed: () => onChanged(value + 0.05),
-                icon: const Icon(Icons.add_rounded),
-              ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -361,7 +319,7 @@ class _LibraryActionButton extends StatelessWidget {
     return IconButton(
       tooltip: tooltip,
       onPressed: onTap,
-      icon: Icon(icon),
+      icon: AppIcon(icon),
       visualDensity: VisualDensity.compact,
     );
   }

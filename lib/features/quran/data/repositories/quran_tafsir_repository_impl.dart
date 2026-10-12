@@ -129,7 +129,8 @@ class QuranTafsirRepositoryImpl
       tafsir: tafsir.text,
     );
     return QuranTafsirResult(
-      resource: tafsir.resource.id == 0 ? resource : tafsir.resource,
+      // Verse responses omit language_name; retain the complete catalog metadata.
+      resource: resource,
       verseKey: verseKey,
       text: tafsir.text,
     );

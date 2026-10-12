@@ -70,8 +70,15 @@ class _SurahImageAvatarState extends State<SurahImageAvatar> {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    final imageUrl = SurahImageCatalog.imageUrlFor(widget.surahNumber);
     final cachedFile = _cachedFile;
+    final fallbackImage = Image.asset(
+      SurahImageCatalog.fallbackAssetPathFor(widget.surahNumber),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => _SurahImageFallbackBubble(
+        label: widget.fallbackLabel,
+        active: widget.active,
+      ),
+    );
     return Semantics(
       image: true,
       label: 'Surah ${widget.surahNumber} image',
@@ -87,25 +94,11 @@ class _SurahImageAvatarState extends State<SurahImageAvatar> {
         ),
         child: ClipOval(
           child: cachedFile == null
-              ? Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return _SurahImageFallbackBubble(
-                      label: widget.fallbackLabel,
-                      active: widget.active,
-                    );
-                  },
-                )
+              ? fallbackImage
               : Image.file(
                   cachedFile,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return _SurahImageFallbackBubble(
-                      label: widget.fallbackLabel,
-                      active: widget.active,
-                    );
-                  },
+                  errorBuilder: (context, error, stackTrace) => fallbackImage,
                 ),
         ),
       ),

@@ -21,6 +21,7 @@ class SettingsStore {
   static const _fontScaleKey = 'font_scale';
   static const _fontWeightScaleKey = 'font_weight_scale';
   static const _quranArabicFontScaleKey = 'quran_arabic_font_scale';
+  static const _quranArabicScriptKey = 'quran_arabic_script';
   static const _quranTranslationFontScaleKey = 'quran_translation_font_scale';
   static const _quranTranslationVisibleKey = 'quran_translation_visible';
   static const _libraryTranslationEnabledKey = 'library_translation_enabled';
@@ -67,6 +68,8 @@ class SettingsStore {
   static const _tasbiehCountKey = 'tasbieh_count';
   static const _tasbiehTargetKey = 'tasbieh_target';
   static const _tasbiehUpdatedAtKey = 'tasbieh_updated_at';
+  static const _homeTileIdsKey = 'home_tile_ids';
+  static const _homeCompanionTileIdsKey = 'home_companion_tile_ids';
 
   static Future<SettingsStore> open() async {
     await Hive.initFlutter();
@@ -75,10 +78,34 @@ class SettingsStore {
   }
 
   String get themeMode => _readString(_themeModeKey, 'light');
+  List<String>? get homeTileIds {
+    if (_read(_homeCompanionTileIdsKey) is List) {
+      return _readStringList(_homeCompanionTileIdsKey, const []);
+    }
+    if (_read(_homeTileIdsKey) is! List) return null;
+    // These cards were always visible below the legacy shortcut list.
+    return {
+      ..._readStringList(_homeTileIdsKey, const []),
+      'todayReadingGoal',
+      'dailyAyah',
+    }.toList(growable: false);
+  }
+
+  Future<void> setHomeTileIds(List<String> ids) =>
+      _write(_homeCompanionTileIdsKey, ids.toSet().toList(growable: false));
+  String? get lastVerseShareBackgroundImage =>
+      _readOptionalString('verse_share_background_image');
+  Future<void> setLastVerseShareBackgroundImage(String assetPath) =>
+      _write('verse_share_background_image', assetPath);
   String get themePresetId => _readString(_themePresetIdKey, 'white-glass');
   double get fontScale => _readDouble(_fontScaleKey, 1.0);
   double get fontWeightScale => _readDouble(_fontWeightScaleKey, 0.88);
   double get quranArabicFontScale => _readDouble(_quranArabicFontScaleKey, 1.0);
+  String get quranArabicScript => _readString(_quranArabicScriptKey, 'uthmani');
+  bool get hasManualArabicScript => _readBool(
+    'quran_arabic_script_manual',
+    _read(_quranArabicScriptKey) != null,
+  );
   double get quranTranslationFontScale =>
       _readDouble(_quranTranslationFontScaleKey, 1.0);
   bool get quranTranslationVisible =>
@@ -149,6 +176,8 @@ class SettingsStore {
       _readBool(_audioPlayTranslationEnabledKey, false);
   String get audioTranslationReciterId =>
       _readString(_audioTranslationReciterIdKey, '');
+  String translationVoiceForLanguage(String languageCode) =>
+      _readString('translation_voice:${languageCode.toLowerCase()}', '');
   Map<String, Object?> get audioRestoreState =>
       _readStringObjectMap(_audioRestoreStateKey);
   String get interlinearTranslationSkipVersion =>
@@ -171,6 +200,14 @@ class SettingsStore {
       _write(_fontWeightScaleKey, value);
   Future<void> setQuranArabicFontScale(double value) =>
       _write(_quranArabicFontScaleKey, value);
+  Future<void> setQuranArabicScript(
+    String value, {
+    bool automatic = false,
+  }) async {
+    await _write(_quranArabicScriptKey, value);
+    await _write('quran_arabic_script_manual', !automatic);
+  }
+
   Future<void> setQuranTranslationFontScale(double value) =>
       _write(_quranTranslationFontScaleKey, value);
   Future<void> setQuranTranslationVisible(bool value) =>
@@ -196,8 +233,27 @@ class SettingsStore {
 
   Future<void> setWordMeaningLanguageCode(String value) =>
       _write(_wordMeaningLanguageCodeKey, value);
-  Future<void> setAudioMeaningLanguageCode(String value) =>
-      _write(_audioMeaningLanguageCodeKey, value);
+  Future<void> setAudioMeaningLanguageCode(String value) async {
+    final code = value.trim().toLowerCase();
+    final previous = audioMeaningLanguageCodeOrNull;
+    if (previous == code) return;
+    if (previous != null && audioTranslationReciterId.isNotEmpty) {
+      await _write('translation_voice:$previous', audioTranslationReciterId);
+    }
+    await _write(_audioMeaningLanguageCodeKey, code);
+    final saved = translationVoiceForLanguage(code);
+    await _write(
+      _audioTranslationReciterIdKey,
+      code.isEmpty
+          ? ''
+          : saved.isNotEmpty
+          ? saved
+          : previous == null
+          ? audioTranslationReciterId
+          : '',
+    );
+  }
+
   Future<void> setHadithLanguageCode(String value) =>
       _write(_hadithLanguageCodeKey, value);
   Future<void> setAzkarLanguageCode(String value) =>
@@ -280,8 +336,16 @@ class SettingsStore {
   Future<void> setAudioPlayTranslationEnabled(bool value) =>
       _write(_audioPlayTranslationEnabledKey, value);
 
-  Future<void> setAudioTranslationReciterId(String value) =>
-      _write(_audioTranslationReciterIdKey, value);
+  Future<void> setAudioTranslationReciterId(
+    String value, {
+    String? languageCode,
+  }) async {
+    await _write(_audioTranslationReciterIdKey, value);
+    final code = languageCode ?? audioMeaningLanguageCodeOrNull;
+    if (code != null && value.isNotEmpty) {
+      await _write('translation_voice:${code.toLowerCase()}', value);
+    }
+  }
 
   Future<void> setAudioRestoreState(Map<String, Object?> value) =>
       _write(_audioRestoreStateKey, value);

@@ -1,11 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../library/data/stores/library_user_data_store.dart';
 import '../../domain/entities/zakat_calculation.dart';
@@ -133,26 +134,28 @@ class _ZakatPageState extends State<ZakatPage> {
     final pricesReady =
         _number(_goldPrice.text) > 0 && _number(_silverPrice.text) > 0;
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context).zakatTitle)),
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context).zakatTitle),
+        flexibleSpace: const ArchitecturalBackdrop(),
+      ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [
-          PremiumSurface(
-            padding: const EdgeInsets.all(20),
-            prominent: true,
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
                   'ZAKAT DUE • 2.5%',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   pricesReady ? _money(result.zakatDue) : 'Enter metal prices',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -190,7 +193,7 @@ class _ZakatPageState extends State<ZakatPage> {
               height: 1.45,
             ),
           ),
-          const SizedBox(height: 14),
+          const Divider(height: 32),
           _Section(
             title: 'Nisab assumptions',
             children: [
@@ -224,7 +227,7 @@ class _ZakatPageState extends State<ZakatPage> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Price date'),
                 subtitle: Text(DateFormat.yMMMd().format(_priceDate)),
-                trailing: const Icon(Icons.calendar_today_outlined),
+                trailing: const AppIcon(Icons.calendar_today_outlined),
                 onTap: () async {
                   final selected = await showDatePicker(
                     context: context,
@@ -232,7 +235,7 @@ class _ZakatPageState extends State<ZakatPage> {
                     firstDate: DateTime(2000),
                     lastDate: DateTime.now(),
                   );
-                  if (selected != null) {
+                  if (selected != null && mounted) {
                     setState(() => _priceDate = selected);
                     await _save();
                   }
@@ -242,11 +245,11 @@ class _ZakatPageState extends State<ZakatPage> {
                 segments: const [
                   ButtonSegment(
                     value: NisabBasis.silver,
-                    label: Text('Silver 612.36g'),
+                    label: Text('Silver\n612.36g', textAlign: TextAlign.center),
                   ),
                   ButtonSegment(
                     value: NisabBasis.gold,
-                    label: Text('Gold 87.48g'),
+                    label: Text('Gold\n87.48g', textAlign: TextAlign.center),
                   ),
                 ],
                 selected: {_basis},
@@ -257,7 +260,7 @@ class _ZakatPageState extends State<ZakatPage> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const Divider(height: 32),
           _Section(
             title: 'Zakatable assets',
             children: [
@@ -270,13 +273,14 @@ class _ZakatPageState extends State<ZakatPage> {
                   decoration: InputDecoration(
                     labelText: category.label,
                     helperText: category.hint,
+                    helperMaxLines: 4,
                   ),
                 ),
                 const SizedBox(height: 10),
               ],
             ],
           ),
-          const SizedBox(height: 14),
+          const Divider(height: 32),
           _Section(
             title: 'Deductions',
             children: [
@@ -292,10 +296,10 @@ class _ZakatPageState extends State<ZakatPage> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const Divider(height: 32),
           OutlinedButton.icon(
             onPressed: _reset,
-            icon: const Icon(Icons.restart_alt_rounded),
+            icon: const AppIcon(Icons.restart_alt_rounded),
             label: const Text('Reset amounts'),
           ),
         ],
@@ -341,10 +345,12 @@ class _ResultRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
-      child: Row(
+      child: Wrap(
+        spacing: 12,
+        alignment: WrapAlignment.spaceBetween,
         children: [
-          Expanded(child: Text(label)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+          Text(label),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -359,8 +365,8 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -368,7 +374,7 @@ class _Section extends StatelessWidget {
             title,
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
           ...children,

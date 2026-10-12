@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 
 import '../../../../core/theme/quran_theme.dart';
+import '../../../../core/widgets/app_sheet.dart';
 import '../../../quran/domain/entities/quran_audio_reciter.dart';
 
 Future<QuranAudioReciter?> showQuranReciterPickerSheet(
@@ -55,133 +57,65 @@ class _QuranReciterPickerSheetState extends State<QuranReciterPickerSheet> {
         .where((reciter) => _matchesQuery(reciter, query))
         .toList(growable: false);
     final primary = Theme.of(context).colorScheme.primary;
-    return SafeArea(
-      top: false,
-      child: FractionallySizedBox(
-        heightFactor: 0.86,
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.18),
-                blurRadius: 30,
-                offset: const Offset(0, -10),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              18,
-              10,
-              18,
-              18 + MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Column(
-              children: [
-                Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: QuranTheme.outline(context),
-                    borderRadius: BorderRadius.circular(QuranTheme.radiusPill),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: QuranTheme.softFill(context, primary),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Icon(
-                        Icons.record_voice_over_rounded,
-                        color: primary,
-                      ),
+    return AppSheet(
+      title: widget.title,
+      subtitle: '${widget.reciters.length} reciters',
+      scrollableChild: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: 'Search reciters',
+              prefixIcon: const AppIcon(Icons.search_rounded),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear',
+                      onPressed: () {
+                        _controller.clear();
+                        setState(() {});
+                      },
+                      icon: const AppIcon(Icons.close_rounded),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.title,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w900),
-                          ),
-                          Text(
-                            '${widget.reciters.length} reciters available',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: QuranTheme.subText(context)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton.filledTonal(
-                      tooltip: 'Close',
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _controller,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Search reciters',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: query.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear',
-                            onPressed: () {
-                              _controller.clear();
-                              setState(() {});
-                            },
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                    filled: true,
-                    fillColor: QuranTheme.softFill(context, primary),
-                    border: _searchBorder(context),
-                    enabledBorder: _searchBorder(context),
-                    focusedBorder: _searchBorder(context, primary),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Expanded(
-                  child: reciters.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No reciters found',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: QuranTheme.subText(context)),
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: EdgeInsets.zero,
-                          itemCount: reciters.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final reciter = reciters[index];
-                            return QuranReciterPickerTile(
-                              reciter: reciter,
-                              selected: reciter.id == widget.selectedReciterId,
-                              onTap: () => Navigator.of(context).pop(reciter),
-                            );
-                          },
-                        ),
-                ),
-              ],
+              filled: true,
+              fillColor: QuranTheme.softFill(context, primary),
+              border: _searchBorder(context),
+              enabledBorder: _searchBorder(context),
+              focusedBorder: _searchBorder(context, primary),
             ),
           ),
-        ),
+          const SizedBox(height: 14),
+          Flexible(
+            child: reciters.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'No reciters found',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: QuranTheme.subText(context),
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemCount: reciters.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final reciter = reciters[index];
+                      return QuranReciterPickerTile(
+                        reciter: reciter,
+                        selected: reciter.id == widget.selectedReciterId,
+                        onTap: () => Navigator.of(context).pop(reciter),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
@@ -226,33 +160,18 @@ class QuranReciterPickerTile extends StatelessWidget {
       color: selected
           ? QuranTheme.softFill(context, primary)
           : Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(QuranTheme.radiusCard),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(QuranTheme.radiusCard),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: selected
-                  ? primary.withValues(alpha: 0.34)
-                  : QuranTheme.outline(context),
-            ),
-            boxShadow: [
-              if (!selected)
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 14,
-                  offset: const Offset(0, 7),
-                ),
-            ],
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           child: Row(
             children: [
               QuranReciterAvatar(
                 reciter: reciter,
-                size: 56,
+                size: 44,
                 selected: selected,
               ),
               const SizedBox(width: 12),
@@ -265,7 +184,7 @@ class QuranReciterPickerTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     if (reciter.arabicName != null) ...[
@@ -311,12 +230,12 @@ class QuranReciterPickerTile extends StatelessWidget {
                   ),
                 ),
                 child: selected
-                    ? Icon(
+                    ? AppIcon(
                         Icons.check_rounded,
                         color: Theme.of(context).colorScheme.onPrimary,
                         size: 20,
                       )
-                    : Icon(
+                    : AppIcon(
                         Icons.chevron_right_rounded,
                         color: QuranTheme.subText(context),
                         size: 22,
@@ -362,13 +281,6 @@ class QuranReciterAvatar extends StatelessWidget {
         border: Border.all(
           color: selected ? primary : QuranTheme.outline(context),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: selected ? 0.10 : 0.06),
-            blurRadius: selected ? 16 : 12,
-            offset: const Offset(0, 7),
-          ),
-        ],
       ),
       child: ClipOval(
         child: url == null
@@ -443,7 +355,7 @@ class QuranReciterMetaChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: QuranTheme.subText(context)),
+          AppIcon(icon, size: 15, color: QuranTheme.subText(context)),
           const SizedBox(width: 5),
           Text(
             label,

@@ -64,6 +64,7 @@ class _QuranAppView extends StatelessWidget {
         final theme = QuranTheme.buildTheme(
           preset: preset,
           fontWeightScale: themeState.fontWeightScale,
+          arabicScript: themeState.quranArabicScript,
         );
 
         return BlocBuilder<LocaleCubit, LocaleState>(

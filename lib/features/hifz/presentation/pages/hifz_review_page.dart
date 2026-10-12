@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../quran/domain/entities/quran_audio_reciter.dart';
 import '../../../quran/domain/entities/quran_ayah.dart';
 import '../../../quran/domain/entities/quran_surah.dart';
@@ -116,11 +117,14 @@ class _HifzReviewPageState extends State<HifzReviewPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hifz review'),
+        flexibleSpace: const ArchitecturalBackdrop(),
         actions: [
           if (_cards.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('${_index + 1}/${_cards.length}'),
+              child: Text(
+                '${(_index + 1).clamp(1, _cards.length)}/${_cards.length}',
+              ),
             ),
         ],
       ),
@@ -142,11 +146,10 @@ class _HifzReviewPageState extends State<HifzReviewPage> {
     final ayah = _ayah!;
     final firstWord = ayah.text.trim().split(RegExp(r'\s+')).first;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
       children: [
-        PremiumSurface(
-          prominent: true,
-          padding: const EdgeInsets.all(20),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -169,50 +172,42 @@ class _HifzReviewPageState extends State<HifzReviewPage> {
                         style: Theme.of(context).textTheme.headlineMedium
                             ?.copyWith(height: 2, fontWeight: FontWeight.w700),
                       )
-                    : Container(
+                    : ConstrainedBox(
                         key: const ValueKey('hidden'),
-                        height: 150,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: QuranTheme.surfaceVariant(
-                            context,
-                          ).withValues(alpha: 0.58),
-                          borderRadius: BorderRadius.circular(
-                            QuranTheme.radiusCard,
+                        constraints: const BoxConstraints(minHeight: 180),
+                        child: Center(
+                          child: Text(
+                            _hint ? firstWord : 'Recite from memory',
+                            textAlign: TextAlign.center,
+                            textDirection: _hint ? TextDirection.rtl : null,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(color: QuranTheme.subText(context)),
                           ),
-                        ),
-                        child: Text(
-                          _hint ? firstWord : 'Recite from memory',
-                          textDirection: _hint ? TextDirection.rtl : null,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w900),
                         ),
                       ),
               ),
               const SizedBox(height: 18),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => setState(() => _hint = true),
-                      icon: const Icon(Icons.lightbulb_outline_rounded),
-                      label: const Text('First word'),
-                    ),
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() => _hint = true),
+                    icon: const AppIcon(Icons.lightbulb_outline_rounded),
+                    label: const Text('First word'),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: () => setState(() => _revealed = true),
-                      icon: const Icon(Icons.visibility_rounded),
-                      label: const Text('Reveal'),
-                    ),
+                  FilledButton.icon(
+                    onPressed: () => setState(() => _revealed = true),
+                    icon: const AppIcon(Icons.visibility_rounded),
+                    label: const Text('Reveal'),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _playRepeated,
-                icon: const Icon(Icons.repeat_rounded),
+                icon: const AppIcon(Icons.repeat_rounded),
                 label: const Text('Play 3 times'),
               ),
             ],
@@ -225,7 +220,7 @@ class _HifzReviewPageState extends State<HifzReviewPage> {
             textAlign: TextAlign.center,
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -235,22 +230,18 @@ class _HifzReviewPageState extends State<HifzReviewPage> {
             children: [
               _RatingButton(
                 label: 'Again',
-                color: Theme.of(context).colorScheme.error,
                 onTap: () => _rate(HifzReviewRating.again),
               ),
               _RatingButton(
                 label: 'Hard',
-                color: Colors.orange,
                 onTap: () => _rate(HifzReviewRating.hard),
               ),
               _RatingButton(
                 label: 'Good',
-                color: Theme.of(context).colorScheme.primary,
                 onTap: () => _rate(HifzReviewRating.good),
               ),
               _RatingButton(
                 label: 'Easy',
-                color: Colors.green,
                 onTap: () => _rate(HifzReviewRating.easy),
               ),
             ],
@@ -302,23 +293,14 @@ class _HifzReviewPageState extends State<HifzReviewPage> {
 }
 
 class _RatingButton extends StatelessWidget {
-  const _RatingButton({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
+  const _RatingButton({required this.label, required this.onTap});
 
   final String label;
-  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton(
-      style: FilledButton.styleFrom(backgroundColor: color),
-      onPressed: onTap,
-      child: Text(label),
-    );
+    return OutlinedButton(onPressed: onTap, child: Text(label));
   }
 }
 
@@ -335,7 +317,7 @@ class _ReviewComplete extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            AppIcon(
               Icons.check_circle_rounded,
               size: 58,
               color: Theme.of(context).colorScheme.primary,
@@ -345,7 +327,7 @@ class _ReviewComplete extends StatelessWidget {
               reviewedCount == 0 ? 'Nothing due' : 'Review complete',
               style: Theme.of(
                 context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             Text('$reviewedCount verses reviewed'),

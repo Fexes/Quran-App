@@ -31,6 +31,8 @@ class QuranAudioHandler extends BaseAudioHandler
   final AudioPlayer _player = AudioPlayer();
   List<QuranAudioQueueItem> _items = const [];
   final Map<int, String?> _artworkUriBySurah = {};
+  int _loadRevision = 0;
+  int _transportRevision = 0;
 
   @override
   Stream<Duration> get positionStream => _player.positionStream;
@@ -57,11 +59,18 @@ class QuranAudioHandler extends BaseAudioHandler
   Future<void> loadAndPlay(
     List<QuranAudioQueueItem> items, {
     int startIndex = 0,
+    Duration initialPosition = Duration.zero,
+    bool autoPlay = true,
   }) async {
     if (items.isEmpty) {
       return;
     }
-    _items = List.unmodifiable(await _withSurahArtwork(items));
+    final loadRevision = ++_loadRevision;
+    final transportRevision = _transportRevision;
+    if (!autoPlay) await _player.pause();
+    final prepared = await _withSurahArtwork(items);
+    if (loadRevision != _loadRevision) return;
+    _items = List.unmodifiable(prepared);
     final mediaItems = _items.map((item) => item.toMediaItem()).toList();
     queue.add(mediaItems);
     mediaItem.add(mediaItems[startIndex.clamp(0, mediaItems.length - 1)]);
@@ -70,11 +79,21 @@ class QuranAudioHandler extends BaseAudioHandler
       for (final item in _items)
         AudioSource.uri(Uri.parse(item.playbackUri), tag: item.toMediaItem()),
     ];
-    await _player.setAudioSources(
-      sources,
-      initialIndex: startIndex.clamp(0, sources.length - 1),
-    );
-    await play();
+    try {
+      await _player.setAudioSources(
+        sources,
+        initialIndex: startIndex.clamp(0, sources.length - 1),
+        initialPosition: initialPosition,
+      );
+    } on PlayerInterruptedException {
+      if (loadRevision != _loadRevision) return;
+      rethrow;
+    }
+    if (loadRevision == _loadRevision &&
+        transportRevision == _transportRevision &&
+        autoPlay) {
+      await play();
+    }
   }
 
   Future<List<QuranAudioQueueItem>> _withSurahArtwork(
@@ -91,7 +110,7 @@ class QuranAudioHandler extends BaseAudioHandler
 
   Future<String?> _localArtworkUriFor(QuranAudioQueueItem item) async {
     final cached = _artworkUriBySurah[item.surahNumber];
-    if (_artworkUriBySurah.containsKey(item.surahNumber)) {
+    if (cached != null) {
       return cached;
     }
 
@@ -105,7 +124,6 @@ class QuranAudioHandler extends BaseAudioHandler
     }
     final uri = Uri.tryParse(imageUrl);
     final artworkUri = uri == null || !uri.hasScheme ? null : imageUrl;
-    _artworkUriBySurah[item.surahNumber] = artworkUri;
     return artworkUri;
   }
 
@@ -115,13 +133,22 @@ class QuranAudioHandler extends BaseAudioHandler
   }
 
   @override
-  Future<void> play() => _player.play();
+  Future<void> play() async {
+    _transportRevision++;
+    // just_audio's play future completes at the end of playback, not on start.
+    unawaited(_player.play().catchError(_broadcastPlaybackError));
+  }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> pause() {
+    _transportRevision++;
+    return _player.pause();
+  }
 
   @override
   Future<void> stop() async {
+    _loadRevision++;
+    _transportRevision++;
     await _player.stop();
     _items = const [];
     queue.add(const []);
@@ -200,6 +227,7 @@ class QuranAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> dispose() {
+    _loadRevision++;
     return _player.dispose();
   }
 }

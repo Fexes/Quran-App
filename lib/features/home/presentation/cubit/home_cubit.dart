@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../prayer_times/domain/repositories/prayer_times_repository.dart';
@@ -15,24 +16,72 @@ class HomeCubit extends Cubit<HomeState> {
     required PrayerTimesRepository prayerTimesRepository,
     QuranTranslationRepository? translationRepository,
     ReadingProgressRepository? readingProgressRepository,
+    Listenable? lastReadChanges,
     DailyAyahService dailyAyahService = const DailyAyahService(),
     DateTime Function()? now,
   }) : _quranRepository = quranRepository,
        _prayerTimesRepository = prayerTimesRepository,
        _translationRepository = translationRepository,
        _readingProgressRepository = readingProgressRepository,
+       _lastReadChanges = lastReadChanges,
        _dailyAyahService = dailyAyahService,
        _now = now ?? DateTime.now,
-       super(const HomeState.initial());
+       super(const HomeState.initial()) {
+    _lastReadChanges?.addListener(refreshLastRead);
+  }
 
   final QuranRepository _quranRepository;
   final PrayerTimesRepository _prayerTimesRepository;
   final QuranTranslationRepository? _translationRepository;
   final ReadingProgressRepository? _readingProgressRepository;
+  final Listenable? _lastReadChanges;
   final DailyAyahService _dailyAyahService;
   final DateTime Function() _now;
+  int _lastReadRevision = 0;
+
+  Future<void> refreshLastRead() async {
+    if (isClosed) return;
+    final revision = ++_lastReadRevision;
+    try {
+      final lastRead = await _quranRepository.getLastRead();
+      final surah = lastRead == null
+          ? null
+          : state.lastReadSurah?.number == lastRead.surahNumber
+          ? state.lastReadSurah
+          : await _quranRepository.getSurah(lastRead.surahNumber);
+      if (isClosed || revision != _lastReadRevision) return;
+      emit(
+        state.copyWith(
+          lastRead: lastRead,
+          lastReadSurah: surah,
+          clearLastRead: lastRead == null,
+          prayerErrorMessage: state.prayerErrorMessage,
+          dailyAyahErrorMessage: state.dailyAyahErrorMessage,
+          errorMessage: state.errorMessage,
+        ),
+      );
+    } catch (_) {
+      if (isClosed || revision != _lastReadRevision) return;
+      emit(
+        state.copyWith(
+          readingErrorMessage: 'Your reading position could not be refreshed.',
+          prayerErrorMessage: state.prayerErrorMessage,
+          dailyAyahErrorMessage: state.dailyAyahErrorMessage,
+          errorMessage: state.errorMessage,
+        ),
+      );
+    }
+  }
+
+  @override
+  Future<void> close() {
+    _lastReadChanges?.removeListener(refreshLastRead);
+    return super.close();
+  }
 
   Future<void> load() async {
+    if (isClosed) return;
+    final lastReadRevision = ++_lastReadRevision;
     final previous = state;
     emit(
       HomeState(
@@ -82,10 +131,12 @@ class HomeCubit extends Cubit<HomeState> {
       }(),
       () async {
         try {
-          lastRead = await _quranRepository.getLastRead();
-          lastReadSurah = lastRead == null
+          final position = await _quranRepository.getLastRead();
+          final surah = position == null
               ? null
-              : await _quranRepository.getSurah(lastRead!.surahNumber);
+              : await _quranRepository.getSurah(position.surahNumber);
+          lastRead = position;
+          lastReadSurah = surah;
         } catch (error) {
           readingError = 'Your reading position could not be refreshed.';
           details.add('Last read: $error');
@@ -107,6 +158,12 @@ class HomeCubit extends Cubit<HomeState> {
 
     if (isClosed) {
       return;
+    }
+    // A live save wins over a dashboard refresh that started earlier.
+    if (lastReadRevision != _lastReadRevision) {
+      lastRead = state.lastRead;
+      lastReadSurah = state.lastReadSurah;
+      readingError = state.readingErrorMessage;
     }
     final allFailed =
         prayerError != null && readingError != null && dailyAyahError != null;

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/quran_theme.dart';
 
-enum PremiumSurfaceShadowStyle { regular, subtle, none }
+enum PremiumSurfaceShadowStyle { regular, subtle, floating, none }
 
 class PremiumSurfaceShadowScope extends InheritedWidget {
   const PremiumSurfaceShadowScope({
@@ -35,12 +35,14 @@ class PremiumSurface extends StatelessWidget {
     this.radius = QuranTheme.radiusCard,
     this.color,
     this.borderColor,
+    this.borderWidth = 1,
+    this.showBorder = true,
     this.prominent = false,
     this.clipBehavior = Clip.antiAlias,
     this.width,
     this.height,
     this.shadowStyle,
-  });
+  }) : assert(borderWidth >= 0);
 
   final Widget child;
   final VoidCallback? onTap;
@@ -49,6 +51,8 @@ class PremiumSurface extends StatelessWidget {
   final double radius;
   final Color? color;
   final Color? borderColor;
+  final double borderWidth;
+  final bool showBorder;
   final bool prominent;
   final Clip clipBehavior;
   final double? width;
@@ -58,13 +62,36 @@ class PremiumSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderRadius = BorderRadius.circular(radius);
-    final content = Padding(padding: padding, child: child);
     final effectiveBorder = borderColor ?? QuranTheme.outline(context);
+    final hasBorder =
+        showBorder && (borderColor != null || prominent || onTap != null);
+    final shape = RoundedRectangleBorder(
+      borderRadius: borderRadius,
+      side: hasBorder
+          ? BorderSide(color: effectiveBorder, width: borderWidth)
+          : BorderSide.none,
+    );
+    // Keep the inset previously supplied by the decorated container's border.
+    final content = Padding(
+      padding: padding.add(shape.dimensions),
+      child: child,
+    );
     final effectiveShadowStyle =
         shadowStyle ??
         PremiumSurfaceShadowScope.maybeOf(context) ??
-        PremiumSurfaceShadowStyle.regular;
+        (prominent
+            ? PremiumSurfaceShadowStyle.regular
+            : PremiumSurfaceShadowStyle.none);
     final shadows = switch (effectiveShadowStyle) {
+      PremiumSurfaceShadowStyle.floating => [
+        BoxShadow(
+          color: Colors.black.withValues(
+            alpha: QuranTheme.isDark(context) ? 0.38 : 0.18,
+          ),
+          blurRadius: 20,
+          offset: const Offset(0, 5),
+        ),
+      ],
       PremiumSurfaceShadowStyle.regular => QuranTheme.premiumShadow(
         context,
         prominent: prominent,
@@ -77,32 +104,24 @@ class PremiumSurface extends StatelessWidget {
       PremiumSurfaceShadowStyle.none => const <BoxShadow>[],
     };
 
-    return Container(
-      width: width,
-      height: height,
-      margin: margin,
-      decoration: BoxDecoration(
-        color: color ?? QuranTheme.surface(context),
-        borderRadius: borderRadius,
-        border: Border.all(color: effectiveBorder),
-        boxShadow: shadows,
-      ),
-      foregroundDecoration: BoxDecoration(
-        borderRadius: borderRadius,
-        border: Border.all(
-          color: Colors.white.withValues(
-            alpha: borderColor == null
-                ? (QuranTheme.isDark(context) ? 0.06 : 0.46)
-                : (QuranTheme.isDark(context) ? 0.04 : 0.18),
-          ),
+    return PremiumSurfaceShadowScope(
+      style: PremiumSurfaceShadowStyle.none,
+      child: Container(
+        width: width,
+        height: height,
+        margin: margin,
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          boxShadow: shadows,
         ),
-      ),
-      clipBehavior: clipBehavior,
-      child: Material(
-        color: Colors.transparent,
-        child: onTap == null
-            ? content
-            : InkWell(onTap: onTap, borderRadius: borderRadius, child: content),
+        child: Material(
+          color: color ?? QuranTheme.surface(context),
+          shape: shape,
+          clipBehavior: clipBehavior,
+          child: onTap == null
+              ? content
+              : InkWell(onTap: onTap, customBorder: shape, child: content),
+        ),
       ),
     );
   }

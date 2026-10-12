@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_icon.dart';
 
 import '../theme/quran_theme.dart';
 import 'premium_surface.dart';
@@ -40,7 +41,7 @@ class FeatureCard extends StatelessWidget {
                 color: QuranTheme.softFill(context, effectiveAccent),
                 borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
               ),
-              child: Icon(icon, color: effectiveAccent, size: 21),
+              child: AppIcon(icon, color: effectiveAccent, size: 21),
             ),
             const SizedBox(height: 16),
             Text(

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground>
+        <!-- Keep the cover and bookmark inside the circular safe area. -->
+        <inset android:inset="20%">
+            <bitmap
+                android:src="@drawable/ic_launcher_artwork"
+                android:gravity="fill"
+                android:filter="true" />
+        </inset>
+    </foreground>
+</adaptive-icon>

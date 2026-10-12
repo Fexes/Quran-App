@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 
 import '../../domain/entities/prayer_time_entry.dart';
 
@@ -50,7 +51,7 @@ class PrayerTimeImage extends StatelessWidget {
               cacheHeight: 384,
               gaplessPlayback: true,
               excludeFromSemantics: true,
-              errorBuilder: (context, error, stackTrace) => Icon(
+              errorBuilder: (context, error, stackTrace) => AppIcon(
                 _fallbackIconFor(name),
                 color: fallbackColor,
                 size: size * 0.72,

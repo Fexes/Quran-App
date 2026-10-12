@@ -1,5 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/constants/quran_arabic_script.dart';
+import 'quran_ayah.dart';
+
 class QuranWord extends Equatable {
   const QuranWord({
     required this.verseKey,
@@ -30,6 +33,41 @@ class QuranWord extends Equatable {
   final String translation;
   final int page;
   final int lineNumber;
+
+  static List<QuranWord> forAyahText(
+    QuranAyah ayah,
+    List<QuranWord> words,
+    QuranArabicScript script,
+  ) {
+    if (words.isEmpty) return const [];
+    final display = QuranArabicScript.wordSpans(ayah.textForScript(script));
+    final byPosition = {for (final word in words) word.wordIndex: word};
+    final isIndoPak =
+        script == QuranArabicScript.indoPak && ayah.indoPakText != null;
+    final positions = isIndoPak
+        ? ayah.indoPakWordPositions
+        : List.generate(display.length, (index) => index + 1);
+    // Never attach meanings to a mismatched canonical word sequence.
+    final aligned =
+        positions.length == display.length &&
+        (isIndoPak ||
+            (byPosition.length == display.length &&
+                positions.every(byPosition.containsKey)));
+    return [
+      for (var index = 0; index < display.length; index++)
+        QuranWord(
+          verseKey: ayah.verseKey,
+          ayahNumber: ayah.number,
+          wordIndex: index + 1,
+          arabicText: display[index].trimRight(),
+          translation: aligned
+              ? byPosition[positions[index]]?.translation ?? ''
+              : '',
+          page: ayah.page,
+          lineNumber: words.first.lineNumber,
+        ),
+    ];
+  }
 
   Map<String, Object> toJson() {
     return {

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/content/content_source.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../azkar/domain/entities/azkar_category.dart';
 import '../../../azkar/domain/entities/dhikr_item.dart';
@@ -49,7 +50,10 @@ class _DuasPageState extends State<DuasPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context).duasTitle)),
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context).duasTitle),
+        flexibleSpace: const ArchitecturalBackdrop(),
+      ),
       body: FutureBuilder<_DuaData>(
         future: _future,
         builder: (context, snapshot) {
@@ -57,7 +61,7 @@ class _DuasPageState extends State<DuasPage> {
             return Center(
               child: FilledButton.icon(
                 onPressed: () => setState(() => _future = _load()),
-                icon: const Icon(Icons.refresh_rounded),
+                icon: const AppIcon(Icons.refresh_rounded),
                 label: const Text('Retry loading Duas'),
               ),
             );
@@ -65,6 +69,9 @@ class _DuasPageState extends State<DuasPage> {
           final data = snapshot.data;
           if (data == null) {
             return const Center(child: CircularProgressIndicator());
+          }
+          if (data.items.isEmpty) {
+            return const Center(child: Text('No Duas available.'));
           }
           final normalized = _query.trim().toLowerCase();
           final visible = data.items
@@ -91,84 +98,107 @@ class _DuasPageState extends State<DuasPage> {
                       .inDays
                       .abs() %
                   data.items.length];
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
-            children: [
-              _FeaturedDua(item: featured),
-              const SizedBox(height: 14),
-              TextField(
-                onChanged: (value) => setState(() => _query = value),
-                decoration: const InputDecoration(
-                  hintText: 'Search title, Arabic, meaning, or reference',
-                  prefixIcon: Icon(Icons.search_rounded),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                sliver: SliverList.list(
                   children: [
-                    ChoiceChip(
-                      selected: _category == null && !_favoritesOnly,
-                      label: const Text('All'),
-                      onSelected: (_) => setState(() {
-                        _category = null;
-                        _favoritesOnly = false;
-                      }),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      selected: _favoritesOnly,
-                      label: const Text('Favorites'),
-                      onSelected: (_) => setState(() {
-                        _category = null;
-                        _favoritesOnly = true;
-                      }),
-                    ),
-                    for (final category in data.categories) ...[
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        selected: _category == category.id,
-                        label: Text(category.englishName),
-                        onSelected: (_) => setState(() {
-                          _category = category.id;
-                          _favoritesOnly = false;
-                        }),
+                    TextField(
+                      onChanged: (value) => setState(() => _query = value),
+                      decoration: const InputDecoration(
+                        hintText: 'Search title, Arabic, meaning, or reference',
+                        prefixIcon: AppIcon(Icons.search_rounded),
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 10),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ChoiceChip(
+                            selected: _category == null && !_favoritesOnly,
+                            label: const Text('All'),
+                            onSelected: (_) => setState(() {
+                              _category = null;
+                              _favoritesOnly = false;
+                            }),
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            selected: _favoritesOnly,
+                            label: const Text('Favorites'),
+                            onSelected: (_) => setState(() {
+                              _category = null;
+                              _favoritesOnly = true;
+                            }),
+                          ),
+                          for (final category in data.categories) ...[
+                            const SizedBox(width: 8),
+                            ChoiceChip(
+                              selected: _category == category.id,
+                              label: Text(category.englishName),
+                              onSelected: (_) => setState(() {
+                                _category = category.id;
+                                _favoritesOnly = false;
+                              }),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _FeaturedDua(item: featured),
+                    const Divider(height: 28),
+                    if (visible.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(30),
+                        child: Center(child: Text('No matching Duas.')),
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              if (visible.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(30),
-                  child: Center(child: Text('No matching Duas.')),
-                )
-              else
-                for (final item in visible)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _DuaCard(
-                      item: item,
-                      favorite: _userData.isBookmarked('dua:${item.id}'),
-                      onFavorite: () async {
-                        await _userData.toggleBookmark('dua:${item.id}');
-                        if (mounted) {
-                          setState(() {});
-                        }
-                      },
-                    ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList.builder(
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final item = visible[index];
+                    return Padding(
+                      key: ValueKey(item.id),
+                      padding: const EdgeInsets.only(bottom: 18),
+                      child: _DuaCard(
+                        item: item,
+                        favorite: _userData.isBookmarked('dua:${item.id}'),
+                        onFavorite: () async {
+                          await _userData.toggleBookmark('dua:${item.id}');
+                          if (mounted) {
+                            setState(() {});
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+                sliver: SliverToBoxAdapter(
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: const Text('Source and attribution'),
+                    children: [
+                      Text(
+                        data.sources.isEmpty
+                            ? 'Each entry displays its supplied reference.'
+                            : 'Source: ${data.sources.first.name}. '
+                                  '${data.sources.first.attribution}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: QuranTheme.subText(context, 0.62),
+                        ),
+                      ),
+                    ],
                   ),
-              const SizedBox(height: 8),
-              Text(
-                data.sources.isEmpty
-                    ? 'Each entry displays its supplied reference.'
-                    : 'Source: ${data.sources.first.name}. '
-                          '${data.sources.first.attribution}',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: QuranTheme.subText(context, 0.62),
                 ),
               ),
             ],
@@ -198,42 +228,34 @@ class _FeaturedDua extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(18),
-      prominent: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'DUA OF THE DAY',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-            ),
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(bottom: 12),
+      expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+      title: const Text('Dua of the day'),
+      leading: const AppIcon(Icons.wb_sunny_outlined),
+      children: [
+        const SizedBox(height: 12),
+        Text(
+          item.arabic,
+          textAlign: TextAlign.right,
+          textDirection: TextDirection.rtl,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            height: 1.8,
+            fontWeight: FontWeight.w700,
           ),
-          const SizedBox(height: 12),
-          Text(
-            item.arabic,
-            textAlign: TextAlign.right,
-            textDirection: TextDirection.rtl,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              height: 1.8,
-              fontWeight: FontWeight.w700,
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(item.translation),
+        const SizedBox(height: 8),
+        Text(
+          item.reference,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(height: 8),
-          Text(item.translation),
-          const SizedBox(height: 8),
-          Text(
-            item.reference,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -251,8 +273,8 @@ class _DuaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -261,13 +283,13 @@ class _DuaCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   item.title.isEmpty ? 'Supplication' : item.title,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
               IconButton(
                 tooltip: favorite ? 'Remove favorite' : 'Add favorite',
                 onPressed: onFavorite,
-                icon: Icon(
+                icon: AppIcon(
                   favorite
                       ? Icons.favorite_rounded
                       : Icons.favorite_border_rounded,
@@ -297,7 +319,7 @@ class _DuaCard extends StatelessWidget {
             '${item.reference} • Source ${item.sourceId}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

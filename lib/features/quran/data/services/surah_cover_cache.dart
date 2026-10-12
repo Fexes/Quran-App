@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/entities/surah_image_catalog.dart';
@@ -44,7 +45,29 @@ class SurahCoverCache {
     if (await _isUsable(file)) {
       return file;
     }
-    return _downloadCover(surahNumber, file);
+    final downloaded = await _downloadCover(surahNumber, file);
+    if (downloaded != null) {
+      return downloaded;
+    }
+
+    // Device media players need a file URI, not a Flutter asset path.
+    final tempFile = File('${file.path}.part');
+    try {
+      final data = await rootBundle.load(
+        SurahImageCatalog.fallbackAssetPathFor(surahNumber),
+      );
+      await file.parent.create(recursive: true);
+      await tempFile.writeAsBytes(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+        flush: true,
+      );
+      return await tempFile.rename(file.path);
+    } catch (_) {
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+      return null;
+    }
   }
 
   Future<File?> _downloadCover(int surahNumber, File destination) async {
@@ -59,9 +82,15 @@ class SurahCoverCache {
       if (await tempFile.exists()) {
         await tempFile.delete();
       }
-      final request = await _httpClient.getUrl(uri);
-      final response = await request.close();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      final request = await _httpClient
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 5));
+      final response = await request.close().timeout(
+        const Duration(seconds: 5),
+      );
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300 ||
+          response.headers.contentType?.primaryType != 'image') {
         await response.drain<void>();
         return null;
       }

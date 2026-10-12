@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -6,7 +7,7 @@ import '../../../../app/di/injection.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../domain/entities/mosque_place.dart';
 import '../../domain/repositories/mosque_locator_repository.dart';
@@ -34,19 +35,22 @@ class _MosqueLocatorPageState extends State<MosqueLocatorPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context).mosquesTitle)),
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context).mosquesTitle),
+        flexibleSpace: const ArchitecturalBackdrop(),
+      ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [
-          PremiumSurface(
-            padding: const EdgeInsets.all(16),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   'Search near ${_settings.prayerLocationName}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -64,12 +68,14 @@ class _MosqueLocatorPageState extends State<MosqueLocatorPage> {
                 ),
                 FilledButton.icon(
                   onPressed: () => _search(),
-                  icon: const Icon(Icons.search_rounded),
+                  icon: const AppIcon(Icons.search_rounded),
                   label: const Text('Search OpenStreetMap'),
                 ),
                 TextButton(
-                  onPressed: () =>
-                      context.push(AppRoutes.onboardingPath(edit: true)),
+                  onPressed: () async {
+                    await context.push(AppRoutes.onboardingPath(edit: true));
+                    if (mounted) setState(() => _future = null);
+                  },
                   child: const Text('Change saved prayer city'),
                 ),
               ],
@@ -91,8 +97,8 @@ class _MosqueLocatorPageState extends State<MosqueLocatorPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return PremiumSurface(
-                    padding: const EdgeInsets.all(16),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Column(
                       children: [
                         const Text(
@@ -103,7 +109,7 @@ class _MosqueLocatorPageState extends State<MosqueLocatorPage> {
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
                           onPressed: _openAreaMap,
-                          icon: const Icon(Icons.open_in_new_rounded),
+                          icon: const AppIcon(Icons.open_in_new_rounded),
                           label: const Text('Open map search'),
                         ),
                       ],
@@ -112,8 +118,8 @@ class _MosqueLocatorPageState extends State<MosqueLocatorPage> {
                 }
                 final places = snapshot.data ?? const [];
                 if (places.isEmpty) {
-                  return PremiumSurface(
-                    padding: const EdgeInsets.all(16),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Column(
                       children: [
                         const Text(
@@ -133,33 +139,13 @@ class _MosqueLocatorPageState extends State<MosqueLocatorPage> {
                 return Column(
                   children: [
                     for (final place in places)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 9),
-                        child: PremiumSurface(
-                          onTap: () => _openPlace(place),
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.mosque_outlined),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      place.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    Text(_distanceLabel(place.distanceMeters)),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Icons.open_in_new_rounded),
-                            ],
-                          ),
-                        ),
+                      ListTile(
+                        onTap: () => _openPlace(place),
+                        contentPadding: EdgeInsets.zero,
+                        leading: const AppIcon(Icons.mosque_outlined),
+                        title: Text(place.name),
+                        subtitle: Text(_distanceLabel(place.distanceMeters)),
+                        trailing: const AppIcon(Icons.open_in_new_rounded),
                       ),
                   ],
                 );

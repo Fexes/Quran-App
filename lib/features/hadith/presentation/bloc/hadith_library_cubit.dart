@@ -15,7 +15,7 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
   var _searchRequestId = 0;
 
   Future<void> load() async {
-    _searchRequestId++;
+    final requestId = ++_searchRequestId;
     emit(
       state.copyWith(
         status: HadithLibraryStatus.loading,
@@ -27,6 +27,9 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
     try {
       final sources = await _repository.getContentSources();
       final books = await _repository.getBooks();
+      if (requestId != _searchRequestId) {
+        return;
+      }
       emit(
         HadithLibraryState(
           status: books.isEmpty
@@ -40,6 +43,9 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
         ),
       );
     } catch (error) {
+      if (requestId != _searchRequestId) {
+        return;
+      }
       emit(
         state.copyWith(
           status: HadithLibraryStatus.failure,
@@ -197,7 +203,7 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
     String? chapterId,
     String? languageCode,
   }) async {
-    _searchRequestId++;
+    final requestId = ++_searchRequestId;
     emit(
       state.copyWith(
         status: HadithLibraryStatus.loading,
@@ -205,6 +211,9 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
         selectedChapterId: chapterId,
         selectedTranslationLanguageCode: languageCode,
         query: '',
+        hadiths: const [],
+        hasMoreHadiths: false,
+        loadingMoreHadiths: false,
       ),
     );
     try {
@@ -219,6 +228,9 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
         languageCode: languageCode,
         limit: _pageSize,
       );
+      if (requestId != _searchRequestId) {
+        return;
+      }
       emit(
         HadithLibraryState(
           status: hadiths.isEmpty
@@ -236,6 +248,9 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
         ),
       );
     } catch (error) {
+      if (requestId != _searchRequestId) {
+        return;
+      }
       emit(
         state.copyWith(
           status: HadithLibraryStatus.failure,
@@ -247,25 +262,42 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
 
   Future<void> loadMore() async {
     final bookId = state.selectedBookId;
-    if (bookId == null || !state.hasMoreHadiths || state.query.isNotEmpty) {
+    if (bookId == null ||
+        !state.hasMoreHadiths ||
+        state.loadingMoreHadiths ||
+        state.query.isNotEmpty) {
       return;
     }
+    final requestId = _searchRequestId;
+    final chapterId = state.selectedChapterId;
+    final languageCode = state.selectedTranslationLanguageCode;
+    final offset = state.hadiths.length;
+    emit(state.copyWith(loadingMoreHadiths: true));
     try {
       final next = await _repository.getHadiths(
         bookId: bookId,
-        chapterId: state.selectedChapterId,
-        languageCode: state.selectedTranslationLanguageCode,
-        offset: state.hadiths.length,
+        chapterId: chapterId,
+        languageCode: languageCode,
+        offset: offset,
         limit: _pageSize,
       );
+      if (requestId != _searchRequestId ||
+          state.selectedBookId != bookId ||
+          state.selectedChapterId != chapterId ||
+          state.selectedTranslationLanguageCode != languageCode) {
+        return;
+      }
       emit(
         state.copyWith(
           hadiths: [...state.hadiths, ...next],
           hasMoreHadiths: next.length == _pageSize,
+          loadingMoreHadiths: false,
         ),
       );
     } catch (_) {
-      emit(state.copyWith(hasMoreHadiths: false));
+      if (requestId == _searchRequestId) {
+        emit(state.copyWith(hasMoreHadiths: false, loadingMoreHadiths: false));
+      }
     }
   }
 
@@ -399,7 +431,7 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
     required String rawQuery,
     String? languageCode,
   }) async {
-    _searchRequestId++;
+    final requestId = ++_searchRequestId;
     final hadithNumber = _hadithNumberFrom(rawQuery);
     if (hadithNumber == null) {
       emit(
@@ -437,6 +469,9 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
         'hadith:$bookId:$hadithNumber',
         languageCode: languageCode,
       );
+      if (requestId != _searchRequestId) {
+        return;
+      }
       emit(
         HadithLibraryState(
           status: item == null
@@ -454,6 +489,9 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
         ),
       );
     } catch (error) {
+      if (requestId != _searchRequestId) {
+        return;
+      }
       emit(
         state.copyWith(
           status: HadithLibraryStatus.failure,

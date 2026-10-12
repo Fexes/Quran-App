@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/animated_expansion.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -10,9 +12,12 @@ import '../../../../core/theme/quran_theme_state.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/app_sheet.dart';
+import '../../../../core/widgets/note_editor_sheet.dart';
 import '../../../library/data/stores/library_user_data_store.dart';
 import '../../../library/domain/library_translation_language_mapper.dart';
 import '../../../library/presentation/widgets/library_reader_widgets.dart';
+import '../../../library/presentation/widgets/library_share_sheet.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
 import '../../domain/entities/hadith_book.dart';
@@ -20,6 +25,7 @@ import '../../domain/entities/hadith_item.dart';
 import '../../domain/repositories/hadith_repository.dart';
 import '../bloc/hadith_library_cubit.dart';
 import '../bloc/hadith_library_state.dart';
+import '../widgets/hadith_translation_sheet.dart';
 
 class HadithBookPage extends StatelessWidget {
   const HadithBookPage({super.key, required this.bookId, this.initialLookup});
@@ -32,12 +38,16 @@ class HadithBookPage extends StatelessWidget {
     return BlocProvider(
       create: (_) {
         final cubit = HadithLibraryCubit(repository: getIt<HadithRepository>());
-        final lookup =
-            initialLookup?.trim() ?? _lastHadithNumberForBook(bookId);
+        final languageCode = getIt<SettingsStore>().hadithLanguageCodeOrNull;
+        final lookup = initialLookup?.trim();
         if (lookup != null && lookup.isNotEmpty) {
-          cubit.lookupHadith(bookId: bookId, rawQuery: lookup);
+          cubit.lookupHadith(
+            bookId: bookId,
+            rawQuery: lookup,
+            languageCode: languageCode,
+          );
         } else {
-          cubit.openBook(bookId);
+          cubit.openBook(bookId, languageCode: languageCode);
         }
         return cubit;
       },
@@ -81,8 +91,13 @@ class _HadithBookViewState extends State<_HadithBookView> {
     null,
   );
   bool _translationAvailable = true;
+  bool _translationSupported = true;
+  bool _loadingLanguage = true;
+  int _languageRequest = 0;
   String? _selectedItemKey;
-  String? _currentHadithNumber;
+  late final ValueNotifier<String?> _currentHadithNumber;
+  late final String? _resumeHadithNumber;
+  String? _lastSavedItemKey;
 
   String get _scopeKey => 'hadith:${widget.bookId}';
   String? get _activeHadithLanguageCode => _language.hadithCode;
@@ -97,6 +112,8 @@ class _HadithBookViewState extends State<_HadithBookView> {
     _scrollController = ScrollController()..addListener(_onScroll);
     _lookupController = TextEditingController(text: widget.initialLookup ?? '');
     _searchFocusNode = FocusNode();
+    _resumeHadithNumber = _lastHadithNumberForBook(widget.bookId);
+    _currentHadithNumber = ValueNotifier(null);
     _loadContentLanguage();
   }
 
@@ -107,10 +124,12 @@ class _HadithBookViewState extends State<_HadithBookView> {
       ..dispose();
     _lookupController.dispose();
     _searchFocusNode.dispose();
+    _currentHadithNumber.dispose();
     super.dispose();
   }
 
-  Future<void> _loadContentLanguage() async {
+  Future<void> _loadContentLanguage({bool forceReload = false}) async {
+    final request = ++_languageRequest;
     final translationRepository = getIt<QuranTranslationRepository>();
     final previousQuranSelection = await translationRepository
         .selectedTranslation();
@@ -123,39 +142,42 @@ class _HadithBookViewState extends State<_HadithBookView> {
           'en';
       await _settingsStore.setHadithLanguageCode(code);
     }
-    QuranTranslationResource? displayResource;
-    final languages = await translationRepository.translationLanguages();
-    for (final language in languages) {
-      final resource = language.defaultResource;
-      if (libraryLanguageFromQuranTranslation(resource).hadithCode == code) {
-        displayResource = resource;
-        break;
-      }
-    }
+    final displayResource =
+        libraryLanguageFromQuranTranslation(
+              previousQuranSelection,
+            ).hadithCode ==
+            code
+        ? previousQuranSelection
+        : null;
     final language = libraryLanguageFromCode(code, resource: displayResource);
-    final available = await getIt<HadithRepository>().hasFullTranslation(
+    final repository = getIt<HadithRepository>();
+    final supported = await repository.availableTranslationLanguagesForBook(
       widget.bookId,
-      code,
     );
-    if (!mounted) {
+    final available = await repository.hasFullTranslation(widget.bookId, code);
+    if (!mounted || request != _languageRequest) {
       return;
     }
     setState(() {
       _selectedTranslation = displayResource;
       _language = language;
       _translationAvailable = available;
+      _translationSupported = supported.contains(code);
+      _loadingLanguage = false;
     });
     final cubit = context.read<HadithLibraryCubit>();
-    if (available && cubit.state.selectedTranslationLanguageCode != code) {
+    final loadedLanguageCode =
+        cubit.state.selectedTranslationLanguageCode ?? 'en';
+    if (forceReload || loadedLanguageCode != code) {
       final query = cubit.state.query;
       if (query.isNotEmpty) {
-        cubit.searchInBook(
+        await cubit.searchInBook(
           bookId: widget.bookId,
           query: query,
           languageCode: code,
         );
       } else {
-        cubit.openBook(
+        await cubit.openBook(
           widget.bookId,
           chapterId: cubit.state.selectedChapterId,
           languageCode: code,
@@ -183,8 +205,14 @@ class _HadithBookViewState extends State<_HadithBookView> {
             .clamp(0, hadiths.length - 1)
             .toInt();
     final item = hadiths[index];
-    _currentHadithNumber = item.hadithNumber;
-    _userDataStore.saveLastRead(scopeKey: _scopeKey, itemKey: _itemKey(item));
+    final itemKey = _itemKey(item);
+    if (_currentHadithNumber.value != item.hadithNumber) {
+      _currentHadithNumber.value = item.hadithNumber;
+    }
+    if (_lastSavedItemKey != itemKey) {
+      _lastSavedItemKey = itemKey;
+      _userDataStore.saveLastRead(scopeKey: _scopeKey, itemKey: itemKey);
+    }
   }
 
   @override
@@ -213,12 +241,12 @@ class _HadithBookViewState extends State<_HadithBookView> {
               IconButton(
                 tooltip: 'Search this book',
                 onPressed: _searchFocusNode.requestFocus,
-                icon: const Icon(Icons.search_rounded),
+                icon: const AppIcon(Icons.search_rounded),
               ),
               IconButton(
                 tooltip: 'Reader settings',
                 onPressed: _showSettings,
-                icon: const Icon(Icons.tune_rounded),
+                icon: const AppIcon(Icons.tune_rounded),
               ),
             ],
           ),
@@ -230,9 +258,7 @@ class _HadithBookViewState extends State<_HadithBookView> {
                   message: state.errorMessage ?? 'Please try again.',
                   onRetry: () => context.read<HadithLibraryCubit>().openBook(
                     widget.bookId,
-                    languageCode: _translationAvailable
-                        ? _activeHadithLanguageCode
-                        : null,
+                    languageCode: _activeHadithLanguageCode,
                   ),
                 );
               }
@@ -248,68 +274,152 @@ class _HadithBookViewState extends State<_HadithBookView> {
                     controller: _scrollController,
                     thumbVisibility: true,
                     interactive: true,
-                    child: ListView(
+                    child: CustomScrollView(
                       controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 132),
-                      children: [
-                        if (state.selectedBook != null)
-                          _BookSummary(book: state.selectedBook!),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _lookupController,
-                          focusNode: _searchFocusNode,
-                          textInputAction: TextInputAction.search,
-                          onChanged: (_) => setState(() {}),
-                          onSubmitted: _searchBook,
-                          decoration: InputDecoration(
-                            hintText: 'Search text or hadith number',
-                            prefixIcon: const Icon(Icons.search_rounded),
-                            suffixIcon: _lookupController.text.trim().isEmpty
-                                ? null
-                                : IconButton(
-                                    tooltip: 'Clear search',
-                                    onPressed: _clearLookup,
-                                    icon: const Icon(Icons.close_rounded),
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+                          sliver: SliverToBoxAdapter(
+                            child: Column(
+                              children: [
+                                if (state.selectedBook != null)
+                                  _BookSummary(
+                                    book: state.selectedBook!,
+                                    resumeHadithNumber: state.query.isEmpty
+                                        ? _resumeHadithNumber
+                                        : null,
+                                    onResume: _resumeHadithNumber == null
+                                        ? null
+                                        : () {
+                                            _lookupController.text =
+                                                _resumeHadithNumber;
+                                            _lookup(_resumeHadithNumber);
+                                          },
+                                  ),
+                                if (_showTranslation &&
+                                    !_loadingLanguage &&
+                                    !_translationAvailable) ...[
+                                  if (_translationSupported)
+                                    OutlinedButton.icon(
+                                      onPressed: _showTranslationPicker,
+                                      icon: const AppIcon(
+                                        Icons.download_rounded,
+                                      ),
+                                      label: Text(
+                                        'Download ${_language.label} for all available books',
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      '${_language.label} translation is not available for this book.',
+                                    ),
+                                ],
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _lookupController,
+                                  focusNode: _searchFocusNode,
+                                  textInputAction: TextInputAction.search,
+                                  onChanged: (_) => setState(() {}),
+                                  onSubmitted: _searchBook,
+                                  decoration: InputDecoration(
+                                    hintText: 'Search text or hadith number',
+                                    prefixIcon: const AppIcon(
+                                      Icons.search_rounded,
+                                    ),
+                                    suffixIcon:
+                                        _lookupController.text.trim().isEmpty
+                                        ? null
+                                        : IconButton(
+                                            tooltip: 'Clear search',
+                                            onPressed: _clearLookup,
+                                            icon: const AppIcon(
+                                              Icons.close_rounded,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                if (state.chapters.isNotEmpty &&
+                                    state.query.isEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  _ChapterStrip(state: state),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (state.status == HadithLibraryStatus.empty)
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            sliver: SliverToBoxAdapter(
+                              child: _EmptyLookup(
+                                bookId: widget.bookId,
+                                query: state.query,
+                              ),
+                            ),
+                          )
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            sliver: SliverList.builder(
+                              itemCount: state.hadiths.length,
+                              itemBuilder: (context, index) {
+                                final hadith = state.hadiths[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _HadithReaderCard(
+                                    hadith: hadith,
+                                    themeState: themeState,
+                                    selected:
+                                        _selectedItemKey == _itemKey(hadith),
+                                    showTranslation:
+                                        _showTranslation &&
+                                        !_loadingLanguage &&
+                                        _translationAvailable,
+                                    translationAvailable: _translationAvailable,
+                                    languageLabel: _language.label,
+                                    languageCode: _activeHadithLanguageCode,
+                                    translationResource: _selectedTranslation,
+                                    onTap: () => _selectHadith(hadith),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        if (state.hasMoreHadiths && state.query.isEmpty)
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
+                            sliver: SliverToBoxAdapter(
+                              child: OutlinedButton.icon(
+                                onPressed: state.loadingMoreHadiths
+                                    ? null
+                                    : context
+                                          .read<HadithLibraryCubit>()
+                                          .loadMore,
+                                icon: state.loadingMoreHadiths
+                                    ? const SizedBox.square(
+                                        dimension: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const AppIcon(Icons.expand_more_rounded),
+                                label: Text(
+                                  state.loadingMoreHadiths
+                                      ? 'Loading more'
+                                      : 'Load more',
+                                ),
+                              ),
+                            ),
+                          ),
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: _selectedItem(state) == null
+                                ? 24
+                                : LibraryReaderActionBar.bottomClearance(
+                                    context,
                                   ),
                           ),
                         ),
-                        if (state.chapters.isNotEmpty &&
-                            state.query.isEmpty) ...[
-                          const SizedBox(height: 12),
-                          _ChapterStrip(state: state),
-                        ],
-                        const SizedBox(height: 14),
-                        if (state.status == HadithLibraryStatus.empty)
-                          _EmptyLookup(
-                            bookId: widget.bookId,
-                            query: state.query,
-                          )
-                        else
-                          for (final hadith in state.hadiths)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _HadithReaderCard(
-                                hadith: hadith,
-                                themeState: themeState,
-                                selected: _selectedItemKey == _itemKey(hadith),
-                                showTranslation: _showTranslation,
-                                translationAvailable: _translationAvailable,
-                                languageLabel: _language.label,
-                                translationResource: _selectedTranslation,
-                                onTap: () => _selectHadith(hadith),
-                              ),
-                            ),
-                        if (state.hasMoreHadiths && state.query.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: OutlinedButton.icon(
-                              onPressed: context
-                                  .read<HadithLibraryCubit>()
-                                  .loadMore,
-                              icon: const Icon(Icons.expand_more_rounded),
-                              label: const Text('Load more'),
-                            ),
-                          ),
                       ],
                     ),
                   ),
@@ -317,9 +427,12 @@ class _HadithBookViewState extends State<_HadithBookView> {
                     PositionedDirectional(
                       end: 8,
                       top: MediaQuery.sizeOf(context).height * 0.38,
-                      child: _ProgressPill(
-                        label:
-                            'Hadith ${_currentHadithNumber ?? state.hadiths.first.hadithNumber}',
+                      child: ValueListenableBuilder<String?>(
+                        valueListenable: _currentHadithNumber,
+                        builder: (context, number, child) => _ProgressPill(
+                          label:
+                              'Hadith ${number ?? state.hadiths.first.hadithNumber}',
+                        ),
                       ),
                     ),
                   if (_selectedItem(state) != null)
@@ -336,9 +449,14 @@ class _HadithBookViewState extends State<_HadithBookView> {
                             _toggleBookmark(_selectedItem(state)!),
                         onNote: () => _editNote(_selectedItem(state)!),
                         onCopy: () => _copyHadith(_selectedItem(state)!),
-                        onShare: () => _copyHadith(
+                        onShare: () => showHadithShareSheet(
+                          context,
                           _selectedItem(state)!,
-                          shareIntent: true,
+                          languageCode: _activeHadithLanguageCode,
+                          translationResource: _selectedTranslation,
+                          includeTranslation: _showTranslation,
+                          translationAvailable:
+                              _translationAvailable && !_loadingLanguage,
                         ),
                         onSource: () => _showSourceSheet(_selectedItem(state)!),
                         onDetails: () =>
@@ -358,8 +476,9 @@ class _HadithBookViewState extends State<_HadithBookView> {
     final key = _itemKey(hadith);
     setState(() {
       _selectedItemKey = key;
-      _currentHadithNumber = hadith.hadithNumber;
     });
+    _currentHadithNumber.value = hadith.hadithNumber;
+    _lastSavedItemKey = key;
     _userDataStore.saveLastRead(scopeKey: _scopeKey, itemKey: key);
   }
 
@@ -380,7 +499,7 @@ class _HadithBookViewState extends State<_HadithBookView> {
     context.read<HadithLibraryCubit>().lookupHadith(
       bookId: widget.bookId,
       rawQuery: value,
-      languageCode: _translationAvailable ? _activeHadithLanguageCode : null,
+      languageCode: _activeHadithLanguageCode,
     );
   }
 
@@ -389,7 +508,7 @@ class _HadithBookViewState extends State<_HadithBookView> {
     context.read<HadithLibraryCubit>().searchInBook(
       bookId: widget.bookId,
       query: value,
-      languageCode: _translationAvailable ? _activeHadithLanguageCode : null,
+      languageCode: _activeHadithLanguageCode,
     );
   }
 
@@ -397,11 +516,12 @@ class _HadithBookViewState extends State<_HadithBookView> {
     _lookupController.clear();
     context.read<HadithLibraryCubit>().openBook(
       widget.bookId,
-      languageCode: _translationAvailable ? _activeHadithLanguageCode : null,
+      languageCode: _activeHadithLanguageCode,
     );
   }
 
   Future<void> _showNavigationMenu(HadithLibraryState state) {
+    final cubit = context.read<HadithLibraryCubit>();
     return showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -412,107 +532,120 @@ class _HadithBookViewState extends State<_HadithBookView> {
           child: Align(
             alignment: Alignment.topCenter,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(26, 62, 26, 0),
-              child: Material(
-                color: Colors.transparent,
-                child: PremiumSurface(
-                  padding: const EdgeInsets.all(14),
-                  radius: 24,
-                  prominent: true,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 360),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                state.selectedBook?.englishName ?? 'Hadith',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w900),
+              padding: EdgeInsets.fromLTRB(
+                18,
+                62,
+                18,
+                MediaQuery.viewInsetsOf(dialogContext).bottom + 12,
+              ),
+              child: SingleChildScrollView(
+                child: Material(
+                  color: Colors.transparent,
+                  child: PremiumSurface(
+                    padding: const EdgeInsets.all(14),
+                    radius: 24,
+                    prominent: true,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  state.selectedBook?.englishName ?? 'Hadith',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
                               ),
-                            ),
-                            IconButton(
-                              onPressed: () =>
-                                  Navigator.of(dialogContext).pop(),
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _lookupController,
-                          keyboardType: TextInputType.number,
-                          textInputAction: TextInputAction.search,
-                          decoration: const InputDecoration(
-                            labelText: 'Jump to hadith',
-                            prefixIcon: Icon(Icons.tag_rounded),
+                              IconButton(
+                                tooltip: 'Close',
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(),
+                                icon: const AppIcon(Icons.close_rounded),
+                              ),
+                            ],
                           ),
-                          onSubmitted: (value) {
-                            Navigator.of(dialogContext).pop();
-                            _lookup(value);
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _lookupController,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.search,
+                            decoration: const InputDecoration(
+                              labelText: 'Jump to hadith',
+                              prefixIcon: AppIcon(Icons.tag_rounded),
+                            ),
+                            onSubmitted: (value) {
+                              Navigator.of(dialogContext).pop();
+                              _lookup(value);
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(dialogContext).pop();
+                                    _lookup(_lookupController.text);
+                                  },
+                                  icon: const AppIcon(
+                                    Icons.arrow_forward_rounded,
+                                  ),
+                                  label: const Text('Go'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                tooltip: 'Clear lookup',
                                 onPressed: () {
                                   Navigator.of(dialogContext).pop();
-                                  _lookup(_lookupController.text);
+                                  _clearLookup();
                                 },
-                                icon: const Icon(Icons.arrow_forward_rounded),
-                                label: const Text('Go'),
+                                icon: const AppIcon(Icons.close_rounded),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              tooltip: 'Clear lookup',
-                              onPressed: () {
-                                Navigator.of(dialogContext).pop();
-                                _clearLookup();
-                              },
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                          ],
-                        ),
-                        if (state.chapters.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 44,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemBuilder: (context, index) {
-                                final chapter = state.chapters[index];
-                                return ChoiceChip(
-                                  label: Text(
-                                    '${chapter.number}. ${chapter.englishTitle}',
+                            ],
+                          ),
+                          if (state.chapters.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              initialValue: state.selectedChapterId ?? '',
+                              isExpanded: true,
+                              itemHeight: null,
+                              decoration: const InputDecoration(
+                                labelText: 'Chapter',
+                              ),
+                              items: [
+                                const DropdownMenuItem(
+                                  value: '',
+                                  child: Text('All chapters'),
+                                ),
+                                for (final chapter in state.chapters)
+                                  DropdownMenuItem(
+                                    value: chapter.id,
+                                    child: Text(
+                                      '${chapter.number}. ${chapter.englishTitle}',
+                                    ),
                                   ),
-                                  selected:
-                                      chapter.id == state.selectedChapterId,
-                                  onSelected: (_) {
-                                    Navigator.of(dialogContext).pop();
-                                    context.read<HadithLibraryCubit>().openBook(
-                                      widget.bookId,
-                                      chapterId: chapter.id,
-                                      languageCode: _translationAvailable
-                                          ? _activeHadithLanguageCode
-                                          : null,
-                                    );
-                                  },
+                              ],
+                              onChanged: (chapterId) {
+                                if (chapterId == null) return;
+                                Navigator.of(dialogContext).pop();
+                                cubit.openBook(
+                                  widget.bookId,
+                                  chapterId: chapterId.isEmpty
+                                      ? null
+                                      : chapterId,
+                                  languageCode: _activeHadithLanguageCode,
                                 );
                               },
-                              separatorBuilder: (context, index) =>
-                                  const SizedBox(width: 8),
-                              itemCount: state.chapters.length,
                             ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -540,6 +673,10 @@ class _HadithBookViewState extends State<_HadithBookView> {
           onTranslationChanged: (value) {
             setState(() => _showTranslation = value);
             _settingsStore.setLibraryTranslationEnabled(value);
+            if (value && !_translationAvailable && _translationSupported) {
+              Navigator.of(sheetContext).pop();
+              _showTranslationPicker();
+            }
           },
           onLanguageTap: () {
             Navigator.of(sheetContext).pop();
@@ -556,141 +693,16 @@ class _HadithBookViewState extends State<_HadithBookView> {
   }
 
   Future<void> _showTranslationPicker() async {
-    final repository = getIt<HadithRepository>();
-    final languages = {
-      'en',
-      ...await repository.availableTranslationLanguagesForBook(widget.bookId),
-    }.toList()..sort();
-    if (!mounted) {
-      return;
-    }
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return _HadithSheetSurface(
-          height: MediaQuery.sizeOf(context).height * 0.82,
-          child: SafeArea(
-            top: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-              children: [
-                Text(
-                  'Select translation language',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 12),
-                for (final language in languages)
-                  ListTile(
-                    title: Text(libraryLanguageLabel(language)),
-                    subtitle: Text(language.toUpperCase()),
-                    selected: _activeHadithLanguageCode == language,
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.of(context).pop(language),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
+    final selected = await showHadithTranslationSheet(
+      context,
+      initialLanguageCode: _activeHadithLanguageCode,
     );
-    if (selected == null) {
-      return;
-    }
-    final hadithReady = await _ensureHadithTranslation(selected);
-    if (!hadithReady) {
-      return;
-    }
-    await _settingsStore.setHadithLanguageCode(selected);
-    await _loadContentLanguage();
-  }
-
-  Future<bool> _ensureHadithTranslation(String code) async {
-    final repository = getIt<HadithRepository>();
-    final supported = await repository.availableTranslationLanguagesForBook(
-      widget.bookId,
-    );
-    if (!supported.contains(code)) {
-      return true;
-    }
-    if (await repository.hasFullTranslation(widget.bookId, code)) {
-      return true;
-    }
-    final downloaded = await _downloadHadithTranslation(
-      repository: repository,
-      languageCode: code,
-      languageLabel: libraryLanguageLabel(code),
-    );
-    return downloaded == true;
-  }
-
-  Future<bool?> _downloadHadithTranslation({
-    required HadithRepository repository,
-    required String languageCode,
-    required String languageLabel,
-  }) {
-    return showModalBottomSheet<bool>(
-      context: context,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return StreamBuilder(
-          stream: repository.downloadBookTranslation(
-            widget.bookId,
-            languageCode,
-          ),
-          builder: (context, snapshot) {
-            final progress = snapshot.data;
-            if (progress?.isComplete == true) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop(true);
-                }
-              });
-            }
-            return _HadithSheetSurface(
-              padding: const EdgeInsets.all(18),
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Downloading $languageLabel Hadith'),
-                    const SizedBox(height: 12),
-                    LinearProgressIndicator(value: progress?.percent),
-                    const SizedBox(height: 8),
-                    Text(
-                      progress == null || progress.totalItems <= 1
-                          ? 'Preparing download'
-                          : '${progress.completedItems} of ${progress.totalItems}',
-                    ),
-                    if (progress?.hasFailed == true) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        'Hadith translation download failed.',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Close'),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      _showTranslation = true;
+      _loadingLanguage = true;
+    });
+    await _loadContentLanguage(forceReload: true);
   }
 
   Future<void> _toggleBookmark(HadithItem hadith) async {
@@ -701,48 +713,29 @@ class _HadithBookViewState extends State<_HadithBookView> {
   }
 
   Future<void> _editNote(HadithItem hadith) async {
-    final controller = TextEditingController(
-      text: _userDataStore.noteFor(_itemKey(hadith)),
-    );
-    final note = await showDialog<String>(
+    final note = await showModalBottomSheet<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Note ${hadith.reference}'),
-        content: TextField(
-          controller: controller,
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(hintText: 'Write a note'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('Save'),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => NoteEditorSheet(
+        title: 'Note ${hadith.reference}',
+        initialText: _userDataStore.noteFor(_itemKey(hadith)),
+        allowEmpty: true,
       ),
     );
-    controller.dispose();
     if (note != null) {
       await _userDataStore.saveNote(_itemKey(hadith), note);
     }
   }
 
-  Future<void> _copyHadith(
-    HadithItem hadith, {
-    bool shareIntent = false,
-  }) async {
+  Future<void> _copyHadith(HadithItem hadith) async {
     await Clipboard.setData(ClipboardData(text: _plainText(hadith)));
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(shareIntent ? 'Copied to share' : 'Copied')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Copied')));
   }
 
   void _showSourceSheet(HadithItem hadith) {
@@ -754,21 +747,15 @@ class _HadithBookViewState extends State<_HadithBookView> {
     final source = matches.isEmpty ? null : matches.first;
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _HadithSheetSurface(
-        padding: const EdgeInsets.all(18),
+      builder: (context) => AppSheet(
+        title: 'Source',
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Source',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 12),
             Text(
               hadith.collectionName.isEmpty
                   ? hadith.reference
@@ -813,33 +800,34 @@ class _HadithBookViewState extends State<_HadithBookView> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.72,
-        maxChildSize: 0.92,
-        builder: (context, controller) => _HadithSheetSurface(
-          child: ListView(
-            controller: controller,
-            padding: const EdgeInsets.all(18),
-            children: [
-              Text(
-                hadith.reference,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-              ),
+      builder: (context) => AppSheet(
+        title: hadith.reference,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            LibraryArabicText(
+              text: hadith.arabic,
+              themeState: context.read<QuranThemeCubit>().state,
+              selected: true,
+            ),
+            if (_showTranslation &&
+                !_loadingLanguage &&
+                _translationAvailable &&
+                hadith.translation.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(hadith.arabic, textDirection: TextDirection.rtl),
-              if (hadith.translation.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(hadith.translation),
-              ],
-              if (_showExplanation && hadith.cleanReference.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(hadith.cleanReference),
-              ],
+              LibraryTranslationBody(
+                text: hadith.translation,
+                themeState: context.read<QuranThemeCubit>().state,
+                resource: _selectedTranslation,
+                languageCode: _activeHadithLanguageCode,
+              ),
             ],
-          ),
+            if (_showExplanation && hadith.cleanReference.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(hadith.cleanReference),
+            ],
+          ],
         ),
       ),
     );
@@ -859,39 +847,21 @@ class _HadithBookViewState extends State<_HadithBookView> {
   }
 }
 
-class _HadithSheetSurface extends StatelessWidget {
-  const _HadithSheetSurface({
-    required this.child,
-    this.padding = EdgeInsets.zero,
-    this.height,
+class _BookSummary extends StatelessWidget {
+  const _BookSummary({
+    required this.book,
+    this.resumeHadithNumber,
+    this.onResume,
   });
 
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final double? height;
-
-  @override
-  Widget build(BuildContext context) {
-    return PremiumSurface(
-      margin: const EdgeInsets.all(12),
-      padding: padding,
-      height: height,
-      radius: QuranTheme.radiusSheet,
-      prominent: true,
-      child: child,
-    );
-  }
-}
-
-class _BookSummary extends StatelessWidget {
-  const _BookSummary({required this.book});
-
   final HadithBook book;
+  final String? resumeHadithNumber;
+  final VoidCallback? onResume;
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(14),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -900,7 +870,7 @@ class _BookSummary extends StatelessWidget {
             textDirection: TextDirection.rtl,
             textAlign: TextAlign.right,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w500,
               height: 1.4,
             ),
           ),
@@ -917,9 +887,20 @@ class _BookSummary extends StatelessWidget {
             '${book.hadithCount} hadiths • ${book.chapterCount} chapters',
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w500,
             ),
           ),
+          if (resumeHadithNumber != null && onResume != null) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: onResume,
+                icon: const AppIcon(Icons.history_rounded, size: 18),
+                label: Text('Continue at Hadith $resumeHadithNumber'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -938,11 +919,24 @@ class _ChapterStrip extends StatelessWidget {
       return const SizedBox.shrink();
     }
     return SizedBox(
-      height: 38,
+      height: (MediaQuery.textScalerOf(context).scale(14) * 1.4 + 28).clamp(
+        48.0,
+        double.infinity,
+      ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemBuilder: (context, index) {
-          final chapter = state.chapters[index];
+          if (index == 0) {
+            return ChoiceChip(
+              label: const Text('All chapters'),
+              selected: state.selectedChapterId == null,
+              onSelected: (_) => context.read<HadithLibraryCubit>().openBook(
+                book.id,
+                languageCode: state.selectedTranslationLanguageCode,
+              ),
+            );
+          }
+          final chapter = state.chapters[index - 1];
           final selected = chapter.id == state.selectedChapterId;
           return ChoiceChip(
             label: Text('${chapter.number}. ${chapter.englishTitle}'),
@@ -955,7 +949,7 @@ class _ChapterStrip extends StatelessWidget {
           );
         },
         separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemCount: state.chapters.length,
+        itemCount: state.chapters.length + 1,
       ),
     );
   }
@@ -969,6 +963,7 @@ class _HadithReaderCard extends StatelessWidget {
     required this.showTranslation,
     required this.translationAvailable,
     required this.languageLabel,
+    required this.languageCode,
     required this.translationResource,
     required this.onTap,
   });
@@ -979,6 +974,7 @@ class _HadithReaderCard extends StatelessWidget {
   final bool showTranslation;
   final bool translationAvailable;
   final String languageLabel;
+  final String? languageCode;
   final QuranTranslationResource? translationResource;
   final VoidCallback onTap;
 
@@ -997,12 +993,12 @@ class _HadithReaderCard extends StatelessWidget {
                   hadith.reference,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               if (selected)
-                Icon(
+                AppIcon(
                   Icons.check_circle_rounded,
                   color: Theme.of(context).colorScheme.primary,
                   size: 18,
@@ -1017,17 +1013,25 @@ class _HadithReaderCard extends StatelessWidget {
               selected: selected,
             ),
           ],
-          if (showTranslation) ...[
-            const SizedBox(height: 10),
-            if (translationAvailable && hadith.translation.trim().isNotEmpty)
-              LibraryTranslationBody(
-                text: hadith.translation,
-                themeState: themeState,
-                resource: translationResource,
-              )
-            else
-              LibraryTranslationUnavailable(languageLabel: languageLabel),
-          ],
+          AnimatedExpansion(
+            expanded: showTranslation,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                if (translationAvailable &&
+                    hadith.translation.trim().isNotEmpty)
+                  LibraryTranslationBody(
+                    text: hadith.translation,
+                    themeState: themeState,
+                    resource: translationResource,
+                    languageCode: languageCode,
+                  )
+                else
+                  LibraryTranslationUnavailable(languageLabel: languageLabel),
+              ],
+            ),
+          ),
           if (hadith.grade.trim().isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
@@ -1063,7 +1067,7 @@ class _ProgressPill extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: Theme.of(context).colorScheme.onPrimary,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -1086,7 +1090,7 @@ class _EmptyLookup extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          Icon(
+          AppIcon(
             Icons.search_off_rounded,
             color: Theme.of(context).colorScheme.primary,
           ),

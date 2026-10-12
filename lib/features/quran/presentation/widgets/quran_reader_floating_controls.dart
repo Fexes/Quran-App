@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 
+import '../../../../core/constants/quran_arabic_script.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/premium_surface.dart';
 import '../../../quran_audio/domain/entities/quran_audio_queue_item.dart';
@@ -64,145 +66,150 @@ class QuranReaderFloatingControls extends StatelessWidget {
         selectedVerseKey != null && item?.verseKey == selectedVerseKey;
     final primary = Theme.of(context).colorScheme.primary;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: PremiumSurface(
-          radius: 30,
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          prominent: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (audioVisible && item != null)
-                _AudioSummary(
-                  item: item,
-                  selectedAyah: selectedAyah,
-                  isPlaying: audioState.isPlaying,
-                  onPlaySelected: onPlaySelected,
-                )
-              else
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _VerseBubble(
-                      label: visibleAyah?.number.toString() ?? 'Audio',
-                      active: activeSelection,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Ayah ${visibleAyah?.number ?? ''} selected',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w900),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Choose playback options or press Play',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: QuranTheme.subText(context, 0.68),
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              if (audioVisible) ...[
-                const SizedBox(height: 9),
-                QuranAudioSeekBar(state: audioState, onSeek: onSeek),
-              ],
-              const SizedBox(height: 8),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 720),
+      child: PremiumSurface(
+        shadowStyle: PremiumSurfaceShadowStyle.floating,
+        radius: QuranTheme.radiusDock,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        prominent: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (audioVisible && item != null)
+              _AudioSummary(
+                item: item,
+                selectedAyah: selectedAyah,
+                isPlaying: audioState.isPlaying,
+                onPlaySelected: onPlaySelected,
+              )
+            else
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _RoundControl(
-                    tooltip: 'Playback options',
-                    icon: Icons.tune_rounded,
-                    onTap: selectedAyah == null ? null : onPlaybackMenu,
+                  _VerseBubble(
+                    label: visibleAyah?.number.toString() ?? 'Audio',
+                    active: activeSelection,
                   ),
-                  _RoundControl(
-                    tooltip: isBookmarked ? 'Remove bookmark' : 'Bookmark ayah',
-                    icon: isBookmarked
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                    active: isBookmarked,
-                    onTap: selectedAyah == null ? null : onBookmark,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Ayah ${visibleAyah?.number ?? ''} selected',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          visibleAyah?.verseKey ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: QuranTheme.subText(context, 0.68),
+                                fontWeight: FontWeight.w400,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
-                  _RoundControl(
-                    tooltip: 'Open tafsir',
-                    icon: Icons.menu_book_rounded,
-                    onTap: onTafsir,
-                  ),
-                  if (!audioVisible)
-                    _VerseMoreControl(onNote: onNote, onShare: onShare),
-                  const Spacer(),
-                  if (audioVisible) ...[
-                    _RoundControl(
-                      tooltip: 'Previous ayah',
-                      icon: Icons.skip_previous_rounded,
-                      onTap: audioState.hasPrevious ? onPrevious : null,
-                    ),
-                    _RoundControl(
-                      tooltip: audioState.status == QuranAudioStatus.completed
-                          ? 'Replay recitation'
-                          : audioState.isPlaying
-                          ? 'Pause recitation'
-                          : 'Resume recitation',
-                      icon: audioState.status == QuranAudioStatus.completed
-                          ? Icons.replay_rounded
-                          : audioState.isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      active: true,
-                      loading: audioState.isLoading,
-                      onTap: onTogglePlayPause,
-                    ),
-                    _RoundControl(
-                      tooltip: 'Next ayah',
-                      icon: Icons.skip_next_rounded,
-                      onTap: audioState.hasNext ? onNext : null,
-                    ),
-                    _RoundControl(
-                      tooltip: 'Close and stop audio',
-                      icon: Icons.close_rounded,
-                      onTap: onStop,
-                    ),
-                  ] else
-                    FilledButton.icon(
-                      onPressed: onPrimaryPlay,
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Play'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: Colors.white,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
                 ],
               ),
+            if (audioVisible) ...[
+              const SizedBox(height: 9),
+              QuranAudioSeekBar(state: audioState, onSeek: onSeek),
             ],
-          ),
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 8,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _RoundControl(
+                      tooltip: 'Playback options',
+                      icon: Icons.tune_rounded,
+                      onTap: selectedAyah == null ? null : onPlaybackMenu,
+                    ),
+                    _RoundControl(
+                      tooltip: isBookmarked
+                          ? 'Remove bookmark'
+                          : 'Bookmark ayah',
+                      icon: isBookmarked
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      active: isBookmarked,
+                      onTap: selectedAyah == null ? null : onBookmark,
+                    ),
+                    _RoundControl(
+                      tooltip: 'Open tafsir',
+                      icon: Icons.menu_book_rounded,
+                      onTap: onTafsir,
+                    ),
+                    if (!audioVisible)
+                      _VerseMoreControl(onNote: onNote, onShare: onShare),
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (audioVisible) ...[
+                      _RoundControl(
+                        tooltip: 'Previous ayah',
+                        icon: Icons.skip_previous_rounded,
+                        onTap: audioState.hasPrevious ? onPrevious : null,
+                      ),
+                      _RoundControl(
+                        tooltip: audioState.status == QuranAudioStatus.completed
+                            ? 'Replay recitation'
+                            : audioState.isPlaying
+                            ? 'Pause recitation'
+                            : 'Resume recitation',
+                        icon: audioState.status == QuranAudioStatus.completed
+                            ? Icons.replay_rounded
+                            : audioState.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        active: true,
+                        loading: audioState.isLoading,
+                        onTap: onTogglePlayPause,
+                      ),
+                      _RoundControl(
+                        tooltip: 'Next ayah',
+                        icon: Icons.skip_next_rounded,
+                        onTap: audioState.hasNext ? onNext : null,
+                      ),
+                      _RoundControl(
+                        tooltip: 'Close and stop audio',
+                        icon: Icons.close_rounded,
+                        onTap: onStop,
+                      ),
+                    ] else
+                      FilledButton.icon(
+                        onPressed: onPrimaryPlay,
+                        icon: const AppIcon(Icons.play_arrow_rounded),
+                        label: const Text('Play'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: primary,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onPrimary,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -246,7 +253,7 @@ class _AudioSummary extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(
                   context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 2),
               Text(
@@ -255,7 +262,7 @@ class _AudioSummary extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: QuranTheme.subText(context, 0.68),
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],
@@ -265,7 +272,7 @@ class _AudioSummary extends StatelessWidget {
           const SizedBox(width: 8),
           FilledButton.icon(
             onPressed: onPlaySelected,
-            icon: const Icon(Icons.play_arrow_rounded, size: 18),
+            icon: const AppIcon(Icons.play_arrow_rounded, size: 18),
             label: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -273,7 +280,9 @@ class _AudioSummary extends StatelessWidget {
                 Text(
                   selected.verseKey,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.78),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onPrimary.withValues(alpha: 0.78),
                     fontWeight: FontWeight.w400,
                     height: 1,
                   ),
@@ -291,7 +300,7 @@ class _AudioSummary extends StatelessWidget {
               ),
               textStyle: Theme.of(
                 context,
-              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900),
+              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -311,6 +320,7 @@ class QuranReaderArabicText extends StatelessWidget {
     this.maxLines,
     this.textAlign = TextAlign.right,
     this.lineHeight = 1.55,
+    this.arabicScript = QuranArabicScript.uthmani,
   });
 
   final String text;
@@ -321,13 +331,18 @@ class QuranReaderArabicText extends StatelessWidget {
   final int? maxLines;
   final TextAlign textAlign;
   final double lineHeight;
+  final QuranArabicScript arabicScript;
 
   @override
   Widget build(BuildContext context) {
     final fontSize = 24 * arabicFontScale;
+    final effectiveHeight = lineHeight > arabicScript.readerLineHeight
+        ? lineHeight
+        : arabicScript.readerLineHeight;
     final baseStyle = Theme.of(context).textTheme.headlineMedium?.copyWith(
       fontSize: fontSize,
-      height: lineHeight,
+      fontFamily: arabicScript.fontFamily,
+      height: effectiveHeight,
       fontWeight: FontWeight.w700,
       color: selected || highlighterActive
           ? QuranTheme.quranTextSelected(context)
@@ -335,7 +350,8 @@ class QuranReaderArabicText extends StatelessWidget {
     );
     final strutStyle = StrutStyle(
       fontSize: fontSize,
-      height: lineHeight,
+      fontFamily: arabicScript.fontFamily,
+      height: effectiveHeight,
       fontWeight: FontWeight.w700,
     );
     final activeIndex = activeWordIndex;
@@ -355,12 +371,7 @@ class QuranReaderArabicText extends StatelessWidget {
       );
     }
 
-    final words = text
-        .split(RegExp(r'\s+'))
-        .where((word) {
-          return word.trim().isNotEmpty;
-        })
-        .toList(growable: false);
+    final words = QuranArabicScript.wordSpans(text);
     final wordHighlight = QuranTheme.wordHighlight(context);
     final inactiveColor = selected || highlighterActive
         ? QuranTheme.quranTextSelected(context)
@@ -380,9 +391,7 @@ class QuranReaderArabicText extends StatelessWidget {
           children: [
             for (var index = 0; index < words.length; index++)
               TextSpan(
-                text: index == words.length - 1
-                    ? words[index]
-                    : '${words[index]} ',
+                text: words[index],
                 style: index + 1 == activeIndex
                     ? TextStyle(color: wordHighlight)
                     : null,
@@ -452,29 +461,27 @@ class _RoundControl extends StatelessWidget {
         borderRadius: BorderRadius.circular(QuranTheme.radiusPill),
         onTap: onTap,
         child: Container(
-          width: 42,
-          height: 42,
-          margin: const EdgeInsetsDirectional.only(end: 4),
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: active ? primary : Colors.transparent,
-            border: active
-                ? null
-                : Border.all(color: QuranTheme.outline(context)),
           ),
           child: loading
               ? Padding(
                   padding: const EdgeInsets.all(11),
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: active ? Colors.white : primary,
+                    color: active
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : primary,
                   ),
                 )
-              : Icon(
+              : AppIcon(
                   icon,
                   size: 22,
                   color: active
-                      ? Colors.white
+                      ? Theme.of(context).colorScheme.onPrimary
                       : onTap == null
                       ? QuranTheme.subText(context, 0.32)
                       : null,
@@ -495,18 +502,13 @@ class _VerseMoreControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      margin: const EdgeInsetsDirectional.only(end: 4),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: QuranTheme.outline(context)),
-      ),
+    return SizedBox(
+      width: 44,
+      height: 44,
       child: PopupMenuButton<_VerseMoreAction>(
         tooltip: 'More ayah actions',
         padding: EdgeInsets.zero,
-        icon: const Icon(Icons.more_horiz_rounded, size: 22),
+        icon: const AppIcon(Icons.more_horiz_rounded, size: 22),
         onSelected: (action) {
           switch (action) {
             case _VerseMoreAction.note:
@@ -520,7 +522,7 @@ class _VerseMoreControl extends StatelessWidget {
             value: _VerseMoreAction.note,
             child: ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.edit_note_rounded),
+              leading: AppIcon(Icons.edit_note_rounded),
               title: Text('Add ayah note'),
             ),
           ),
@@ -528,7 +530,7 @@ class _VerseMoreControl extends StatelessWidget {
             value: _VerseMoreAction.share,
             child: ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.share_rounded),
+              leading: AppIcon(Icons.share_rounded),
               title: Text('Share ayah'),
             ),
           ),

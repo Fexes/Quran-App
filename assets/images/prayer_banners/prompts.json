@@ -1,0 +1,50 @@
+{
+  "generatedWith": "OpenAI built-in image generation",
+  "referenceAsset": "assets/images/architecture/courtyard.jpg",
+  "commonPrompt": "Use case: photorealistic-natural. Asset: architectural photograph for a Quran app prayer banner, landscape 3:2. Use the attached courtyard only as an aesthetic reference: understated premium editorial photography, believable Islamic pale-stone mosque architecture, arches, marble, exquisite natural light, no exaggerated gold or ornate decorative frame. Create a NEW distinct composition, not a color tint of the reference. Keep the center quiet enough for app text to overlay, with recognizable architecture within the central 70 percent for a mobile crop. Actual photograph appearance, natural textures, restrained contrast, clear detail. No people, figures, text, lettering, calligraphy, logos, watermark, books, UI, or collage. ",
+  "usage": "Home and Prayer tab banner artwork. Bundled offline. Sunrise lasts until Dhuhr; sunset artwork appears in the last 20 minutes before Maghrib. This changes artwork only, not prayer times.",
+  "assets": [
+    {
+      "phase": "fajr",
+      "assetPath": "assets/images/prayer_banners/fajr.jpg",
+      "prompt": "FAJR before sunrise: View from a quiet narrow pointed-arch colonnade out across pale marble toward a modest dome and slender minaret. Cool blue and lavender predawn sky with a very faint rose horizon, no visible sun. Small warm hanging lanterns beneath the arcades, quiet still air and subtle stone reflections. Visibly predawn, reverent and calm.",
+      "generatedSource": "exec-dc35150f-ef7a-46ff-80d7-2ae9570623ec.png"
+    },
+    {
+      "phase": "sunrise",
+      "assetPath": "assets/images/prayer_banners/sunrise.jpg",
+      "prompt": "SUNRISE: A new low camera position beside a long shallow reflecting pool in a pale limestone mosque courtyard, delicate repeated arches running along the right, a slender minaret and small dome beyond. The first golden sun has just risen, visible low on the horizon to the left of the dome, fresh blue-to-peach morning sky. Clean still water reflects the early amber sunlight and arch geometry. Spacious composition and bright hopeful early-morning atmosphere, not orange evening light.",
+      "generatedSource": "exec-ef7270f0-8000-4f43-ac0c-a549021ac702.png"
+    },
+    {
+      "phase": "dhuhr",
+      "assetPath": "assets/images/prayer_banners/dhuhr.jpg",
+      "prompt": "DHUHR midday: An open sunlit pale-stone mosque courtyard seen from a slightly elevated terrace, a graceful row of pointed arches along the far side, one elegant dome framed by a pair of tall palms. Clear pale azure sky and strong clean noon daylight, short crisp architectural shadows, cool white marble with faint gray veining. Spacious bright midday composition, no visible low sun, no sunset colors. Fresh, serene architectural editorial photograph.",
+      "generatedSource": "exec-2a54a3e1-d572-4da7-b37f-9359b97d6952.png"
+    },
+    {
+      "phase": "asr",
+      "assetPath": "assets/images/prayer_banners/asr.jpg",
+      "prompt": "ASR afternoon: A distinctly diagonal architectural view along a long arcade of pale limestone pointed arches at the edge of a mosque garden. Tall slender date palms, low dark-green foliage, a small distant dome and minaret beyond the garden. Warm late-afternoon side light makes alternating long geometric shadows across a clean polished marble walkway. Sun is still above the horizon and outside the frame, calm pale blue sky. Natural olive green, stone white, soft honey highlights. More garden and arcade than broad open courtyard.",
+      "generatedSource": "exec-dc2e5389-1fa3-422e-8759-9f07d3b85535.png"
+    },
+    {
+      "phase": "sunset",
+      "assetPath": "assets/images/prayer_banners/sunset.jpg",
+      "prompt": "SUNSET: A wide open mosque terrace with a shallow rectangular reflecting pool occupying the lower foreground, a tall minaret and low pale dome on the left, delicate stone arches on the right. The sun is a small warm disc touching the horizon between distant hills, a distinct peach and coral rose evening sky above. Pale stone retains realistic texture and detail, gentle sunset reflections in the water. Serene warm horizon, tasteful subdued color, not dramatic fiery fantasy. New composition clearly different from an arcade close-up.",
+      "generatedSource": "exec-9334088d-8e52-4eda-a9ce-4e2d4e465684.png"
+    },
+    {
+      "phase": "maghrib",
+      "assetPath": "assets/images/prayer_banners/maghrib.jpg",
+      "prompt": "MAGHRIB just after sunset: A symmetrical view through a beautiful pale-stone horseshoe arch toward a quiet mosque courtyard, a small centered dome beyond. Tall arcades recede on both sides with warm amber lanterns now lit and reflecting on pale polished marble. Sky transitions from muted dusty rose at the horizon to soft indigo overhead, the sun has completely disappeared. Restrained rosy twilight, clearly later than sunset but not fully dark night. Understated real architecture and elegant spacious symmetry.",
+      "generatedSource": "exec-ee59778c-5187-4121-9d75-4c96ed09e70c.png"
+    },
+    {
+      "phase": "isha",
+      "assetPath": "assets/images/prayer_banners/isha.jpg",
+      "prompt": "ISHA deep night: A new peaceful wide view across a pale marble mosque courtyard, elegant illuminated arcades receding on the left and a large pale dome with a slender minaret on the right. Deep midnight blue sky with a small delicate crescent and a few faint realistic stars, no sunset band. Warm amber lantern pools beneath arches contrast softly with cool moonlit stone. Reflective marble, dark green palms, fully night but architecture remains clearly visible. Serene sophisticated editorial architectural photo, not a fantasy palace.",
+      "generatedSource": "exec-6cd8a3a9-3e8f-4f04-b8fe-0a9faa7b446a.png"
+    }
+  ]
+}

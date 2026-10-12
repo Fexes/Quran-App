@@ -1,6 +1,8 @@
 import 'dart:ui' show TextAlign, TextDirection;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:quran/core/constants/quran_arabic_script.dart';
+import 'package:quran/core/storage/settings_store.dart';
 import 'package:quran/features/quran/data/repositories/quran_translation_repository_impl.dart';
 import 'package:quran/features/quran/data/stores/quran_translation_store.dart';
 import 'package:quran/features/quran/domain/entities/quran_translation.dart';
@@ -92,8 +94,11 @@ void main() {
 
   group('QuranTranslationRepositoryImpl', () {
     test('groups Quran.com resources into one default per language', () async {
+      final settings = SettingsStore.memory();
+      final store = QuranTranslationStore.memory();
       final repository = QuranTranslationRepositoryImpl(
-        store: QuranTranslationStore.memory(),
+        store: store,
+        settingsStore: settings,
         resourcesFetcher: () async => {
           'translations': [
             {
@@ -109,6 +114,13 @@ void main() {
               'name': 'M. Pickthall',
               'author_name': 'M. Pickthall',
               'slug': 'quran.en.pickthall',
+            },
+            {
+              'id': 97,
+              'language_name': 'urdu',
+              'name': 'Maududi',
+              'author_name': 'Maududi',
+              'slug': 'ur-maududi',
             },
             {
               'id': 234,
@@ -128,6 +140,26 @@ void main() {
       expect(languages.first.defaultResource.id, 85);
       expect(languages.first.resourceCount, 2);
       expect(languages.last.languageName, 'urdu');
+      expect(languages.last.defaultResource.id, 234);
+      await repository.setSelectedTranslation(
+        languages.last.defaultResource.id,
+      );
+      expect(settings.audioMeaningLanguageCodeOrNull, 'ur');
+      await settings.setAudioTranslationReciterId('alqurancloud:ur.khan');
+      await repository.setSelectedTranslation(97);
+      await repository.setSelectedTranslation(85);
+      expect(settings.audioMeaningLanguageCodeOrNull, 'en');
+      expect(settings.audioTranslationReciterId, isEmpty);
+      expect(
+        (await repository.translationLanguages()).last.defaultResource.id,
+        97,
+      );
+      await repository.setSelectedTranslation(97);
+      expect(settings.audioTranslationReciterId, 'alqurancloud:ur.khan');
+      await repository.setSelectedTranslation(null);
+      expect(settings.audioMeaningLanguageCodeOrNull, isNull);
+      expect(settings.audioTranslationReciterId, isEmpty);
+      expect(store.preferredResourceId('urdu'), 97);
     });
 
     test(
@@ -141,6 +173,25 @@ void main() {
         final languages = await repository.translationLanguages();
 
         expect(languages, hasLength(69));
+        expect(
+          languages.every(
+            (language) =>
+                language.defaultResource.resolvedLanguageCode.isNotEmpty,
+          ),
+          isTrue,
+        );
+        for (final country in ['PK', 'IN', 'BD', ' pk ']) {
+          expect(
+            QuranArabicScript.forCountry(country),
+            QuranArabicScript.indoPak,
+          );
+        }
+        for (final country in ['US', 'SA', 'GB', '']) {
+          expect(
+            QuranArabicScript.forCountry(country),
+            QuranArabicScript.uthmani,
+          );
+        }
         expect(
           languages.map((language) => language.defaultResource.id),
           containsAll([85, 234]),

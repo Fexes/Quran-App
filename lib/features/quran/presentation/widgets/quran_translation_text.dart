@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/quran_theme.dart';
 import '../../domain/entities/quran_translation.dart';
 
 class QuranTranslationText extends StatelessWidget {
@@ -8,29 +9,36 @@ class QuranTranslationText extends StatelessWidget {
     required this.text,
     required this.style,
     this.resource,
+    this.languageCode,
     this.maxLines,
     this.overflow,
+    this.textAlign,
   });
 
   final String text;
   final TextStyle? style;
   final QuranTranslationResource? resource;
+  final String? languageCode;
   final int? maxLines;
   final TextOverflow? overflow;
+  final TextAlign? textAlign;
 
   @override
   Widget build(BuildContext context) {
     final direction = _translationDirection(resource: resource, text: text);
-    final align = direction == TextDirection.rtl
-        ? TextAlign.right
-        : TextAlign.left;
+    final align =
+        textAlign ??
+        (direction == TextDirection.rtl ? TextAlign.right : TextAlign.left);
     return Directionality(
       textDirection: direction,
       child: Text(
         text,
         textAlign: align,
         textDirection: direction,
-        style: style,
+        style: QuranTheme.translationStyle(
+          style,
+          languageCode ?? resource?.resolvedLanguageCode,
+        ),
         maxLines: maxLines,
         overflow: overflow,
       ),
@@ -48,6 +56,10 @@ class QuranTranslationText extends StatelessWidget {
   }
 
   static bool _hasStrongRtlText(String text) {
-    return RegExp(r'[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]').hasMatch(text);
+    // Ayah brackets are also present in otherwise left-to-right translations.
+    final withoutAyahBrackets = text.replaceAll(RegExp(r'[\uFD3E\uFD3F]'), '');
+    return RegExp(
+      r'[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]',
+    ).hasMatch(withoutAyahBrackets);
   }
 }

@@ -60,10 +60,8 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
         preferredLanguageCode: _settingsStore.audioMeaningLanguageCodeOrNull,
       );
       final selectedArabic = _selectedReciter(arabicReciters, selectedId);
-      final savedTranslationId = _settingsStore.audioTranslationReciterId;
-      final selectedTranslationReciter = _selectedReciter(
+      final selectedTranslationReciter = _preferredTranslationReciter(
         translationReciters,
-        savedTranslationId,
       );
       final visibleReciters = _recitersForAudioType(
         state.audioType,
@@ -104,8 +102,11 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
 
   Future<void> selectReciter(QuranAudioReciter reciter) async {
     if (state.audioType == QuranAudioDownloadAudioType.translation) {
-      await _settingsStore.setAudioTranslationReciterId(reciter.id);
       await _settingsStore.setAudioMeaningLanguageCode(reciter.languageCode);
+      await _settingsStore.setAudioTranslationReciterId(
+        reciter.id,
+        languageCode: reciter.languageCode,
+      );
       emit(
         state.copyWith(
           selectedReciter: reciter,
@@ -126,9 +127,8 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
 
   Future<void> setAudioType(QuranAudioDownloadAudioType audioType) async {
     final allReciters = await _quranRepository.getAudioReciters();
-    final selectedTranslation =
-        state.selectedTranslation ??
-        await _translationRepository?.selectedTranslation();
+    final selectedTranslation = await _translationRepository
+        ?.selectedTranslation();
     final arabicReciters = _arabicReciters(allReciters);
     final translationReciters = quranTranslationAudioRecitersFor(
       reciters: allReciters,
@@ -141,12 +141,9 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
           arabicReciters,
           await _quranRepository.getSelectedAudioReciterId(),
         );
-    final selectedTranslationReciter =
-        state.selectedTranslationReciter ??
-        _selectedReciter(
-          translationReciters,
-          _settingsStore.audioTranslationReciterId,
-        );
+    final selectedTranslationReciter = _preferredTranslationReciter(
+      translationReciters,
+    );
     final visibleReciters = _recitersForAudioType(
       audioType,
       arabicReciters: arabicReciters,
@@ -183,6 +180,9 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
     }
     await repository.setSelectedTranslation(resourceId);
     final selectedTranslation = await repository.selectedTranslation();
+    await _settingsStore.setAudioMeaningLanguageCode(
+      selectedTranslation?.resolvedLanguageCode ?? '',
+    );
     final allReciters = await _quranRepository.getAudioReciters();
     final arabicReciters = _arabicReciters(allReciters);
     final translationReciters = quranTranslationAudioRecitersFor(
@@ -196,9 +196,8 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
           arabicReciters,
           await _quranRepository.getSelectedAudioReciterId(),
         );
-    final selectedTranslationReciter = _selectedReciter(
+    final selectedTranslationReciter = _preferredTranslationReciter(
       translationReciters,
-      _settingsStore.audioTranslationReciterId,
     );
     emit(
       state.copyWith(
@@ -221,6 +220,16 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
   void setFilter(QuranAudioDownloadsFilter filter) {
     emit(state.copyWith(filter: filter));
   }
+
+  QuranAudioReciter? _preferredTranslationReciter(
+    List<QuranAudioReciter> reciters,
+  ) => preferredQuranTranslationVoice(
+    reciters,
+    preferredId: _settingsStore.translationVoiceForLanguage(
+      reciters.firstOrNull?.languageCode ?? '',
+    ),
+    legacyId: _settingsStore.audioTranslationReciterId,
+  );
 
   Future<void> setWifiOnlyLargeDownloads(bool value) async {
     await _settingsStore.setAudioWifiOnlyLargeDownloads(value);

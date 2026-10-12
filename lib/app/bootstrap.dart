@@ -1,6 +1,7 @@
 import 'package:bloc/bloc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../core/widgets/app_icon.dart';
 import 'package:flutter/services.dart';
 
 import 'di/injection.dart';
@@ -19,6 +20,9 @@ Future<void> _startApp(AppBuilder builder) async {
   try {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     await configureDependencies();
+    await (FontLoader(
+      'UthmanicHafs',
+    )..addFont(rootBundle.load('assets/fonts/UthmanicHafs.ttf'))).load();
     runApp(builder());
   } catch (error, stackTrace) {
     FlutterError.reportError(
@@ -56,7 +60,7 @@ class _BootstrapFailureApp extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.storage_rounded, size: 42),
+                  const AppIcon(Icons.storage_rounded, size: 42),
                   const SizedBox(height: 14),
                   Text(
                     'Quran could not finish starting',
@@ -83,7 +87,7 @@ class _BootstrapFailureApp extends StatelessWidget {
                   const SizedBox(height: 18),
                   FilledButton.icon(
                     onPressed: onRetry,
-                    icon: const Icon(Icons.refresh_rounded),
+                    icon: const AppIcon(Icons.refresh_rounded),
                     label: const Text('Try again'),
                   ),
                 ],

@@ -34,7 +34,7 @@ class LocalHadithDataSource {
   final List<HadithChapter>? _manualChapters;
   final List<HadithItem>? _manualHadiths;
   final _bookCache = <String, _HadithBookAsset>{};
-  final _bookSearchCache = <String, List<_HadithSearchDocument>>{};
+  final _bookLoadFutures = <String, Future<_HadithBookAsset>>{};
 
   Future<List<HadithBook>>? _booksFuture;
   Future<List<ContentSource>>? _sourcesFuture;
@@ -88,6 +88,7 @@ class LocalHadithDataSource {
     return book.availableLanguages
         .map(_languageCodeFor)
         .whereType<String>()
+        .where((code) => code != 'ar')
         .toSet()
         .toList(growable: false);
   }
@@ -215,41 +216,11 @@ class LocalHadithDataSource {
       return const [];
     }
     final asset = await _loadBookAsset(bookId);
-    final cachedDocuments = _bookSearchCache.remove(bookId);
-    final documents =
-        cachedDocuments ??
-        [
-          for (final hadith in asset.hadiths)
-            _HadithSearchDocument(
-              item: hadith,
-              normalizedText: SearchTextNormalizer.normalize(
-                '${hadith.reference} ${hadith.cleanReference} ${hadith.grade} '
-                '${hadith.arabic} ${hadith.translation}',
-              ),
-            ),
-        ];
-    _bookSearchCache[bookId] = documents;
-    while (_bookSearchCache.length > 3) {
-      _bookSearchCache.remove(_bookSearchCache.keys.first);
-    }
-    final matches = <({HadithItem item, int score})>[];
-    for (final document in documents) {
-      final score = _matchScore(
-        query: normalized,
-        text: document.normalizedText,
-        number: document.item.hadithNumber,
-      );
-      if (score > 0) {
-        matches.add((item: document.item, score: score));
-      }
-    }
-    matches.sort((a, b) {
-      final score = b.score.compareTo(a.score);
-      return score != 0
-          ? score
-          : _compareHadithNumbers(a.item.hadithNumber, b.item.hadithNumber);
+    return compute(_searchHadithBook, {
+      'hadiths': asset.hadiths,
+      'query': normalized,
+      'limit': limit,
     });
-    return [for (final match in matches.take(limit)) match.item];
   }
 
   Future<List<ContentSource>> _loadContentSources() async {
@@ -289,11 +260,26 @@ class LocalHadithDataSource {
     }
     final book = await getBook(bookId);
     final slug = book?.slug ?? bookId;
-    final raw = await _assetBundle.loadString(
-      'assets/data/hadith/books/$slug.json',
-    );
-    final map = await compute(_decodeJsonObject, raw);
-    final asset = _HadithBookAsset.fromMap(map);
+    final cachedBySlug = _bookCache.remove(slug);
+    if (cachedBySlug != null) {
+      _bookCache[slug] = cachedBySlug;
+      _bookCache[bookId] = cachedBySlug;
+      return cachedBySlug;
+    }
+    final future = _bookLoadFutures.putIfAbsent(slug, () async {
+      final raw = await _assetBundle.loadString(
+        'assets/data/hadith/books/$slug.json',
+      );
+      return compute(_decodeHadithBookAsset, raw);
+    });
+    late final _HadithBookAsset asset;
+    try {
+      asset = await future;
+    } finally {
+      if (identical(_bookLoadFutures[slug], future)) {
+        _bookLoadFutures.remove(slug);
+      }
+    }
     _bookCache[slug] = asset;
     _bookCache[bookId] = asset;
     while (_bookCache.length > 6) {
@@ -372,16 +358,6 @@ class _HadithBookAsset {
   final List<HadithItem> hadiths;
 }
 
-class _HadithSearchDocument {
-  const _HadithSearchDocument({
-    required this.item,
-    required this.normalizedText,
-  });
-
-  final HadithItem item;
-  final String normalizedText;
-}
-
 int _matchScore({
   required String query,
   required String text,
@@ -436,6 +412,10 @@ Map<String, dynamic> _decodeJsonObject(String source) {
   return jsonDecode(source) as Map<String, dynamic>;
 }
 
+_HadithBookAsset _decodeHadithBookAsset(String source) {
+  return _HadithBookAsset.fromMap(_decodeJsonObject(source));
+}
+
 List<DeepSearchIndexRecord> _decodeSearchIndex(String source) {
   return [
     for (final line in source.split('\n'))
@@ -466,4 +446,32 @@ List<String> _searchIndexMatches(Map<String, Object> arguments) {
   }
   matches.sort((a, b) => b.score.compareTo(a.score));
   return [for (final match in matches.take(limit)) match.targetId];
+}
+
+List<HadithItem> _searchHadithBook(Map<String, Object> arguments) {
+  final hadiths = arguments['hadiths']! as List<HadithItem>;
+  final query = arguments['query']! as String;
+  final limit = arguments['limit']! as int;
+  final matches = <({HadithItem item, int score})>[];
+  for (final hadith in hadiths) {
+    final text = SearchTextNormalizer.normalize(
+      '${hadith.reference} ${hadith.cleanReference} ${hadith.grade} '
+      '${hadith.arabic} ${hadith.translation}',
+    );
+    final score = _matchScore(
+      query: query,
+      text: text,
+      number: hadith.hadithNumber,
+    );
+    if (score > 0) {
+      matches.add((item: hadith, score: score));
+    }
+  }
+  matches.sort((a, b) {
+    final score = b.score.compareTo(a.score);
+    return score != 0
+        ? score
+        : _compareHadithNumbers(a.item.hadithNumber, b.item.hadithNumber);
+  });
+  return [for (final match in matches.take(limit)) match.item];
 }

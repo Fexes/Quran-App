@@ -88,6 +88,7 @@ Future<void> configureDependencies({
   if (!getIt.isRegistered<LocalQuranDataSource>()) {
     getIt.registerLazySingleton<LocalQuranDataSource>(LocalQuranDataSource.new);
   }
+  await getIt<LocalQuranDataSource>().ensureQpcHafsLoaded();
 
   if (!getIt.isRegistered<QuranUserDataStore>()) {
     final store = quranUserDataStore ?? await QuranUserDataStore.open();
@@ -163,7 +164,10 @@ Future<void> configureDependencies({
 
   if (!getIt.isRegistered<QuranTranslationRepository>()) {
     getIt.registerLazySingleton<QuranTranslationRepository>(
-      () => QuranTranslationRepositoryImpl(store: getIt()),
+      () => QuranTranslationRepositoryImpl(
+        store: getIt(),
+        settingsStore: getIt(),
+      ),
     );
   }
 

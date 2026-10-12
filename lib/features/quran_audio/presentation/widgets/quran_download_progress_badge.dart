@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 
 import '../../../../core/theme/quran_theme.dart';
 import '../../domain/entities/quran_audio_download_item.dart';
@@ -23,7 +24,7 @@ class QuranDownloadProgressBadge extends StatelessWidget {
           CircleAvatar(
             radius: 22,
             backgroundColor: QuranTheme.softFill(context, primary),
-            child: Icon(_iconForGroup(group), color: primary),
+            child: AppIcon(_iconForGroup(group), color: primary),
           ),
           if (isDownloading)
             SizedBox(

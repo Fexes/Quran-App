@@ -141,6 +141,11 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
         selectedTranslations,
         loaded.surah.number,
       );
+      final openingAyahs = loaded.surah.number == 1
+          ? loaded.ayahs
+          : await _repository.getAyahs(1);
+      final bismillahAyah = openingAyahs.isEmpty ? null : openingAyahs.first;
+      assert(bismillahAyah == null || bismillahAyah.verseKey == '1:1');
       final translationsByVerse = selectedTranslation == null
           ? const <String, String>{}
           : translationsByResource[selectedTranslation.id] ?? const {};
@@ -149,6 +154,7 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
           status: QuranReaderStatus.success,
           surah: loaded.surah,
           ayahs: loaded.ayahs,
+          bismillahAyah: bismillahAyah,
           bookmarkedVerseKeys: bookmarks
               .map((bookmark) => bookmark.verseKey)
               .toSet(),
@@ -183,37 +189,45 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     QuranReaderSurahChanged event,
     Emitter<QuranReaderState> emit,
   ) async {
-    final loaded = await _loadSurahReaderData(
-      surahNumber: event.surahNumber.clamp(1, 114).toInt(),
-      initialAyahNumber: event.initialAyahNumber,
-      ayahTextLayout: state.ayahTextLayout,
-      showTranslation: state.showTranslation,
-      interlinearCacheComplete: state.interlinearCacheComplete,
-      interlinearLanguageCode: state.interlinearLanguageCode,
-      existingWords: state.pageWordsByPage,
-    );
-    final translationsByResource = await _translationMapsForSurah(
-      state.selectedTranslations,
-      loaded.surah.number,
-    );
-    final translationsByVerse = state.selectedTranslation == null
-        ? const <String, String>{}
-        : translationsByResource[state.selectedTranslation!.id] ?? const {};
-    emit(
-      state.copyWith(
-        surah: loaded.surah,
-        ayahs: loaded.ayahs,
-        pageWordsByPage: loaded.pageWordCache,
-        translationsByVerse: translationsByVerse,
-        translationsByResource: translationsByResource,
-        pageWordDataAvailable: {
-          ...state.pageWordDataAvailable,
-          ..._availableWordPages(loaded.pageWordCache),
-        },
-        currentVerseKey: loaded.startingAyah?.verseKey,
-        selectedVerseKey: loaded.startingAyah?.verseKey,
-      ),
-    );
+    if (state.errorMessage != null) emit(state.copyWith());
+    try {
+      final loaded = await _loadSurahReaderData(
+        surahNumber: event.surahNumber.clamp(1, 114).toInt(),
+        initialAyahNumber: event.initialAyahNumber,
+        ayahTextLayout: state.ayahTextLayout,
+        showTranslation: state.showTranslation,
+        interlinearCacheComplete: state.interlinearCacheComplete,
+        interlinearLanguageCode: state.interlinearLanguageCode,
+        existingWords: state.pageWordsByPage,
+      );
+      final translationsByResource = await _translationMapsForSurah(
+        state.selectedTranslations,
+        loaded.surah.number,
+      );
+      final translationsByVerse = state.selectedTranslation == null
+          ? const <String, String>{}
+          : translationsByResource[state.selectedTranslation!.id] ?? const {};
+      emit(
+        state.copyWith(
+          surah: loaded.surah,
+          ayahs: loaded.ayahs,
+          pageWordsByPage: loaded.pageWordCache,
+          translationsByVerse: translationsByVerse,
+          translationsByResource: translationsByResource,
+          pageWordDataAvailable: {
+            ...state.pageWordDataAvailable,
+            ..._availableWordPages(loaded.pageWordCache),
+          },
+          currentVerseKey: loaded.startingAyah?.verseKey,
+          selectedVerseKey: loaded.startingAyah?.verseKey,
+        ),
+      );
+    } catch (_) {
+      // Keep the current reader visible and allow a failed pull to be retried.
+      emit(
+        state.copyWith(errorMessage: 'Could not open surah. Please try again.'),
+      );
+    }
   }
 
   Future<void> _onTranslationToggled(
@@ -698,13 +712,21 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     if (repository == null || resources.isEmpty) {
       return const {};
     }
-    return {
-      for (final resource in resources)
-        resource.id: await repository.cachedTranslationsForSurah(
-          resource.id,
-          surahNumber,
-        ),
-    };
+    final translations = <int, Map<String, String>>{};
+    for (final resource in resources) {
+      final verses = await repository.cachedTranslationsForSurah(
+        resource.id,
+        surahNumber,
+      );
+      final opening = surahNumber == 1 || surahNumber == 9
+          ? null
+          : await repository.cachedTranslationForVerse(resource.id, '1:1');
+      translations[resource.id] = {
+        ...verses,
+        if (opening != null && opening.trim().isNotEmpty) '1:1': opening,
+      };
+    }
+    return translations;
   }
 
   Future<Map<int, List<QuranWord>>> _surahPageWordCache(

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../constants/quran_arabic_script.dart';
 import 'quran_theme_state.dart';
 
 @immutable
@@ -93,64 +94,42 @@ class QuranSemanticColors extends ThemeExtension<QuranSemanticColors> {
 class QuranTheme {
   const QuranTheme._();
 
-  static const double radiusCard = 22;
-  static const double radiusControl = 18;
-  static const double radiusDock = 34;
-  static const double radiusSheet = 32;
+  static const double radiusCard = 12;
+  static const double radiusControl = 12;
+  static const double radiusDock = 20;
+  static const double radiusSheet = 24;
   static const double radiusPill = 999;
 
   static const presets = [
     QuranThemePreset(
       id: 'white-glass',
-      name: 'White Glass',
+      name: 'Light',
       mode: QuranThemeMode.light,
-      primary: Color(0xFF050505),
+      primary: Color(0xFF202323),
       onPrimary: Color(0xFFFFFFFF),
       background: Color(0xFFFFFFFF),
       surface: Color(0xFFFFFFFF),
-      surfaceVariant: Color(0xFFF7FAF9),
-      outline: Color(0xFFE7EFEB),
-      text: Color(0xFF0B1511),
-    ),
-    QuranThemePreset(
-      id: 'light-sanctuary',
-      name: 'Light Sanctuary',
-      mode: QuranThemeMode.light,
-      primary: Color(0xFF0F766E),
-      onPrimary: Color(0xFFFFFFFF),
-      background: Color(0xFFF8FAF8),
-      surface: Color(0xFFFFFFFF),
-      surfaceVariant: Color(0xFFEDF5F2),
-      outline: Color(0xFFD8E5DF),
-      text: Color(0xFF13211D),
+      surfaceVariant: Color(0xFFF3F3F3),
+      outline: Color(0xFFE7E7E7),
+      text: Color(0xFF202323),
     ),
     QuranThemePreset(
       id: 'dark-minbar',
-      name: 'Dark Minbar',
+      name: 'Dark',
       mode: QuranThemeMode.dark,
-      primary: Color(0xFFD6A657),
-      onPrimary: Color(0xFF201404),
-      background: Color(0xFF101412),
-      surface: Color(0xFF171D1A),
-      surfaceVariant: Color(0xFF202822),
-      outline: Color(0xFF314138),
-      text: Color(0xFFF4F2E8),
-    ),
-    QuranThemePreset(
-      id: 'black-gold',
-      name: 'Black Gold',
-      mode: QuranThemeMode.black,
-      primary: Color(0xFFD7B46A),
-      onPrimary: Color(0xFF171004),
-      background: Color(0xFF000000),
-      surface: Color(0xFF0B0D0C),
-      surfaceVariant: Color(0xFF141816),
-      outline: Color(0xFF252F29),
-      text: Color(0xFFF6F0DF),
+      primary: Color(0xFFF3F3F3),
+      onPrimary: Color(0xFF171717),
+      background: Color(0xFF141414),
+      surface: Color(0xFF191919),
+      surfaceVariant: Color(0xFF252525),
+      outline: Color(0xFF363636),
+      text: Color(0xFFF3F3F3),
     ),
   ];
 
   static QuranThemePreset presetById(String id) {
+    // Restore retired dark presets without changing the user's brightness.
+    if (id == 'black-gold') return presets.last;
     return presets.firstWhere(
       (preset) => preset.id == id,
       orElse: () => presets.first,
@@ -158,6 +137,7 @@ class QuranTheme {
   }
 
   static QuranThemeMode modeFromName(String value) {
+    if (value == 'black') return QuranThemeMode.dark;
     return QuranThemeMode.values.firstWhere(
       (mode) => mode.name == value,
       orElse: () => QuranThemeMode.light,
@@ -172,6 +152,7 @@ class QuranTheme {
   static ThemeData buildTheme({
     required QuranThemePreset preset,
     required double fontWeightScale,
+    QuranArabicScript arabicScript = QuranArabicScript.uthmani,
   }) {
     final brightness = preset.mode == QuranThemeMode.light
         ? Brightness.light
@@ -183,6 +164,10 @@ class QuranTheme {
         ).copyWith(
           primary: preset.primary,
           onPrimary: preset.onPrimary,
+          secondary: preset.primary,
+          onSecondary: preset.onPrimary,
+          secondaryContainer: preset.surfaceVariant,
+          onSecondaryContainer: preset.text,
           surface: preset.surface,
           surfaceContainerHighest: preset.surfaceVariant,
           outline: preset.outline,
@@ -197,11 +182,30 @@ class QuranTheme {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: preset.background,
+      fontFamily: 'Manrope',
+      fontFamilyFallback: [
+        if (arabicScript.fontFamily != null) arabicScript.fontFamily!,
+        'NotoSansArabic',
+      ],
       visualDensity: VisualDensity.standard,
     );
 
     final textTheme = _scaleTextWeights(
-      base.textTheme,
+      base.textTheme.copyWith(
+        titleLarge: base.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w500,
+          fontSize: 22,
+        ),
+        titleMedium: base.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
+        titleSmall: base.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
+        labelLarge: base.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
+      ),
       fontWeightScale,
     ).apply(bodyColor: preset.text, displayColor: preset.text);
     final cardShadowColor = brightness == Brightness.dark
@@ -218,28 +222,44 @@ class QuranTheme {
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
-        backgroundColor: preset.background.withValues(alpha: 0.94),
+        backgroundColor: preset.background,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
         foregroundColor: preset.text,
         titleTextStyle: textTheme.titleLarge?.copyWith(
-          fontWeight: weight(FontWeight.w700, fontWeightScale),
+          fontWeight: weight(FontWeight.w600, fontWeightScale),
+          letterSpacing: 0,
         ),
         systemOverlayStyle: systemUiOverlayStyle(preset.mode),
       ),
       cardTheme: CardThemeData(
-        elevation: brightness == Brightness.dark ? 0 : 5,
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
         color: preset.surface,
-        shadowColor: cardShadowColor,
+        shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusCard),
-          side: BorderSide(color: preset.outline),
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        minVerticalPadding: 10,
+        iconColor: preset.text.withValues(alpha: 0.68),
+        textColor: preset.text,
+        selectedColor: preset.primary,
+        selectedTileColor: preset.primary.withValues(
+          alpha: brightness == Brightness.dark ? 0.18 : 0.09,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusCard),
         ),
       ),
       dividerTheme: DividerThemeData(color: preset.outline, thickness: 1),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: preset.surface,
+        fillColor: preset.surfaceVariant,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
@@ -265,7 +285,7 @@ class QuranTheme {
             borderRadius: BorderRadius.circular(radiusControl),
           ),
           textStyle: TextStyle(
-            fontWeight: weight(FontWeight.w700, fontWeightScale),
+            fontWeight: weight(FontWeight.w500, fontWeightScale),
           ),
         ),
       ),
@@ -295,17 +315,17 @@ class QuranTheme {
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: preset.surface,
-        selectedColor: preset.primary.withValues(
-          alpha: brightness == Brightness.dark ? 0.22 : 0.12,
-        ),
+        selectedColor: scheme.secondaryContainer,
+        labelStyle: textTheme.labelLarge?.copyWith(letterSpacing: 0),
         side: BorderSide(color: preset.outline),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusPill),
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: Colors.transparent,
-        modalBackgroundColor: Colors.transparent,
+        showDragHandle: false,
+        backgroundColor: preset.surface,
+        modalBackgroundColor: preset.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         modalElevation: 0,
@@ -323,6 +343,15 @@ class QuranTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusSheet),
           side: BorderSide(color: preset.outline),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: preset.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 6,
+        textStyle: textTheme.bodyMedium,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusControl),
         ),
       ),
       sliderTheme: SliderThemeData(
@@ -422,6 +451,18 @@ class QuranTheme {
     return semantic(context).wordHighlight;
   }
 
+  static TextStyle translationStyle(TextStyle? style, String? languageCode) {
+    final base = style ?? const TextStyle();
+    final language = languageCode?.toLowerCase().split(RegExp('[-_]')).first;
+    if (language != 'ur' && language != 'urdu') return base;
+    return base.copyWith(
+      fontFamily: 'NotoNastaliqUrdu',
+      fontFamilyFallback: const ['NotoSansArabic'],
+      height: math.max(base.height ?? 1, 2.15),
+      letterSpacing: 0,
+    );
+  }
+
   static Color wordHighlighterFill(BuildContext context) {
     return wordHighlight(
       context,
@@ -450,42 +491,49 @@ class QuranTheme {
     bool prominent = false,
     bool compact = false,
   }) {
-    if (compact) {
-      return [
-        BoxShadow(
-          color: Colors.black.withValues(
-            alpha: isDark(context)
-                ? (prominent ? 0.24 : 0.16)
-                : (prominent ? 0.075 : 0.045),
-          ),
-          blurRadius: prominent ? 20 : 14,
-          spreadRadius: prominent ? -4 : -3,
-          offset: Offset(0, prominent ? 8 : 5),
-        ),
-      ];
+    if (isDark(context) && !prominent) {
+      return const <BoxShadow>[];
     }
+
     if (isDark(context)) {
       return [
         BoxShadow(
-          color: Colors.black.withValues(alpha: prominent ? 0.38 : 0.28),
-          blurRadius: prominent ? 34 : 24,
-          offset: Offset(0, prominent ? 18 : 12),
+          color: Colors.black.withValues(alpha: 0.26),
+          blurRadius: 30,
+          spreadRadius: -6,
+          offset: const Offset(0, 12),
+        ),
+      ];
+    }
+
+    if (compact) {
+      return [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: prominent ? 0.09 : 0.025),
+          blurRadius: prominent ? 22 : 10,
+          spreadRadius: prominent ? -4 : -2,
+          offset: Offset(0, prominent ? 8 : 4),
         ),
       ];
     }
 
     return [
       BoxShadow(
-        color: Colors.black.withValues(alpha: prominent ? 0.105 : 0.065),
-        blurRadius: prominent ? 38 : 26,
-        offset: Offset(0, prominent ? 20 : 12),
+        color: Colors.black.withValues(alpha: prominent ? 0.10 : 0.03),
+        blurRadius: prominent ? 26 : 12,
+        spreadRadius: prominent ? -5 : -2,
+        offset: Offset(0, prominent ? 12 : 4),
       ),
+    ];
+  }
+
+  static List<BoxShadow> modalSheetShadow(BuildContext context) {
+    return [
       BoxShadow(
-        color: Theme.of(
-          context,
-        ).colorScheme.primary.withValues(alpha: prominent ? 0.045 : 0.026),
-        blurRadius: prominent ? 42 : 26,
-        offset: Offset(0, prominent ? 18 : 12),
+        color: Colors.black.withValues(alpha: isDark(context) ? 0.28 : 0.10),
+        blurRadius: 28,
+        spreadRadius: -5,
+        offset: const Offset(0, -8),
       ),
     ];
   }
@@ -519,6 +567,7 @@ class QuranTheme {
     }
     return style.copyWith(
       fontWeight: weight(style.fontWeight ?? FontWeight.w400, fontWeightScale),
+      letterSpacing: 0,
     );
   }
 

@@ -1,11 +1,12 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../domain/entities/backup_models.dart';
 import '../../domain/repositories/backup_repository.dart';
@@ -32,23 +33,24 @@ class _BackupPageState extends State<BackupPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context).backupPrivacyTitle),
+        flexibleSpace: const ArchitecturalBackdrop(),
       ),
       body: Stack(
         children: [
           ListView(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 40),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
             children: [
               const _PrivacySummary(),
-              const SizedBox(height: 14),
-              PremiumSurface(
-                padding: const EdgeInsets.all(16),
+              const Divider(height: 32),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
                       'Encrypted local backup',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -59,28 +61,28 @@ class _BackupPageState extends State<BackupPage> {
                     const SizedBox(height: 14),
                     FilledButton.icon(
                       onPressed: _busy ? null : _exportBackup,
-                      icon: const Icon(Icons.file_upload_outlined),
+                      icon: const AppIcon(Icons.file_upload_outlined),
                       label: const Text('Export encrypted backup'),
                     ),
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
                       onPressed: _busy ? null : _importBackup,
-                      icon: const Icon(Icons.file_download_outlined),
+                      icon: const AppIcon(Icons.file_download_outlined),
                       label: const Text('Preview and restore backup'),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              PremiumSurface(
-                padding: const EdgeInsets.all(16),
+              const Divider(height: 32),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
                       'Erase local data',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -94,10 +96,10 @@ class _BackupPageState extends State<BackupPage> {
                     for (final category in BackupDataCategory.values)
                       ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: Icon(_categoryIcon(category)),
+                        leading: AppIcon(_categoryIcon(category)),
                         title: Text(_categoryLabel(category)),
                         subtitle: Text(_categoryDescription(category)),
-                        trailing: const Icon(Icons.delete_outline_rounded),
+                        trailing: const AppIcon(Icons.delete_outline_rounded),
                         onTap: _busy ? null : () => _eraseCategory(category),
                       ),
                     const Divider(height: 26),
@@ -106,7 +108,7 @@ class _BackupPageState extends State<BackupPage> {
                         foregroundColor: Theme.of(context).colorScheme.error,
                       ),
                       onPressed: _busy ? null : _eraseAll,
-                      icon: const Icon(Icons.delete_forever_rounded),
+                      icon: const AppIcon(Icons.delete_forever_rounded),
                       label: const Text('Erase all personal data'),
                     ),
                   ],
@@ -194,6 +196,7 @@ class _BackupPageState extends State<BackupPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: Text('Erase ${_categoryLabel(category)}?'),
         content: Text(
           '${_categoryDescription(category)} This cannot be undone unless it '
@@ -205,6 +208,10 @@ class _BackupPageState extends State<BackupPage> {
             child: const Text('Cancel'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Erase'),
           ),
@@ -221,10 +228,11 @@ class _BackupPageState extends State<BackupPage> {
   }
 
   Future<void> _eraseAll() async {
-    final controller = TextEditingController();
+    var confirmation = '';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('Erase all personal data?'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -236,8 +244,8 @@ class _BackupPageState extends State<BackupPage> {
               'Type ERASE to continue.',
             ),
             const SizedBox(height: 14),
-            TextField(
-              controller: controller,
+            TextFormField(
+              onChanged: (value) => confirmation = value,
               autofocus: true,
               textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(labelText: 'ERASE'),
@@ -250,14 +258,17 @@ class _BackupPageState extends State<BackupPage> {
             child: const Text('Cancel'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
             onPressed: () =>
-                Navigator.pop(dialogContext, controller.text.trim() == 'ERASE'),
+                Navigator.pop(dialogContext, confirmation.trim() == 'ERASE'),
             child: const Text('Erase all'),
           ),
         ],
       ),
     );
-    controller.dispose();
     if (confirmed != true) {
       return;
     }
@@ -268,21 +279,27 @@ class _BackupPageState extends State<BackupPage> {
   }
 
   Future<String?> _passwordDialog({bool confirm = false}) async {
-    final passwordController = TextEditingController();
-    final confirmController = TextEditingController();
+    var password = '';
+    var confirmation = '';
     String? validation;
     final result = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          scrollable: true,
           title: Text(confirm ? 'Protect your backup' : 'Unlock backup'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: passwordController,
+              TextFormField(
+                onChanged: (value) => password = value,
                 obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: confirm
+                    ? TextInputAction.next
+                    : TextInputAction.done,
                 autofocus: true,
                 decoration: InputDecoration(
                   labelText: 'Password',
@@ -291,9 +308,11 @@ class _BackupPageState extends State<BackupPage> {
               ),
               if (confirm) ...[
                 const SizedBox(height: 10),
-                TextField(
-                  controller: confirmController,
+                TextFormField(
+                  onChanged: (value) => confirmation = value,
                   obscureText: true,
+                  autocorrect: false,
+                  enableSuggestions: false,
                   decoration: const InputDecoration(
                     labelText: 'Confirm password',
                   ),
@@ -315,14 +334,13 @@ class _BackupPageState extends State<BackupPage> {
             ),
             FilledButton(
               onPressed: () {
-                final password = passwordController.text;
                 if (password.length < 8) {
                   setDialogState(() {
                     validation = 'Use at least 8 characters.';
                   });
                   return;
                 }
-                if (confirm && password != confirmController.text) {
+                if (confirm && password != confirmation) {
                   setDialogState(() {
                     validation = 'Passwords do not match.';
                   });
@@ -336,8 +354,6 @@ class _BackupPageState extends State<BackupPage> {
         ),
       ),
     );
-    passwordController.dispose();
-    confirmController.dispose();
     return result;
   }
 
@@ -345,6 +361,7 @@ class _BackupPageState extends State<BackupPage> {
     return showDialog<BackupRestoreMode>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('Backup preview'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -358,9 +375,11 @@ class _BackupPageState extends State<BackupPage> {
             for (final entry in preview.categoryCounts.entries)
               Padding(
                 padding: const EdgeInsets.only(bottom: 5),
-                child: Row(
+                child: Wrap(
+                  spacing: 12,
+                  alignment: WrapAlignment.spaceBetween,
                   children: [
-                    Expanded(child: Text(_categoryLabel(entry.key))),
+                    Text(_categoryLabel(entry.key)),
                     Text('${entry.value} stored entries'),
                   ],
                 ),
@@ -393,6 +412,7 @@ class _BackupPageState extends State<BackupPage> {
   }
 
   Future<void> _perform(Future<void> Function() operation) async {
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       await operation();
@@ -430,19 +450,19 @@ class _PrivacySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.verified_user_outlined),
+              AppIcon(Icons.verified_user_outlined),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Your personal data stays on this device',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
             ],

@@ -22,6 +22,7 @@ class QuranAudioQueueItem extends Equatable {
     required this.remoteAudioUrl,
     required this.playbackUri,
     this.segmentType = QuranAudioSegmentType.arabic,
+    this.isBismillah = false,
     this.reciterImageUrl,
     this.surahImageAssetPath,
     this.surahArtworkUri,
@@ -37,36 +38,39 @@ class QuranAudioQueueItem extends Equatable {
     required QuranSurah surah,
     required QuranAudioReciter reciter,
     QuranAudioSegmentType segmentType = QuranAudioSegmentType.arabic,
+    QuranAyah? bismillah,
   }) {
+    assert(bismillah == null || bismillah.verseKey == '1:1');
+    final audioAyah = bismillah ?? ayah;
     final effectiveSegmentType = reciter.isTranslation
         ? QuranAudioSegmentType.translation
         : segmentType;
+    final hasWordTiming =
+        effectiveSegmentType == QuranAudioSegmentType.arabic &&
+        bismillah == null;
     return QuranAudioQueueItem(
       surahNumber: ayah.surahNumber,
       ayahNumber: ayah.number,
       verseKey: ayah.verseKey,
       page: ayah.page,
       surahName: surah.englishName,
-      arabicText: ayah.text,
-      translation: ayah.translation,
+      arabicText: audioAyah.text,
+      translation: audioAyah.translation,
       reciterId: reciter.id,
       reciterName: reciter.name,
       segmentType: effectiveSegmentType,
+      isBismillah: bismillah != null,
       reciterImageUrl: reciter.effectiveImageUrl,
       surahImageAssetPath: SurahImageCatalog.imageUrlFor(ayah.surahNumber),
-      remoteAudioUrl: reciter.audioUrlFor(ayah),
-      playbackUri: reciter.audioUrlFor(ayah),
-      timingProvider: effectiveSegmentType == QuranAudioSegmentType.translation
-          ? QuranAudioTimingProvider.none
-          : reciter.timingProvider,
-      timingRecitationId:
-          effectiveSegmentType == QuranAudioSegmentType.translation
-          ? null
-          : reciter.timingRecitationId,
-      timingChapterReciterId:
-          effectiveSegmentType == QuranAudioSegmentType.translation
-          ? null
-          : reciter.timingChapterReciterId,
+      remoteAudioUrl: reciter.audioUrlFor(audioAyah),
+      playbackUri: reciter.audioUrlFor(audioAyah),
+      timingProvider: hasWordTiming
+          ? reciter.timingProvider
+          : QuranAudioTimingProvider.none,
+      timingRecitationId: hasWordTiming ? reciter.timingRecitationId : null,
+      timingChapterReciterId: hasWordTiming
+          ? reciter.timingChapterReciterId
+          : null,
     );
   }
 
@@ -83,6 +87,7 @@ class QuranAudioQueueItem extends Equatable {
   final String? surahImageAssetPath;
   final String? surahArtworkUri;
   final QuranAudioSegmentType segmentType;
+  final bool isBismillah;
   final QuranAudioTimingProvider timingProvider;
   final int? timingRecitationId;
   final int? timingChapterReciterId;
@@ -94,10 +99,16 @@ class QuranAudioQueueItem extends Equatable {
   bool get isTranslationSegment =>
       segmentType == QuranAudioSegmentType.translation;
 
+  // Opening audio reuses Al-Fatihah 1:1 without moving the reader to Al-Fatihah.
+  int get audioSurahNumber => isBismillah ? 1 : surahNumber;
+  int get audioAyahNumber => isBismillah ? 1 : ayahNumber;
+
   MediaItem toMediaItem() {
     return MediaItem(
       id: playbackUri,
-      title: isTranslationSegment
+      title: isBismillah
+          ? '$surahName Bismillah${isTranslationSegment ? ' Translation' : ''}'
+          : isTranslationSegment
           ? '$surahName $surahNumber:$ayahNumber Translation'
           : '$surahName $surahNumber:$ayahNumber',
       artist: reciterName,
@@ -117,6 +128,7 @@ class QuranAudioQueueItem extends Equatable {
         'surahImageAssetPath': surahImageAssetPath,
         'surahArtworkUri': surahArtworkUri,
         'segmentType': segmentType.name,
+        'isBismillah': isBismillah,
         'timingProvider': timingProvider.name,
         'timingRecitationId': timingRecitationId,
         'timingChapterReciterId': timingChapterReciterId,
@@ -143,6 +155,7 @@ class QuranAudioQueueItem extends Equatable {
       reciterId: reciterId,
       reciterName: reciterName,
       segmentType: segmentType,
+      isBismillah: isBismillah,
       reciterImageUrl: reciterImageUrl,
       surahImageAssetPath: surahImageAssetPath,
       surahArtworkUri: surahArtworkUri,
@@ -168,6 +181,7 @@ class QuranAudioQueueItem extends Equatable {
       reciterId: reciterId,
       reciterName: reciterName,
       segmentType: segmentType,
+      isBismillah: isBismillah,
       reciterImageUrl: reciterImageUrl,
       surahImageAssetPath: surahImageAssetPath,
       surahArtworkUri: surahArtworkUri,
@@ -196,6 +210,7 @@ class QuranAudioQueueItem extends Equatable {
       'surahImageAssetPath': surahImageAssetPath,
       'surahArtworkUri': surahArtworkUri,
       'segmentType': segmentType.name,
+      'isBismillah': isBismillah,
       'timingProvider': timingProvider.name,
       'timingRecitationId': timingRecitationId,
       'timingChapterReciterId': timingChapterReciterId,
@@ -243,6 +258,7 @@ class QuranAudioQueueItem extends Equatable {
         (segmentType) => segmentType.name == value['segmentType'],
         orElse: () => QuranAudioSegmentType.arabic,
       ),
+      isBismillah: value['isBismillah'] == true,
       timingProvider: QuranAudioTimingProvider.values.firstWhere(
         (provider) => provider.name == value['timingProvider'],
         orElse: () => QuranAudioTimingProvider.none,
@@ -286,6 +302,7 @@ class QuranAudioQueueItem extends Equatable {
         (segmentType) => segmentType.name == extras['segmentType'],
         orElse: () => QuranAudioSegmentType.arabic,
       ),
+      isBismillah: extras['isBismillah'] == true,
       timingProvider: QuranAudioTimingProvider.values.firstWhere(
         (provider) => provider.name == extras['timingProvider'],
         orElse: () => QuranAudioTimingProvider.none,
@@ -314,6 +331,7 @@ class QuranAudioQueueItem extends Equatable {
     surahImageAssetPath,
     surahArtworkUri,
     segmentType,
+    isBismillah,
     timingProvider,
     timingRecitationId,
     timingChapterReciterId,

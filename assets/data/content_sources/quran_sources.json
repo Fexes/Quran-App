@@ -4,11 +4,12 @@
   "releaseStatus": "review_required",
   "sources": [
     {
-      "id": "quran_with_tafsir_arabic",
+      "id": "qpc_hafs_uthmani",
       "kind": "quranText",
-      "name": "Uthmani Quran text",
-      "provider": "quran_with_tafsir",
-      "edition": "King Fahd Complex Uthmani text",
+      "name": "QPC Hafs text and UthmanicHafs font",
+      "provider": "King Fahd Complex / Nuqayah source archive",
+      "edition": "QPC Hafs Uthmani v2.2",
+      "revision": "8a4f39d563ea69c994416a1692827e38156c548d",
       "languageCode": "ar",
       "languageName": "Arabic",
       "script": "Arab",
@@ -16,10 +17,10 @@
       "publisher": "King Fahd Complex for the Printing of the Holy Quran",
       "retrievalMode": "bundled",
       "cacheRetention": "bundled",
-      "sourceUrl": "https://pub.dev/packages/quran_with_tafsir",
-      "license": "Package code is MIT; bundled content redistribution requires separate review",
+      "sourceUrl": "https://github.com/nuqayah/qpc-fonts/tree/8a4f39d563ea69c994416a1692827e38156c548d/text-mushafs/UthmanicHafs_V22",
+      "license": "Font: original KFGQPC EULA, free use/copy/distribution unchanged; text redistribution requires release review",
       "reviewStatus": "reviewRequired",
-      "attribution": "Arabic Quran text is supplied by quran_with_tafsir and attributed by that package to the King Fahd Complex."
+      "attribution": "Text and font by King Fahd Glorious Quran Printing Complex. Original v2.2 assets archived by Nuqayah, bundled unchanged with font EULA and source checksums."
     },
     {
       "id": "quran_with_tafsir_saheeh_international",

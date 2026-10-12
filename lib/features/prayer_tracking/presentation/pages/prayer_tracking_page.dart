@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
@@ -6,7 +7,8 @@ import '../../../../app/di/injection.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/app_sheet.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../prayer/data/services/prayer_alert_notification_service.dart';
 import '../../domain/entities/prayer_tracking_models.dart';
@@ -15,7 +17,9 @@ import '../cubit/prayer_tracking_cubit.dart';
 import '../cubit/prayer_tracking_state.dart';
 
 class PrayerTrackingPage extends StatelessWidget {
-  const PrayerTrackingPage({super.key});
+  const PrayerTrackingPage({super.key, this.fastingOnly = false});
+
+  final bool fastingOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -23,19 +27,26 @@ class PrayerTrackingPage extends StatelessWidget {
       create: (_) =>
           PrayerTrackingCubit(repository: getIt<PrayerTrackingRepository>())
             ..load(),
-      child: const _PrayerTrackingView(),
+      child: _PrayerTrackingView(fastingOnly: fastingOnly),
     );
   }
 }
 
 class _PrayerTrackingView extends StatelessWidget {
-  const _PrayerTrackingView();
+  const _PrayerTrackingView({required this.fastingOnly});
+
+  final bool fastingOnly;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context).prayerJournalTitle),
+        title: Text(
+          fastingOnly
+              ? AppLocalizations.of(context).fastingJournalTitle
+              : AppLocalizations.of(context).prayerJournalTitle,
+        ),
+        flexibleSpace: const ArchitecturalBackdrop(),
       ),
       body: BlocBuilder<PrayerTrackingCubit, PrayerTrackingState>(
         builder: (context, state) {
@@ -56,23 +67,27 @@ class _PrayerTrackingView extends StatelessWidget {
             onRefresh: context.read<PrayerTrackingCubit>().load,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
               children: [
                 _DateNavigator(date: selected),
-                if (dashboard.activePause != null) ...[
+                if (!fastingOnly && dashboard.activePause != null) ...[
                   const SizedBox(height: 12),
                   _PauseBanner(range: dashboard.activePause!),
                 ],
-                const SizedBox(height: 14),
-                _PrayerJournalCard(dashboard: dashboard),
-                const SizedBox(height: 14),
-                _QadaCard(dashboard: dashboard),
-                const SizedBox(height: 14),
-                _CyclePauseCard(dashboard: dashboard),
-                const SizedBox(height: 14),
+                const Divider(height: 28),
+                if (!fastingOnly) ...[
+                  _PrayerJournalCard(dashboard: dashboard),
+                  const Divider(height: 28),
+                  _QadaCard(dashboard: dashboard),
+                  const Divider(height: 28),
+                  _CyclePauseCard(dashboard: dashboard),
+                  const Divider(height: 28),
+                ],
                 _FastingCard(dashboard: dashboard),
-                const SizedBox(height: 14),
-                _ReflectionCard(dashboard: dashboard),
+                if (!fastingOnly) ...[
+                  const Divider(height: 28),
+                  _ReflectionCard(dashboard: dashboard),
+                ],
                 const SizedBox(height: 14),
                 Text(
                   'This is a private reflection tool, not a religious ruling. '
@@ -99,17 +114,18 @@ class _DateNavigator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isToday = worshipDateKey(date) == worshipDateKey(DateTime.now());
-    return PremiumSurface(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           IconButton(
             tooltip: 'Previous day',
             onPressed: () => context.read<PrayerTrackingCubit>().changeDay(-1),
-            icon: const Icon(Icons.chevron_left_rounded),
+            icon: const AppIcon(Icons.chevron_left_rounded),
           ),
           Expanded(
             child: InkWell(
+              borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
               onTap: () async {
                 final selected = await showDatePicker(
                   context: context,
@@ -125,7 +141,7 @@ class _DateNavigator extends StatelessWidget {
                 children: [
                   Text(
                     isToday ? 'Today' : DateFormat.EEEE().format(date),
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   Text(DateFormat.yMMMd().format(date)),
                 ],
@@ -135,7 +151,7 @@ class _DateNavigator extends StatelessWidget {
           IconButton(
             tooltip: 'Next day',
             onPressed: () => context.read<PrayerTrackingCubit>().changeDay(1),
-            icon: const Icon(Icons.chevron_right_rounded),
+            icon: const AppIcon(Icons.chevron_right_rounded),
           ),
         ],
       ),
@@ -150,18 +166,18 @@ class _PauseBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(14),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
-          const Icon(Icons.visibility_off_outlined),
+          const AppIcon(Icons.visibility_off_outlined),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               range.exemptTracking
                   ? 'Private pause active. Prayers are exempt from missed totals.'
                   : 'Private pause active for this date.',
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -178,8 +194,8 @@ class _PrayerJournalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final paused = dashboard.activePause?.exemptTracking == true;
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -187,10 +203,8 @@ class _PrayerJournalCard extends StatelessWidget {
             'Daily prayers',
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 4),
-          const Text('Record only what is useful for your own reflection.'),
           const SizedBox(height: 10),
           for (final prayer in TrackedPrayer.values)
             _PrayerRecordRow(
@@ -225,58 +239,61 @@ class _PrayerRecordRow extends StatelessWidget {
         status != PrayerCompletion.exempt;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            width: 74,
-            child: Text(
-              _prayerLabel(prayer),
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
+          Text(
+            _prayerLabel(prayer),
+            style: const TextStyle(fontWeight: FontWeight.w500),
           ),
-          Expanded(
-            child: DropdownButtonFormField<PrayerCompletion>(
-              initialValue: status,
-              isDense: true,
-              decoration: const InputDecoration(),
-              items: [
-                for (final item in PrayerCompletion.values)
-                  DropdownMenuItem(
-                    value: item,
-                    child: Text(_completionLabel(item)),
-                  ),
-              ],
-              onChanged: disabled
-                  ? null
-                  : (next) {
-                      if (next == null) {
-                        return;
-                      }
-                      context.read<PrayerTrackingCubit>().savePrayer(
-                        prayer: prayer,
-                        status: next,
-                        congregation: record?.congregation ?? false,
-                      );
-                    },
-            ),
-          ),
-          const SizedBox(width: 5),
-          Tooltip(
-            message: 'Congregation',
-            child: IconButton(
-              onPressed: canCongregate
-                  ? () => context.read<PrayerTrackingCubit>().savePrayer(
-                      prayer: prayer,
-                      status: status,
-                      congregation: !(record?.congregation ?? false),
-                    )
-                  : null,
-              icon: Icon(
-                record?.congregation == true
-                    ? Icons.groups_rounded
-                    : Icons.group_outlined,
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<PrayerCompletion>(
+                  key: ValueKey(status),
+                  initialValue: status,
+                  isExpanded: true,
+                  decoration: const InputDecoration(),
+                  items: [
+                    for (final item in PrayerCompletion.values)
+                      DropdownMenuItem(
+                        value: item,
+                        child: Text(_completionLabel(item)),
+                      ),
+                  ],
+                  onChanged: disabled
+                      ? null
+                      : (next) {
+                          if (next == null) {
+                            return;
+                          }
+                          context.read<PrayerTrackingCubit>().savePrayer(
+                            prayer: prayer,
+                            status: next,
+                            congregation: record?.congregation ?? false,
+                          );
+                        },
+                ),
               ),
-            ),
+              const SizedBox(width: 5),
+              IconButton(
+                tooltip: 'Congregation',
+                isSelected: record?.congregation == true,
+                onPressed: canCongregate
+                    ? () => context.read<PrayerTrackingCubit>().savePrayer(
+                        prayer: prayer,
+                        status: status,
+                        congregation: !(record?.congregation ?? false),
+                      )
+                    : null,
+                icon: AppIcon(
+                  record?.congregation == true
+                      ? Icons.groups_rounded
+                      : Icons.group_outlined,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -291,11 +308,11 @@ class _QadaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          const Icon(Icons.update_rounded),
+          const AppIcon(Icons.update_rounded),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -304,7 +321,7 @@ class _QadaCard extends StatelessWidget {
                 Text(
                   'Qada plan',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text('${dashboard.qadaDue} currently recorded as due'),
@@ -330,8 +347,8 @@ class _CyclePauseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -344,7 +361,7 @@ class _CyclePauseCard extends StatelessWidget {
                     Text(
                       'Private cycle pause',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const Text('Optional exemption and reminder suppression.'),
@@ -354,7 +371,7 @@ class _CyclePauseCard extends StatelessWidget {
               IconButton(
                 tooltip: 'Add private pause',
                 onPressed: () => _addPause(context),
-                icon: const Icon(Icons.add_circle_outline_rounded),
+                icon: const AppIcon(Icons.add_circle_outline_rounded),
               ),
             ],
           ),
@@ -377,7 +394,7 @@ class _CyclePauseCard extends StatelessWidget {
                   await getIt<PrayerAlertNotificationService>()
                       .syncUpcomingAlerts();
                 },
-                icon: const Icon(Icons.delete_outline_rounded),
+                icon: const AppIcon(Icons.delete_outline_rounded),
               ),
             ),
           if (dashboard.pauseRanges.isEmpty)
@@ -399,8 +416,8 @@ class _FastingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fast = dashboard.fast;
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -413,7 +430,7 @@ class _FastingCard extends StatelessWidget {
                     Text(
                       'Fasting log',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
@@ -448,8 +465,8 @@ class _ReflectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -457,7 +474,7 @@ class _ReflectionCard extends StatelessWidget {
             'Reflection summary',
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
           _SummaryRow(label: 'Last 7 days', summary: dashboard.week),
@@ -480,7 +497,7 @@ class _SummaryRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 5),
         Text(
           '${summary.prayersCompleted} prayers completed • '
@@ -500,65 +517,62 @@ Future<void> _editQadaPlan(
   BuildContext context,
   PrayerTrackingDashboard dashboard,
 ) async {
-  final balance = TextEditingController(text: '${dashboard.qadaDue}');
-  final target = TextEditingController(
-    text: '${dashboard.qadaPlan.dailyTarget}',
-  );
+  var balance = '${dashboard.qadaDue}';
+  var target = '${dashboard.qadaPlan.dailyTarget}';
   var enabled = dashboard.qadaPlan.enabled;
-  final saved = await showDialog<bool>(
+  final saved = await showModalBottomSheet<bool>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
-        title: const Text('Adjust Qada plan'),
-        content: Column(
+      builder: (context, setDialogState) => AppSheet(
+        title: 'Adjust Qada plan',
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
               'Set the balance that is meaningful for you. The app does not '
               'determine religious obligations.',
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: balance,
+            TextFormField(
+              initialValue: balance,
+              onChanged: (value) => balance = value,
+              textInputAction: TextInputAction.next,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Current balance'),
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: target,
+            TextFormField(
+              initialValue: target,
+              onChanged: (value) => target = value,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Daily target'),
             ),
-            SwitchListTile(
+            SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               title: const Text('Use daily plan'),
               value: enabled,
               onChanged: (value) => setDialogState(() => enabled = value),
             ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     ),
   );
   if (saved == true && context.mounted) {
     await context.read<PrayerTrackingCubit>().setQadaPlan(
-      currentBalance: int.tryParse(balance.text) ?? dashboard.qadaDue,
-      dailyTarget: int.tryParse(target.text) ?? 1,
+      currentBalance: int.tryParse(balance) ?? dashboard.qadaDue,
+      dailyTarget: int.tryParse(target) ?? 1,
       enabled: enabled,
     );
   }
-  balance.dispose();
-  target.dispose();
 }
 
 Future<void> _addPause(BuildContext context) async {
@@ -566,18 +580,22 @@ Future<void> _addPause(BuildContext context) async {
   var end = DateTime.now();
   var suppressReminders = true;
   var exemptTracking = true;
-  final saved = await showDialog<bool>(
+  final saved = await showModalBottomSheet<bool>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
-        title: const Text('Add private pause'),
-        content: Column(
+      builder: (context, setDialogState) => AppSheet(
+        title: 'Add private pause',
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Start'),
-              trailing: Text(DateFormat.yMMMd().format(start)),
+              subtitle: Text(DateFormat.yMMMd().format(start)),
+              trailing: const AppIcon(Icons.calendar_today_outlined),
               onTap: () async {
                 final selected = await showDatePicker(
                   context: context,
@@ -585,7 +603,7 @@ Future<void> _addPause(BuildContext context) async {
                   firstDate: DateTime(1950),
                   lastDate: DateTime.now().add(const Duration(days: 365)),
                 );
-                if (selected != null) {
+                if (selected != null && context.mounted) {
                   setDialogState(() {
                     start = selected;
                     if (end.isBefore(start)) {
@@ -598,7 +616,8 @@ Future<void> _addPause(BuildContext context) async {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('End'),
-              trailing: Text(DateFormat.yMMMd().format(end)),
+              subtitle: Text(DateFormat.yMMMd().format(end)),
+              trailing: const AppIcon(Icons.calendar_today_outlined),
               onTap: () async {
                 final selected = await showDatePicker(
                   context: context,
@@ -606,37 +625,32 @@ Future<void> _addPause(BuildContext context) async {
                   firstDate: start,
                   lastDate: DateTime.now().add(const Duration(days: 365)),
                 );
-                if (selected != null) {
+                if (selected != null && context.mounted) {
                   setDialogState(() => end = selected);
                 }
               },
             ),
-            SwitchListTile(
+            SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               title: const Text('Mark prayers exempt'),
               value: exemptTracking,
               onChanged: (value) =>
                   setDialogState(() => exemptTracking = value),
             ),
-            SwitchListTile(
+            SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               title: const Text('Pause prayer reminders'),
               value: suppressReminders,
               onChanged: (value) =>
                   setDialogState(() => suppressReminders = value),
             ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save privately'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save privately'),
-          ),
-        ],
       ),
     ),
   );
@@ -654,16 +668,20 @@ Future<void> _addPause(BuildContext context) async {
 Future<void> _editFast(BuildContext context, FastingRecord? initial) async {
   var type = initial?.type ?? FastType.ramadan;
   var status = initial?.status ?? FastStatus.completed;
-  final action = await showDialog<String>(
+  final action = await showModalBottomSheet<String>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
-        title: const Text('Fasting log'),
-        content: Column(
+      builder: (context, setDialogState) => AppSheet(
+        title: 'Fasting log',
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<FastType>(
               initialValue: type,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Fast type'),
               items: [
                 for (final item in FastType.values)
@@ -681,6 +699,7 @@ Future<void> _editFast(BuildContext context, FastingRecord? initial) async {
             const SizedBox(height: 10),
             DropdownButtonFormField<FastStatus>(
               initialValue: status,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Status'),
               items: [
                 for (final item in FastStatus.values)
@@ -695,23 +714,18 @@ Future<void> _editFast(BuildContext context, FastingRecord? initial) async {
                 }
               },
             ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, 'save'),
+              child: const Text('Save'),
+            ),
+            if (initial != null)
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, 'delete'),
+                child: const Text('Remove'),
+              ),
           ],
         ),
-        actions: [
-          if (initial != null)
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, 'delete'),
-              child: const Text('Remove'),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, 'save'),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     ),
   );

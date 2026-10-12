@@ -84,7 +84,8 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   generate: true
-
+  config:
+    enable-lldb-debugging: false
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -94,7 +95,15 @@ flutter:
     - assets/data/cities15000.tsv.gz
     - assets/data/geonames_attribution.txt
     - assets/data/surah_image_attributions.json
+    - assets/data/quran/
+    - assets/fonts/IndoPak-OFL.txt
+    - assets/fonts/UthmanicHafs-EULA.txt
+    - assets/fonts/Manrope-OFL.txt
     - assets/images/prayers/
+    - assets/images/prayer_banners/
+    - assets/images/architecture/
+    - assets/images/companions/
+    - assets/images/surah_cover/
     - assets/data/content_sources/
     - assets/data/hadith/
     - assets/data/hadith/books/
@@ -119,6 +128,22 @@ flutter:
   #       - asset: fonts/Schyler-Regular.ttf
   #       - asset: fonts/Schyler-Italic.ttf
   #         style: italic
+  fonts:
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-Variable.ttf
+    - family: IndoPakQuran
+      fonts:
+        - asset: assets/fonts/DigitalKhattIndoPak.ttf
+    - family: UthmanicHafs
+      fonts:
+        - asset: assets/fonts/UthmanicHafs.ttf
+    - family: NotoNastaliqUrdu
+      fonts:
+        - asset: assets/fonts/NotoNastaliqUrdu-Variable.ttf
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-Variable.ttf
   #   - family: Trajan Pro
   #     fonts:
   #       - asset: fonts/TrajanPro.ttf

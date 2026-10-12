@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:quran/core/constants/quran_arabic_script.dart';
 import 'package:quran/core/theme/quran_theme.dart';
 import 'package:quran/features/quran/domain/entities/quran_ayah.dart';
 import 'package:quran/features/quran_audio/domain/entities/quran_audio_queue_item.dart';
@@ -262,11 +263,14 @@ void main() {
     expect(activeWordRoot.toPlainText(), 'بسم الله');
     for (final style in [normal.style, selected.style, playing.style]) {
       expect(style?.fontSize, expectedFontSize);
-      expect(style?.height, 1.55);
+      expect(style?.height, QuranArabicScript.uthmani.readerLineHeight);
       expect(style?.fontWeight, FontWeight.w700);
     }
     expect(activeWordRoot.style?.fontSize, expectedFontSize);
-    expect(activeWordRoot.style?.height, 1.55);
+    expect(
+      activeWordRoot.style?.height,
+      QuranArabicScript.uthmani.readerLineHeight,
+    );
     expect(activeWordRoot.style?.fontWeight, FontWeight.w700);
     for (final span in activeWordSpans) {
       expect(span.style?.fontSize, isNull);
@@ -304,7 +308,7 @@ void main() {
     final wordSpans = rootSpan.children!.whereType<TextSpan>();
 
     expect(rootSpan.style?.fontSize, 24 * fontScale);
-    expect(rootSpan.style?.height, lineHeight);
+    expect(rootSpan.style?.height, QuranArabicScript.uthmani.readerLineHeight);
     expect(rootSpan.style?.fontWeight, FontWeight.w700);
     for (final span in wordSpans) {
       expect(span.style?.fontSize, isNull);

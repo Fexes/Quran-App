@@ -59,12 +59,27 @@ class QuranTranslationStore {
     return QuranTranslationResource.fromJson(raw);
   }
 
+  int? preferredResourceId(String languageName) {
+    final value = _read(
+      'preferred_translation:${languageName.trim().toLowerCase()}',
+    );
+    if (value is int) return value;
+    final selected = selectedResource();
+    return selected?.languageName.toLowerCase() == languageName.toLowerCase()
+        ? selected?.id
+        : null;
+  }
+
   Future<void> saveSelectedResource(QuranTranslationResource? resource) async {
     if (resource == null) {
       await _delete('selected_translation_resource');
       return;
     }
     await _write('selected_translation_resource', resource.toJson());
+    await _write(
+      'preferred_translation:${resource.languageName.trim().toLowerCase()}',
+      resource.id,
+    );
   }
 
   List<QuranTranslationResource> selectedResources() {

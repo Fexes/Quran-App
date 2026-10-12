@@ -1,0 +1,30 @@
+{
+  "name": "QPC Hafs text and UthmanicHafs font",
+  "publisher": "King Fahd Glorious Quran Printing Complex",
+  "edition": "Uthmanic Hafs v2.2",
+  "archive": "Nuqayah qpc-fonts",
+  "revision": "8a4f39d563ea69c994416a1692827e38156c548d",
+  "sourceUrl": "https://github.com/nuqayah/qpc-fonts/tree/8a4f39d563ea69c994416a1692827e38156c548d/text-mushafs/UthmanicHafs_V22",
+  "text": {
+    "assetPath": "assets/data/quran/qpc_hafs.json",
+    "sourceUrl": "https://raw.githubusercontent.com/nuqayah/qpc-fonts/8a4f39d563ea69c994416a1692827e38156c548d/text-mushafs/UthmanicHafs_V22/UthmanicHafs%20v22.json",
+    "verseCount": 6236,
+    "format": "[verseText, globalAyahNumber], ordered 1 through 6236",
+    "gitBlobSha1": "d86ac3bb17e39e20a3de68938a624e39b4fe26c0",
+    "sha256": "b5f9c469702154ad8764150a874ee3353f014dd84e233d28d6db74e54226275a",
+    "modified": false,
+    "redistributionReviewStatus": "reviewRequired"
+  },
+  "font": {
+    "assetPath": "assets/fonts/UthmanicHafs.ttf",
+    "sourceUrl": "https://raw.githubusercontent.com/nuqayah/qpc-fonts/8a4f39d563ea69c994416a1692827e38156c548d/text-mushafs/UthmanicHafs_V22/uthmanic_hafs_v22.ttf",
+    "family": "kfgqpc_hafs_uthmanic_script",
+    "version": "2.2",
+    "gitBlobSha1": "4a8e1f75215768aafe116fab57ea2cc4bf1f821d",
+    "sha256": "a6e59510dcaf3ec99db49427321a035ed94af555ffc7d27e7f430b5fd5e179f8",
+    "licenseAsset": "assets/fonts/UthmanicHafs-EULA.txt",
+    "licenseSource": "Original font name table, name ID 13",
+    "license": "Original KFGQPC EULA: free use, copy and distribution; no modification or standalone sale",
+    "modified": false
+  }
+}

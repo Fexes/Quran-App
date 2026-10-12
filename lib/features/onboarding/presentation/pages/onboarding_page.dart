@@ -1,17 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../app/router/app_routes.dart';
+import '../../../../core/constants/quran_arabic_script.dart';
 import '../../../../core/localization/locale_cubit.dart';
 import '../../../../core/localization/locale_state.dart';
 import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/theme/quran_theme_cubit.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/app_sheet.dart';
 import '../../../prayer/data/datasources/offline_prayer_city_data_source.dart';
 import '../../../prayer/data/services/prayer_alert_notification_service.dart';
 import '../../../prayer/domain/entities/prayer_alert_settings.dart';
@@ -21,6 +25,9 @@ import '../../../prayer_times/domain/entities/prayer_location.dart';
 import '../../../prayer_times/domain/repositories/prayer_times_repository.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
+import '../../../quran/presentation/widgets/quran_translation_download_sheet.dart';
+import '../../../quran/presentation/widgets/quran_translation_picker.dart';
+import '../../data/ip_country_lookup.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key, this.editMode = false});
@@ -39,6 +46,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   late final QuranTranslationRepository _translationRepository;
   late final OfflinePrayerCityDataSource _cityDataSource;
   late Future<List<QuranTranslationLanguage>> _translationLanguagesFuture;
+  Future<DailyPrayerTimes>? _previewFuture;
 
   late int _step;
   late PrayerLocation _location;
@@ -49,12 +57,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
   bool _enableNotifications = false;
   int _selectedTranslationId = 0;
   bool _saving = false;
+  late QuranArabicScript _script;
+  late bool _scriptChosenManually;
+  int _scriptLookupRevision = 0;
+  String? _scriptSuggestionSource;
   String? _message;
 
   @override
   void initState() {
     super.initState();
     _store = getIt<SettingsStore>();
+    _script = QuranArabicScript.values.firstWhere(
+      (script) => script.name == _store.quranArabicScript,
+      orElse: () => QuranArabicScript.uthmani,
+    );
+    _scriptChosenManually = _store.hasManualArabicScript;
     _prayerRepository = getIt<PrayerTimesRepository>();
     _translationRepository = getIt<QuranTranslationRepository>();
     _cityDataSource = getIt<OfflinePrayerCityDataSource>();
@@ -73,6 +90,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     _translationLanguagesFuture = _loadTranslationLanguages();
     if (!widget.editMode) {
       unawaited(_store.setOnboardingStep(_step));
+      unawaited(_suggestScript());
     }
   }
 
@@ -88,13 +106,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
           .languageCode
           .toLowerCase();
       for (final language in languages) {
-        for (final resource in language.availableResources) {
-          if (resource.resolvedLanguageCode == deviceLanguage) {
-            suggestedId = resource.id;
-            break;
-          }
-        }
-        if (suggestedId != 0) {
+        if (language.defaultResource.resolvedLanguageCode == deviceLanguage) {
+          suggestedId = language.defaultResource.id;
           break;
         }
       }
@@ -103,6 +116,46 @@ class _OnboardingPageState extends State<OnboardingPage> {
       setState(() => _selectedTranslationId = suggestedId);
     }
     return languages;
+  }
+
+  Future<void> _suggestScript() async {
+    if (_scriptChosenManually) return;
+    final revision = ++_scriptLookupRevision;
+    String? country;
+    var source = 'prayer location';
+    try {
+      if (_locationConfirmed) {
+        country = (await _cityDataSource.nearest(
+          _location.latitude,
+          _location.longitude,
+        ))?.countryCode;
+      }
+    } catch (_) {
+      // An unavailable offline city lookup must not hold up setup.
+    }
+    if (!mounted ||
+        revision != _scriptLookupRevision ||
+        _scriptChosenManually) {
+      return;
+    }
+    if (country == null) {
+      source = 'IP country';
+      country = await lookupIpCountry();
+    }
+    if (!mounted ||
+        revision != _scriptLookupRevision ||
+        _scriptChosenManually) {
+      return;
+    }
+    _applyScriptSuggestion(country, source);
+  }
+
+  void _applyScriptSuggestion(String? country, String source) {
+    if (!mounted || _scriptChosenManually || country == null) return;
+    setState(() {
+      _script = QuranArabicScript.forCountry(country);
+      _scriptSuggestionSource = '$source: $country';
+    });
   }
 
   @override
@@ -114,15 +167,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
             ? IconButton(
                 tooltip: 'Back',
                 onPressed: _saving ? null : _back,
-                icon: const Icon(Icons.arrow_back_rounded),
+                icon: const AppIcon(Icons.arrow_back_rounded),
               )
             : null,
         title: Text(widget.editMode ? 'Setup preferences' : 'Welcome'),
+        flexibleSpace: const ArchitecturalBackdrop(),
         actions: [
           if (widget.editMode)
-            TextButton(
+            IconButton(
+              tooltip: 'Close',
               onPressed: _saving ? null : () => context.pop(),
-              child: const Text('Close'),
+              icon: const AppIcon(Icons.close_rounded),
             ),
         ],
       ),
@@ -139,23 +194,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         child: Text(
                           'Step ${_step + 1} of $_stepCount',
                           style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.w900),
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
-                      ),
-                      Text(
-                        '${(((_step + 1) / _stepCount) * 100).round()}%',
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: QuranTheme.subText(context, 0.68),
-                              fontWeight: FontWeight.w800,
-                            ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
                     value: (_step + 1) / _stepCount,
-                    minHeight: 7,
+                    minHeight: 3,
                     borderRadius: BorderRadius.circular(999),
                     color: primary,
                   ),
@@ -164,7 +211,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                padding: const EdgeInsets.only(bottom: 20),
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
                   child: KeyedSubtree(
@@ -198,7 +245,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Icon(
+                      : AppIcon(
                           _step == _stepCount - 1
                               ? Icons.check_rounded
                               : Icons.arrow_forward_rounded,
@@ -228,13 +275,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   Widget _languageStep() {
     return BlocBuilder<LocaleCubit, LocaleState>(
-      builder: (context, state) => _StepCard(
+      builder: (context, state) => _StepPanel(
         icon: Icons.language_rounded,
         title: 'Choose app language',
         description:
             'This controls menus and buttons only. Quran, tafsir, Hadith, and Azkar keep separate language choices.',
         child: DropdownButtonFormField<String>(
           initialValue: state.preferenceCode,
+          isExpanded: true,
           decoration: const InputDecoration(labelText: 'Interface language'),
           items: const [
             DropdownMenuItem(value: 'system', child: Text('System language')),
@@ -253,7 +301,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Widget _translationStep() {
-    return _StepCard(
+    return _StepPanel(
       icon: Icons.translate_rounded,
       title: 'Choose Quran translation',
       description:
@@ -261,6 +309,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
       child: FutureBuilder<List<QuranTranslationLanguage>>(
         future: _translationLanguagesFuture,
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Column(
+              children: [
+                const Text('Translation editions could not be loaded.'),
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    _translationLanguagesFuture = _loadTranslationLanguages();
+                  }),
+                  icon: const AppIcon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
+                ),
+              ],
+            );
+          }
           if (!snapshot.hasData) {
             return const Center(
               child: Padding(
@@ -287,39 +349,30 @@ class _OnboardingPageState extends State<OnboardingPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              DropdownButtonFormField<int>(
-                initialValue: selectedId,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Edition'),
-                items: [
-                  const DropdownMenuItem(
-                    value: 0,
-                    child: Text('Bundled English default'),
-                  ),
-                  for (final resource in resources)
-                    DropdownMenuItem(
-                      value: resource.id,
-                      child: Text(
-                        '${resource.displayEndonym} • ${resource.name}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedTranslationId = value);
-                  }
-                },
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const AppIcon(Icons.translate_rounded),
+                title: Text(selected?.displayEndonym ?? 'Bundled English'),
+                subtitle: Text(selected?.name ?? 'Default edition'),
+                trailing: const AppIcon(Icons.chevron_right_rounded),
+                onTap: _saving ? null : () => _chooseTranslation(selected),
               ),
+              if (selected != null)
+                TextButton(
+                  onPressed: _saving
+                      ? null
+                      : () => setState(() => _selectedTranslationId = 0),
+                  child: const Text('Use bundled English'),
+                ),
               const SizedBox(height: 12),
               Text(
                 selected == null
                     ? 'Preview: bundled English translation is available offline.'
                     : 'Preview: ${selected.displayEndonym} by ${selected.translator}. '
-                          'Source ${selected.sourceUrl}. Download is requested when first opened.',
+                          'Source ${selected.sourceUrl}.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   height: 1.45,
-                  fontWeight: FontWeight.w700,
+                  color: QuranTheme.subText(context),
                 ),
               ),
             ],
@@ -330,19 +383,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Widget _locationStep() {
-    return _StepCard(
+    return _StepPanel(
       icon: Icons.location_on_rounded,
       title: 'Set prayer location',
       description:
-          'Prayer times need an accurate city or location. You can search manually without granting location permission.',
+          'Choose a city or use your location for prayer times. Coordinates stay on your device.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PremiumSurface(
-            padding: const EdgeInsets.all(14),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
               children: [
-                Icon(
+                AppIcon(
                   _locationConfirmed
                       ? Icons.check_circle_rounded
                       : Icons.info_outline_rounded,
@@ -360,7 +413,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             ? _location.name
                             : 'No location confirmed',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -380,14 +433,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
           ),
           const SizedBox(height: 12),
           FilledButton.tonalIcon(
-            onPressed: _chooseCity,
-            icon: const Icon(Icons.search_rounded),
+            onPressed: _saving ? null : _chooseCity,
+            icon: const AppIcon(Icons.search_rounded),
             label: const Text('Search city'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: _useCurrentLocation,
-            icon: const Icon(Icons.my_location_rounded),
+            onPressed: _saving ? null : _useCurrentLocation,
+            icon: const AppIcon(Icons.my_location_rounded),
             label: const Text('Use current location'),
           ),
         ],
@@ -396,7 +449,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Widget _calculationStep() {
-    return _StepCard(
+    return _StepPanel(
       icon: Icons.schedule_rounded,
       title: 'Prayer calculation',
       description:
@@ -405,6 +458,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
         children: [
           DropdownButtonFormField<PrayerCalculationMethod>(
             initialValue: _method,
+            isExpanded: true,
+            itemHeight: null,
             decoration: const InputDecoration(labelText: 'Method'),
             items: const [
               DropdownMenuItem(
@@ -429,6 +484,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
           const SizedBox(height: 12),
           DropdownButtonFormField<PrayerAsrMadhab>(
             initialValue: _madhab,
+            isExpanded: true,
+            itemHeight: null,
             decoration: const InputDecoration(labelText: 'Asr calculation'),
             items: const [
               DropdownMenuItem(
@@ -452,13 +509,43 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Widget _intentAndNotificationsStep() {
-    return _StepCard(
+    return _StepPanel(
       icon: Icons.track_changes_rounded,
       title: 'Personalize your journey',
       description:
           'Your reading intent stays private on this device. Notification permission is requested only after you finish setup.',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text('Arabic script', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SegmentedButton<QuranArabicScript>(
+            segments: [
+              for (final script in QuranArabicScript.values)
+                ButtonSegment(value: script, label: Text(script.label)),
+            ],
+            selected: {_script},
+            onSelectionChanged: (selection) => setState(() {
+              _script = selection.first;
+              _scriptChosenManually = true;
+              _scriptSuggestionSource = null;
+              _scriptLookupRevision++;
+            }),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _scriptChosenManually
+                ? 'Your selection'
+                : _scriptSuggestionSource == null
+                ? 'Automatic default: prayer location, then approximate IP country (country.is).'
+                : 'Suggested from $_scriptSuggestionSource',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: QuranTheme.subText(context)),
+          ),
+          const SizedBox(height: 20),
+          Text('Reading intent', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
           SegmentedButton<String>(
             showSelectedIcon: false,
             segments: const [
@@ -472,13 +559,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
             },
           ),
           const SizedBox(height: 14),
-          SwitchListTile(
+          SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             value: _enableNotifications,
             onChanged: (value) {
               setState(() => _enableNotifications = value);
             },
-            secondary: const Icon(Icons.notifications_rounded),
+            secondary: const AppIcon(Icons.notifications_rounded),
             title: const Text('Prayer notifications'),
             subtitle: const Text(
               'Remind me at the five daily prayer times. The system prompt appears after this explanation.',
@@ -494,7 +581,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       method: _method,
       asrMadhab: _madhab,
     );
-    return _StepCard(
+    return _StepPanel(
       icon: Icons.auto_awesome_rounded,
       title: 'Your setup preview',
       description:
@@ -506,31 +593,36 @@ class _OnboardingPageState extends State<OnboardingPage> {
           _SummaryRow(label: 'Method', value: _methodLabel(_method)),
           _SummaryRow(label: 'Asr', value: _madhabLabel(_madhab)),
           _SummaryRow(label: 'Reading', value: _readingIntentLabel()),
+          _SummaryRow(label: 'Arabic script', value: _script.label),
           _SummaryRow(
             label: 'Notifications',
             value: _enableNotifications ? 'Requested on finish' : 'Off',
           ),
           const SizedBox(height: 14),
           FutureBuilder<DailyPrayerTimes>(
-            future: _prayerRepository.getDailyPrayerTimes(
+            future: _previewFuture ??= _prayerRepository.getDailyPrayerTimes(
               date: DateTime.now(),
               location: _location,
               settings: settings,
             ),
             builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return TextButton.icon(
+                  onPressed: () => setState(() => _previewFuture = null),
+                  icon: const AppIcon(Icons.refresh_rounded),
+                  label: const Text('Retry prayer preview'),
+                );
+              }
               final daily = snapshot.data;
               if (daily == null) {
                 return const Center(child: CircularProgressIndicator());
               }
-              return Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              return Column(
                 children: [
                   for (final entry in daily.entries)
-                    Chip(
-                      label: Text(
-                        '${entry.displayName} ${TimeOfDay.fromDateTime(entry.time).format(context)}',
-                      ),
+                    _SummaryRow(
+                      label: entry.displayName,
+                      value: TimeOfDay.fromDateTime(entry.time).format(context),
                     ),
                 ],
               );
@@ -543,19 +635,115 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   bool get _canContinue => _step != 2 || _locationConfirmed;
 
-  Future<void> _continue() async {
-    setState(() => _message = null);
-    if (_step < _stepCount - 1) {
-      final next = _step + 1;
-      if (!widget.editMode) {
-        await _store.setOnboardingStep(next);
+  Future<void> _chooseTranslation(QuranTranslationResource? selected) async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+    try {
+      final resource = await showModalBottomSheet<QuranTranslationResource>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => QuranTranslationPicker(
+          repository: _translationRepository,
+          currentResource: selected,
+        ),
+      );
+      if (resource != null &&
+          mounted &&
+          await _ensureTranslationDownloaded(resource) &&
+          mounted) {
+        setState(() => _selectedTranslationId = resource.id);
       }
+    } catch (_) {
       if (mounted) {
-        setState(() => _step = next);
+        setState(
+          () => _message = 'Could not prepare translation. Please try again.',
+        );
       }
-      return;
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    await _finish();
+  }
+
+  Future<bool> _ensureTranslationDownloaded(
+    QuranTranslationResource resource,
+  ) async {
+    final available = await _translationRepository.hasFullTranslation(
+      resource.id,
+    );
+    if (!mounted) return false;
+    if (available) return true;
+    return await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          isDismissible: false,
+          enableDrag: false,
+          useSafeArea: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => QuranTranslationDownloadSheet(
+            repository: _translationRepository,
+            resource: resource,
+            activateOnComplete: false,
+          ),
+        ) ==
+        true;
+  }
+
+  Future<bool> _prepareSelectedTranslation() async {
+    List<QuranTranslationLanguage> languages;
+    try {
+      languages = await _translationLanguagesFuture;
+    } catch (_) {
+      // Bundled English remains usable if the catalog is unavailable.
+      if (_selectedTranslationId == 0) return true;
+      rethrow;
+    }
+    if (!mounted) return false;
+    if (_selectedTranslationId == 0) return true;
+    for (final language in languages) {
+      for (final resource in language.availableResources) {
+        if (resource.id == _selectedTranslationId) {
+          return _ensureTranslationDownloaded(resource);
+        }
+      }
+    }
+    throw StateError('Selected translation is unavailable.');
+  }
+
+  Future<void> _continue() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+    try {
+      // Suggested and restored choices must be ready too, even without a picker tap.
+      if ((_step == 1 || _step == _stepCount - 1) &&
+          !await _prepareSelectedTranslation()) {
+        return;
+      }
+      if (!mounted) return;
+      if (_step < _stepCount - 1) {
+        _previewFuture = null;
+        final next = _step + 1;
+        if (!widget.editMode) {
+          await _store.setOnboardingStep(next);
+        }
+        if (mounted) setState(() => _step = next);
+        return;
+      }
+      await _finish();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _message = 'Could not prepare setup. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   void _back() {
@@ -574,6 +762,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   Future<void> _finish() async {
     setState(() => _saving = true);
+    _scriptLookupRevision++;
+    final themeCubit = context.read<QuranThemeCubit>();
     try {
       await _prayerRepository.saveLocation(_location);
       await _prayerRepository.saveSettings(
@@ -583,6 +773,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
         _selectedTranslationId == 0 ? null : _selectedTranslationId,
       );
       await _store.setReadingIntent(_readingIntent);
+      await themeCubit.setQuranArabicScript(
+        _script,
+        automatic: !_scriptChosenManually,
+      );
       await _store.setContentLocaleSuggestionApplied(true);
       await _store.setOnboardingLocationConfirmed(true);
 
@@ -634,21 +828,36 @@ class _OnboardingPageState extends State<OnboardingPage> {
       builder: (context) =>
           _OnboardingCityPicker(cityDataSource: _cityDataSource),
     );
-    if (city == null) {
+    if (city == null || !mounted) {
       return;
     }
+    _scriptLookupRevision++;
+    _applyScriptSuggestion(city.countryCode, 'selected city');
     setState(() {
       _location = city.toPrayerLocation();
       _locationConfirmed = true;
       _message = null;
+      _saving = true;
     });
-    await _store.setOnboardingLocationConfirmed(true);
+    try {
+      if (!widget.editMode) {
+        await _prayerRepository.saveLocation(_location);
+        await _store.setOnboardingLocationConfirmed(true);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _message = 'Could not save location. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _useCurrentLocation() async {
     final proceed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: const Text('Use current location?'),
         content: const Text(
           'Location is used to calculate prayer times and find the nearest offline city and time zone. You can choose a city manually instead.',
@@ -666,7 +875,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       ),
     );
     if (proceed != true || !mounted) {
-      if (proceed == false) {
+      if (proceed == false && mounted) {
         await _chooseCity();
       }
       return;
@@ -676,6 +885,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       _saving = true;
       _message = null;
     });
+    _scriptLookupRevision++;
     try {
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -707,8 +917,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
       if (!mounted) {
         return;
       }
+      _applyScriptSuggestion(nearest?.countryCode, 'location');
       setState(() {
-        _saving = false;
         _location =
             next ??
             PrayerLocation(
@@ -719,7 +929,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
             );
         _locationConfirmed = true;
       });
-      await _store.setOnboardingLocationConfirmed(true);
+      if (!widget.editMode) {
+        await _prayerRepository.saveLocation(_location);
+        await _store.setOnboardingLocationConfirmed(true);
+      }
+      if (mounted) setState(() => _saving = false);
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -757,8 +971,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 }
 
-class _StepCard extends StatelessWidget {
-  const _StepCard({
+class _StepPanel extends StatelessWidget {
+  const _StepPanel({
     required this.icon,
     required this.title,
     required this.description,
@@ -772,35 +986,48 @@ class _StepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(18),
-      prominent: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Icon(icon, size: 38, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 8),
-          Text(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Stack(
+          children: [
+            const Positioned.fill(
+              child: ArchitecturalBackdrop(prominent: true),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+              child: Row(
+                children: [
+                  AppIcon(icon, size: 28, color: Colors.white),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleLarge?.copyWith(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Text(
             description,
-            textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: QuranTheme.subText(context, 0.72),
               height: 1.45,
-              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 20),
-          child,
-        ],
-      ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: child,
+        ),
+      ],
     );
   }
 }
@@ -818,22 +1045,23 @@ class _SummaryRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 106,
+          Expanded(
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: QuranTheme.subText(context, 0.66),
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
+          const SizedBox(width: 16),
           Expanded(
+            flex: 2,
             child: Text(
               value,
               style: Theme.of(
                 context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -856,6 +1084,7 @@ class _OnboardingCityPickerState extends State<_OnboardingCityPicker> {
   List<OfflinePrayerCity> _cities = const [];
   bool _loading = true;
   int _requestId = 0;
+  bool _failed = false;
 
   @override
   void initState() {
@@ -871,65 +1100,78 @@ class _OnboardingCityPickerState extends State<_OnboardingCityPicker> {
 
   Future<void> _search(String value) async {
     final requestId = ++_requestId;
-    setState(() => _loading = true);
-    final cities = await widget.cityDataSource.search(value);
-    if (!mounted || requestId != _requestId) {
-      return;
-    }
     setState(() {
-      _cities = cities;
-      _loading = false;
+      _loading = true;
+      _failed = false;
     });
+    try {
+      final cities = await widget.cityDataSource.search(value);
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _cities = cities;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _failed = true;
+        _loading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.82,
-      minChildSize: 0.55,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Choose prayer city',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+    return AppSheet(
+      title: 'Choose prayer city',
+      scrollableChild: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Search city or country',
+              prefixIcon: AppIcon(Icons.search_rounded),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _controller,
-              autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Search city or country',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-              onChanged: _search,
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      controller: scrollController,
-                      itemCount: _cities.length,
-                      itemBuilder: (context, index) {
-                        final city = _cities[index];
-                        return ListTile(
-                          title: Text(city.name),
-                          subtitle: Text(city.subtitle),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () => Navigator.of(context).pop(city),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+            onChanged: _search,
+          ),
+          const SizedBox(height: 10),
+          Flexible(
+            child: _loading
+                ? const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _failed
+                ? TextButton.icon(
+                    onPressed: () => _search(_controller.text),
+                    icon: const AppIcon(Icons.refresh_rounded),
+                    label: const Text('Cities could not be loaded. Retry'),
+                  )
+                : _cities.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text('No cities found'),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemCount: _cities.length,
+                    itemBuilder: (context, index) {
+                      final city = _cities[index];
+                      return ListTile(
+                        title: Text(city.name),
+                        subtitle: Text(city.subtitle),
+                        trailing: const AppIcon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.of(context).pop(city),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

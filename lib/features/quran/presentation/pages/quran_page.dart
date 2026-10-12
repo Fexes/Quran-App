@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,13 +11,15 @@ import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../../core/widgets/shell_screen_header.dart';
 import '../../../../l10n/gen/app_localizations.dart';
-import '../../domain/entities/quran_surah.dart';
+import '../../../quran_audio/presentation/widgets/quran_floating_audio_player.dart';
 import '../../domain/entities/quran_navigation.dart';
+import '../../domain/entities/quran_surah.dart';
 import '../../domain/repositories/quran_repository.dart';
 import '../bloc/quran_list_bloc.dart';
 import '../bloc/quran_list_event.dart';
 import '../bloc/quran_list_state.dart';
 import '../widgets/surah_tile.dart';
+import '../widgets/quran_browse_tile.dart';
 
 class QuranPage extends StatelessWidget {
   const QuranPage({super.key});
@@ -46,9 +49,9 @@ class _QuranView extends StatefulWidget {
 
 class _QuranViewState extends State<_QuranView> {
   final _scrollController = ScrollController();
+  final _scrollProgress = ValueNotifier<double>(0);
   final _structureFutures =
       <QuranStructureKind, Future<List<QuranNavigationPoint>>>{};
-  var _scrollProgress = 0.0;
   var _browseKind = QuranStructureKind.surah;
 
   @override
@@ -62,6 +65,7 @@ class _QuranViewState extends State<_QuranView> {
     _scrollController
       ..removeListener(_updateScrollProgress)
       ..dispose();
+    _scrollProgress.dispose();
     super.dispose();
   }
 
@@ -73,10 +77,10 @@ class _QuranViewState extends State<_QuranView> {
     final nextProgress = maxExtent <= 0
         ? 0.0
         : (_scrollController.offset / maxExtent).clamp(0.0, 1.0).toDouble();
-    if ((nextProgress - _scrollProgress).abs() < 0.004) {
+    if ((nextProgress - _scrollProgress.value).abs() < 0.004) {
       return;
     }
-    setState(() => _scrollProgress = nextProgress);
+    _scrollProgress.value = nextProgress;
   }
 
   void _onQueryChanged(BuildContext context, String value) {
@@ -88,6 +92,7 @@ class _QuranViewState extends State<_QuranView> {
 
   void _selectBrowseKind(QuranStructureKind kind) {
     setState(() => _browseKind = kind);
+    _scrollProgress.value = 0;
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
@@ -105,7 +110,7 @@ class _QuranViewState extends State<_QuranView> {
     });
   }
 
-  void _jumpToSurahIndex(int index, int itemCount) {
+  void _jumpToItemIndex(int index, int itemCount) {
     if (!_scrollController.hasClients || itemCount <= 1) {
       return;
     }
@@ -117,6 +122,175 @@ class _QuranViewState extends State<_QuranView> {
         _scrollController.position.minScrollExtent,
         _scrollController.position.maxScrollExtent,
       ),
+    );
+  }
+
+  Widget _browseStack(
+    QuranListState state, {
+    List<QuranNavigationPoint>? points,
+    Object? structureError,
+  }) {
+    final isSurah = _browseKind == QuranStructureKind.surah;
+    final visibleSurahs = state.visibleSurahs;
+    final itemCount = isSurah ? visibleSurahs.length : points?.length ?? 0;
+    final canShowScrollbar =
+        itemCount > 1 &&
+        structureError == null &&
+        (isSurah ? state.status == QuranListStatus.success : points != null);
+
+    return LayoutBuilder(
+      builder: (context, constraints) => ColoredBox(
+        color: Color.alphaBlend(
+          QuranTheme.surfaceVariant(context).withValues(alpha: 0.7),
+          QuranTheme.surface(context),
+        ),
+        child: Stack(
+          children: [
+            _browseScrollView(
+              context,
+              state,
+              points: points,
+              structureError: structureError,
+            ),
+            if (canShowScrollbar)
+              ValueListenableBuilder<double>(
+                valueListenable: _scrollProgress,
+                builder: (context, progress, child) => _QuranSectionScrollbar(
+                  key: ValueKey(_browseKind),
+                  viewportHeight: constraints.maxHeight,
+                  topInset:
+                      MediaQuery.paddingOf(this.context).top +
+                      34 +
+                      ShellScreenHeader.height(context),
+                  itemCount: itemCount,
+                  sectionLabel: _structureKindLabel(_browseKind),
+                  previewLabel: (index) => isSurah
+                      ? visibleSurahs[index].number.toString()
+                      : points![index].index.toString(),
+                  scrollProgress: progress,
+                  onIndexChanged: (index) => _jumpToItemIndex(index, itemCount),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _browseScrollView(
+    BuildContext context,
+    QuranListState state, {
+    List<QuranNavigationPoint>? points,
+    Object? structureError,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    return CustomScrollView(
+      controller: _scrollController,
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsetsDirectional.fromSTEB(18, 16, 32, 20),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              children: [
+                TextField(
+                  onChanged: (value) => _onQueryChanged(context, value),
+                  onSubmitted: (value) {
+                    final query = value.trim();
+                    if (query.isNotEmpty) {
+                      context.push(AppRoutes.quranSearchPath(query));
+                    }
+                  },
+                  decoration: InputDecoration(
+                    hintText: l10n.quranSearchHint,
+                    prefixIcon: const AppIcon(Icons.search_rounded),
+                    filled: true,
+                    fillColor: QuranTheme.surface(context),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: QuranTheme.outline(context),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _StructureTabs(
+                  selected: _browseKind,
+                  onSelected: _selectBrowseKind,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _browseKind == QuranStructureKind.surah
+                            ? 'Surahs'
+                            : _structureKindLabel(_browseKind),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ),
+                    if ((_browseKind == QuranStructureKind.surah &&
+                            state.status == QuranListStatus.success) ||
+                        points != null)
+                      Text(
+                        '${_browseKind == QuranStructureKind.surah ? state.visibleSurahs.length : points!.length}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: QuranTheme.subText(context),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_browseKind == QuranStructureKind.surah)
+          switch (state.status) {
+            QuranListStatus.initial ||
+            QuranListStatus.loading => _QuranBrowseStatusSliver(
+              child: AppLoadingView(label: l10n.loadingQuran),
+            ),
+            QuranListStatus.failure => _QuranBrowseStatusSliver(
+              child: AppErrorView(
+                title: l10n.quranLoadFailedTitle,
+                message: state.errorMessage ?? l10n.quranLoadFailedMessage,
+                onRetry: () =>
+                    context.read<QuranListBloc>().add(const QuranListStarted()),
+              ),
+            ),
+            QuranListStatus.success => _SurahSliverList(state: state),
+          }
+        else if (structureError != null)
+          _QuranBrowseStatusSliver(
+            child: AppErrorView(
+              title: 'Navigation unavailable',
+              message: structureError.toString(),
+              onRetry: () {
+                setState(() {
+                  _structureFutures.remove(_browseKind);
+                });
+              },
+            ),
+          )
+        else if (points == null)
+          const _QuranBrowseStatusSliver(
+            child: AppLoadingView(label: 'Loading Quran structure'),
+          )
+        else
+          _StructureSliverList(
+            kind: _browseKind,
+            points: points,
+            surahs: {for (final surah in state.surahs) surah.number: surah},
+          ),
+      ],
     );
   }
 
@@ -147,98 +321,17 @@ class _QuranViewState extends State<_QuranView> {
           Expanded(
             child: BlocBuilder<QuranListBloc, QuranListState>(
               builder: (context, state) {
-                final visibleSurahs = state.visibleSurahs;
-                return Stack(
-                  children: [
-                    ListView(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(18, 0, 32, 112),
-                      children: [
-                        TextField(
-                          onChanged: (value) => _onQueryChanged(context, value),
-                          onSubmitted: (value) {
-                            final query = value.trim();
-                            if (query.isNotEmpty) {
-                              context.push(AppRoutes.quranSearchPath(query));
-                            }
-                          },
-                          decoration: InputDecoration(
-                            hintText: l10n.quranSearchHint,
-                            prefixIcon: const Icon(Icons.search_rounded),
-                            suffixIcon: IconButton(
-                              tooltip: l10n.quranOpenTextSearch,
-                              onPressed: () =>
-                                  context.push(AppRoutes.quranSearchPath()),
-                              icon: const Icon(Icons.manage_search_rounded),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                QuranTheme.radiusControl,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        _StructureTabs(
-                          selected: _browseKind,
-                          onSelected: _selectBrowseKind,
-                        ),
-                        const SizedBox(height: 14),
-                        if (_browseKind == QuranStructureKind.surah)
-                          switch (state.status) {
-                            QuranListStatus.initial ||
-                            QuranListStatus.loading => AppLoadingView(
-                              label: l10n.loadingQuran,
-                            ),
-                            QuranListStatus.failure => AppErrorView(
-                              title: l10n.quranLoadFailedTitle,
-                              message:
-                                  state.errorMessage ??
-                                  l10n.quranLoadFailedMessage,
-                              onRetry: () => context.read<QuranListBloc>().add(
-                                const QuranListStarted(),
-                              ),
-                            ),
-                            QuranListStatus.success => _SurahList(state: state),
-                          }
-                        else
-                          FutureBuilder<List<QuranNavigationPoint>>(
-                            future: _navigationPoints(_browseKind),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasError) {
-                                return AppErrorView(
-                                  title: 'Navigation unavailable',
-                                  message: snapshot.error.toString(),
-                                  onRetry: () {
-                                    setState(() {
-                                      _structureFutures.remove(_browseKind);
-                                    });
-                                  },
-                                );
-                              }
-                              final points = snapshot.data;
-                              if (points == null) {
-                                return const AppLoadingView(
-                                  label: 'Loading Quran structure',
-                                );
-                              }
-                              return _StructureList(
-                                kind: _browseKind,
-                                points: points,
-                              );
-                            },
-                          ),
-                      ],
-                    ),
-                    if (_browseKind == QuranStructureKind.surah &&
-                        state.status == QuranListStatus.success)
-                      _SurahScrollbar(
-                        surahs: visibleSurahs,
-                        scrollProgress: _scrollProgress,
-                        onSurahIndexChanged: (index) =>
-                            _jumpToSurahIndex(index, visibleSurahs.length),
-                      ),
-                  ],
+                if (_browseKind == QuranStructureKind.surah) {
+                  return _browseStack(state);
+                }
+                return FutureBuilder<List<QuranNavigationPoint>>(
+                  key: ValueKey(_browseKind),
+                  future: _navigationPoints(_browseKind),
+                  builder: (context, snapshot) => _browseStack(
+                    state,
+                    points: snapshot.data,
+                    structureError: snapshot.error,
+                  ),
                 );
               },
             ),
@@ -267,6 +360,24 @@ class _StructureTabs extends StatelessWidget {
               child: ChoiceChip(
                 selected: selected == kind,
                 label: Text(_structureKindLabel(kind)),
+                showCheckmark: false,
+                side: BorderSide.none,
+                shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                selectedColor: QuranTheme.text(context),
+                backgroundColor: QuranTheme.surface(context),
+                labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: selected == kind
+                      ? QuranTheme.surface(context)
+                      : QuranTheme.subText(context, 0.85),
+                  fontWeight: selected == kind
+                      ? FontWeight.w500
+                      : FontWeight.w400,
+                  letterSpacing: 0,
+                ),
                 onSelected: (_) => onSelected(kind),
               ),
             ),
@@ -276,45 +387,73 @@ class _StructureTabs extends StatelessWidget {
   }
 }
 
-class _StructureList extends StatelessWidget {
-  const _StructureList({required this.kind, required this.points});
+class _QuranBrowseStatusSliver extends StatelessWidget {
+  const _QuranBrowseStatusSliver({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: SizedBox(height: 260, child: Center(child: child)),
+    );
+  }
+}
+
+class _StructureSliverList extends StatelessWidget {
+  const _StructureSliverList({
+    required this.kind,
+    required this.points,
+    required this.surahs,
+  });
 
   final QuranStructureKind kind;
   final List<QuranNavigationPoint> points;
+  final Map<int, QuranSurah> surahs;
 
   @override
   Widget build(BuildContext context) {
     if (points.isEmpty) {
-      return const Center(child: Text('No navigation points available.'));
+      return const _QuranBrowseStatusSliver(
+        child: Text('No navigation points available.'),
+      );
     }
-    return Column(
-      children: [
-        if (kind == QuranStructureKind.page)
-          Padding(
+    final hasPageJump = kind == QuranStructureKind.page;
+    return SliverPadding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        18,
+        0,
+        32,
+        QuranFloatingAudioPlayer.scrollInset(context),
+      ),
+      sliver: SliverList.builder(
+        itemCount: points.length + (hasPageJump ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (hasPageJump && index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _PageJumpControl(points: points),
+            );
+          }
+          final point = points[index - (hasPageJump ? 1 : 0)];
+          final surah = surahs[point.surahNumber];
+          return Padding(
+            key: ValueKey('${kind.name}-${point.index}'),
             padding: const EdgeInsets.only(bottom: 12),
-            child: _PageJumpControl(points: points),
-          ),
-        for (final point in points)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Card(
-              margin: EdgeInsets.zero,
-              child: ListTile(
-                leading: CircleAvatar(child: Text('${point.index}')),
-                title: Text(
-                  point.label,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                subtitle: Text(
-                  'Surah ${point.surahNumber}:${point.ayahNumber} • '
-                  'Page ${point.page} • Juz ${point.juz}',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _openNavigationPoint(context, point),
-              ),
+            child: QuranBrowseTile(
+              number: point.index,
+              title: point.label,
+              arabicTitle: surah?.arabicName,
+              details: [
+                '${surah?.englishName ?? 'Surah ${point.surahNumber}'} ${point.verseKey}',
+                if (kind != QuranStructureKind.page) 'Page ${point.page}',
+                if (kind != QuranStructureKind.juz) 'Juz ${point.juz}',
+              ],
+              onTap: () => _openNavigationPoint(context, point),
             ),
-          ),
-      ],
+          );
+        },
+      ),
     );
   }
 }
@@ -329,17 +468,24 @@ class _PageJumpControl extends StatelessWidget {
     return TextField(
       keyboardType: TextInputType.number,
       textInputAction: TextInputAction.go,
-      decoration: const InputDecoration(
-        labelText: 'Jump to Mushaf page',
+      decoration: InputDecoration(
+        labelText: 'Jump to page',
         hintText: '1 to 604',
-        prefixIcon: Icon(Icons.my_library_books_outlined),
+        prefixIcon: const AppIcon(Icons.my_library_books_outlined),
+        filled: true,
+        fillColor: QuranTheme.surface(context),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: QuranTheme.outline(context)),
+        ),
       ),
       onSubmitted: (value) {
         final page = int.tryParse(value)?.clamp(1, 604);
         if (page == null) {
           return;
         }
-        final point = points[page - 1];
+        final point = points.where((point) => point.index == page).firstOrNull;
+        if (point == null) return;
         _openNavigationPoint(context, point);
       },
     );
@@ -380,31 +526,40 @@ String _structureKindLabel(QuranStructureKind kind) {
   };
 }
 
-class _SurahScrollbar extends StatefulWidget {
-  const _SurahScrollbar({
-    required this.surahs,
+class _QuranSectionScrollbar extends StatefulWidget {
+  const _QuranSectionScrollbar({
+    super.key,
+    required this.viewportHeight,
+    required this.topInset,
+    required this.itemCount,
+    required this.sectionLabel,
+    required this.previewLabel,
     required this.scrollProgress,
-    required this.onSurahIndexChanged,
+    required this.onIndexChanged,
   });
 
-  final List<QuranSurah> surahs;
+  final double viewportHeight;
+  final double topInset;
+  final int itemCount;
+  final String sectionLabel;
+  final String Function(int index) previewLabel;
   final double scrollProgress;
-  final ValueChanged<int> onSurahIndexChanged;
+  final ValueChanged<int> onIndexChanged;
 
   @override
-  State<_SurahScrollbar> createState() => _SurahScrollbarState();
+  State<_QuranSectionScrollbar> createState() => _QuranSectionScrollbarState();
 }
 
-class _SurahScrollbarState extends State<_SurahScrollbar> {
+class _QuranSectionScrollbarState extends State<_QuranSectionScrollbar> {
   int? _previewIndex;
   var _isInteracting = false;
 
   int _indexForOffset(double dy, double height) {
-    if (widget.surahs.length <= 1 || height <= 0) {
+    if (widget.itemCount <= 1 || height <= 0) {
       return 0;
     }
     final progress = (dy / height).clamp(0.0, 1.0);
-    return (progress * (widget.surahs.length - 1)).round();
+    return (progress * (widget.itemCount - 1)).round();
   }
 
   void _changeIndex(int index) {
@@ -412,7 +567,7 @@ class _SurahScrollbarState extends State<_SurahScrollbar> {
       _isInteracting = true;
       _previewIndex = index;
     });
-    widget.onSurahIndexChanged(index);
+    widget.onIndexChanged(index);
   }
 
   void _settleIndex(int index) {
@@ -420,7 +575,7 @@ class _SurahScrollbarState extends State<_SurahScrollbar> {
       _isInteracting = false;
       _previewIndex = index;
     });
-    widget.onSurahIndexChanged(index);
+    widget.onIndexChanged(index);
     Future<void>.delayed(const Duration(milliseconds: 700), () {
       if (mounted && !_isInteracting) {
         setState(() => _previewIndex = null);
@@ -430,25 +585,23 @@ class _SurahScrollbarState extends State<_SurahScrollbar> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.surahs.length <= 1) {
+    if (widget.itemCount <= 1) {
       return const SizedBox.shrink();
     }
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final topSafeArea = MediaQuery.paddingOf(context).top;
     const scrollbarHeightFactor = 0.44;
-    const shellHeaderHeight = 96.0;
-    final scrollbarHeight = screenHeight * scrollbarHeightFactor;
-    final topOffset =
-        ((screenHeight - scrollbarHeight) / 2) -
-        topSafeArea -
-        shellHeaderHeight;
-    final currentIndex = (widget.scrollProgress * (widget.surahs.length - 1))
+    final scrollbarHeight = (screenHeight * scrollbarHeightFactor).clamp(
+      0.0,
+      widget.viewportHeight,
+    );
+    final topOffset = ((screenHeight - scrollbarHeight) / 2 - widget.topInset)
+        .clamp(0.0, widget.viewportHeight - scrollbarHeight);
+    final currentIndex = (widget.scrollProgress * (widget.itemCount - 1))
         .round();
     final visibleIndex = (_previewIndex ?? currentIndex).clamp(
       0,
-      widget.surahs.length - 1,
+      widget.itemCount - 1,
     );
-    final visibleSurah = widget.surahs[visibleIndex];
     final showDrop = _isInteracting || _previewIndex != null;
     final primary = Theme.of(context).colorScheme.primary;
     final isDark = QuranTheme.isDark(context);
@@ -458,7 +611,7 @@ class _SurahScrollbarState extends State<_SurahScrollbar> {
       width: 18,
       height: scrollbarHeight,
       child: Tooltip(
-        message: 'Jump to surah',
+        message: 'Jump to ${widget.sectionLabel}',
         child: LayoutBuilder(
           builder: (context, constraints) {
             final height = constraints.maxHeight;
@@ -468,7 +621,7 @@ class _SurahScrollbarState extends State<_SurahScrollbar> {
             const thumbInset = (trackWidth - thumbSize) / 2;
             final progress = widget.scrollProgress.clamp(0.0, 1.0).toDouble();
             final top =
-                (visibleIndex / (widget.surahs.length - 1)) *
+                (visibleIndex / (widget.itemCount - 1)) *
                 (height - dropHeight).clamp(0.0, double.infinity);
             final thumbTop =
                 progress * (height - thumbSize).clamp(0.0, double.infinity);
@@ -572,10 +725,10 @@ class _SurahScrollbarState extends State<_SurahScrollbar> {
                           child: showDrop
                               ? IgnorePointer(
                                   key: const ValueKey(
-                                    'surah-scrollbar-preview',
+                                    'quran-section-scrollbar-preview',
                                   ),
                                   child: ClipPath(
-                                    clipper: const _SurahTearDropClipper(),
+                                    clipper: const _QuranIndexTearDropClipper(),
                                     child: Container(
                                       width: 64,
                                       height: dropHeight,
@@ -585,15 +738,17 @@ class _SurahScrollbarState extends State<_SurahScrollbar> {
                                       ),
                                       color: primary,
                                       child: Text(
-                                        visibleSurah.number.toString(),
+                                        widget.previewLabel(visibleIndex),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: Theme.of(context)
                                             .textTheme
                                             .labelLarge
                                             ?.copyWith(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w900,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onPrimary,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                       ),
                                     ),
@@ -601,7 +756,7 @@ class _SurahScrollbarState extends State<_SurahScrollbar> {
                                 )
                               : const SizedBox.shrink(
                                   key: ValueKey(
-                                    'surah-scrollbar-preview-hidden',
+                                    'quran-section-scrollbar-preview-hidden',
                                   ),
                                 ),
                         ),
@@ -618,8 +773,8 @@ class _SurahScrollbarState extends State<_SurahScrollbar> {
   }
 }
 
-class _SurahTearDropClipper extends CustomClipper<Path> {
-  const _SurahTearDropClipper();
+class _QuranIndexTearDropClipper extends CustomClipper<Path> {
+  const _QuranIndexTearDropClipper();
 
   @override
   Path getClip(Size size) {
@@ -646,8 +801,8 @@ class _SurahTearDropClipper extends CustomClipper<Path> {
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
-class _SurahList extends StatelessWidget {
-  const _SurahList({required this.state});
+class _SurahSliverList extends StatelessWidget {
+  const _SurahSliverList({required this.state});
 
   final QuranListState state;
 
@@ -656,11 +811,12 @@ class _SurahList extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     if (state.visibleSurahs.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 28),
-        child: Center(
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 28),
           child: Text(
             l10n.quranNoResults,
+            textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: QuranTheme.subText(context),
             ),
@@ -669,11 +825,20 @@ class _SurahList extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: [
-        for (final surah in state.visibleSurahs)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+    return SliverPadding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        18,
+        0,
+        32,
+        QuranFloatingAudioPlayer.scrollInset(context),
+      ),
+      sliver: SliverList.builder(
+        itemCount: state.visibleSurahs.length,
+        itemBuilder: (context, index) {
+          final surah = state.visibleSurahs[index];
+          return Padding(
+            key: ValueKey(surah.number),
+            padding: const EdgeInsets.only(bottom: 12),
             child: SurahTile(
               surah: surah,
               onTap: () async {
@@ -695,8 +860,9 @@ class _SurahList extends StatelessWidget {
                 }
               },
             ),
-          ),
-      ],
+          );
+        },
+      ),
     );
   }
 }

@@ -51,6 +51,7 @@ class HomeState extends Equatable {
     HomeStatus? status,
     QuranLastRead? lastRead,
     QuranSurah? lastReadSurah,
+    bool clearLastRead = false,
     DailyPrayerTimes? dailyPrayerTimes,
     DailyAyah? dailyAyah,
     ReadingDashboard? readingDashboard,
@@ -61,8 +62,8 @@ class HomeState extends Equatable {
   }) {
     return HomeState(
       status: status ?? this.status,
-      lastRead: lastRead ?? this.lastRead,
-      lastReadSurah: lastReadSurah ?? this.lastReadSurah,
+      lastRead: clearLastRead ? null : lastRead ?? this.lastRead,
+      lastReadSurah: clearLastRead ? null : lastReadSurah ?? this.lastReadSurah,
       dailyPrayerTimes: dailyPrayerTimes ?? this.dailyPrayerTimes,
       dailyAyah: dailyAyah ?? this.dailyAyah,
       readingDashboard: readingDashboard ?? this.readingDashboard,

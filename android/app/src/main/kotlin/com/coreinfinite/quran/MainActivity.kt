@@ -32,6 +32,7 @@ private class QiblaHeadingStreamHandler(
     private var latitude = 0.0
     private var longitude = 0.0
     private var altitude = 0.0
+    private var declination = 0.0
     private var sensorAccuracy = SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
     private var sensorSource = "android_rotation_vector"
 
@@ -41,6 +42,12 @@ private class QiblaHeadingStreamHandler(
         latitude = (args?.get("latitude") as? Number)?.toDouble() ?: 0.0
         longitude = (args?.get("longitude") as? Number)?.toDouble() ?: 0.0
         altitude = (args?.get("altitude") as? Number)?.toDouble() ?: 0.0
+        declination = GeomagneticField(
+            latitude.toFloat(),
+            longitude.toFloat(),
+            altitude.toFloat(),
+            System.currentTimeMillis(),
+        ).declination.toDouble()
         sensorAccuracy = SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
 
         val sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
@@ -77,12 +84,6 @@ private class QiblaHeadingStreamHandler(
         SensorManager.getOrientation(matrix, orientation)
 
         val magneticHeading = normalizeDegrees(Math.toDegrees(orientation[0].toDouble()))
-        val declination = GeomagneticField(
-            latitude.toFloat(),
-            longitude.toFloat(),
-            altitude.toFloat(),
-            System.currentTimeMillis(),
-        ).declination.toDouble()
         val trueHeading = normalizeDegrees(magneticHeading + declination)
 
         eventSink?.success(

@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../constants/quran_arabic_script.dart';
 import '../storage/settings_store.dart';
 import 'quran_theme.dart';
 import 'quran_theme_state.dart';
@@ -15,6 +16,10 @@ class QuranThemeCubit extends Cubit<QuranThemeState> {
           fontWeightScale: settingsStore.fontWeightScale,
           quranArabicFontScale: settingsStore.quranArabicFontScale,
           quranTranslationFontScale: settingsStore.quranTranslationFontScale,
+          quranArabicScript: QuranArabicScript.values.firstWhere(
+            (script) => script.name == settingsStore.quranArabicScript,
+            orElse: () => QuranArabicScript.uthmani,
+          ),
         ),
       ) {
     _normalizeInitialPreset();
@@ -43,6 +48,20 @@ class QuranThemeCubit extends Cubit<QuranThemeState> {
     await _settingsStore.setFontWeightScale(next);
   }
 
+  Future<void> resetTextAppearance() async {
+    emit(state.copyWith(fontScale: 1.0, fontWeightScale: 0.88));
+    await _settingsStore.setFontScale(1.0);
+    await _settingsStore.setFontWeightScale(0.88);
+  }
+
+  Future<void> resetReaderFontSizes() async {
+    emit(
+      state.copyWith(quranArabicFontScale: 1.0, quranTranslationFontScale: 1.0),
+    );
+    await _settingsStore.setQuranArabicFontScale(1.0);
+    await _settingsStore.setQuranTranslationFontScale(1.0);
+  }
+
   Future<void> setQuranArabicFontScale(double value) async {
     final next = value.clamp(0.82, 1.42).toDouble();
     if (next == state.quranArabicFontScale) {
@@ -59,6 +78,20 @@ class QuranThemeCubit extends Cubit<QuranThemeState> {
     }
     emit(state.copyWith(quranTranslationFontScale: next));
     await _settingsStore.setQuranTranslationFontScale(next);
+  }
+
+  Future<void> setQuranArabicScript(
+    QuranArabicScript script, {
+    bool automatic = false,
+  }) async {
+    if (automatic && _settingsStore.hasManualArabicScript) return;
+    if (state.quranArabicScript != script) {
+      emit(state.copyWith(quranArabicScript: script));
+    }
+    await _settingsStore.setQuranArabicScript(
+      script.name,
+      automatic: automatic,
+    );
   }
 
   void _normalizeInitialPreset() {

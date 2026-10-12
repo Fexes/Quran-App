@@ -16,6 +16,7 @@ import '../../features/quran/presentation/pages/search/quran_search_page.dart';
 import '../../features/quran_audio/presentation/pages/quran_downloads_page.dart';
 import '../../features/reading_goals/presentation/pages/reading_goals_page.dart';
 import '../../features/prayer_tracking/presentation/pages/prayer_tracking_page.dart';
+import '../../features/qibla/presentation/pages/qibla_page.dart';
 import '../../features/worship_tools/presentation/pages/achievements_page.dart';
 import '../../features/worship_tools/presentation/pages/divine_names_page.dart';
 import '../../features/worship_tools/presentation/pages/duas_page.dart';
@@ -133,6 +134,16 @@ final appRouter = GoRouter(
       path: AppRoutes.prayerTracking,
       name: 'prayer-tracking',
       builder: (context, state) => const PrayerTrackingPage(),
+    ),
+    GoRoute(
+      path: AppRoutes.qibla,
+      name: 'qibla',
+      builder: (context, state) => const QiblaPage(),
+    ),
+    GoRoute(
+      path: AppRoutes.fastingJournal,
+      name: 'fasting-journal',
+      builder: (context, state) => const PrayerTrackingPage(fastingOnly: true),
     ),
     GoRoute(
       path: AppRoutes.duas,

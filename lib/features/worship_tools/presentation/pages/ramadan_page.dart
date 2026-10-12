@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hijri_calendar/hijri_calendar.dart';
 import 'package:intl/intl.dart';
@@ -6,7 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../../app/di/injection.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../library/data/stores/library_user_data_store.dart';
 import '../../../prayer_times/domain/entities/daily_prayer_times.dart';
@@ -58,7 +59,10 @@ class _RamadanPageState extends State<RamadanPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context).ramadanTitle)),
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context).ramadanTitle),
+        flexibleSpace: const ArchitecturalBackdrop(),
+      ),
       body: FutureBuilder<_RamadanData>(
         future: _future,
         builder: (context, snapshot) {
@@ -66,7 +70,7 @@ class _RamadanPageState extends State<RamadanPage> {
             return Center(
               child: FilledButton.icon(
                 onPressed: _refresh,
-                icon: const Icon(Icons.refresh_rounded),
+                icon: const AppIcon(Icons.refresh_rounded),
                 label: const Text('Retry dashboard'),
               ),
             );
@@ -83,11 +87,10 @@ class _RamadanPageState extends State<RamadanPage> {
             onRefresh: _refresh,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
               children: [
-                PremiumSurface(
-                  padding: const EdgeInsets.all(20),
-                  prominent: true,
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Column(
                     children: [
                       Text(
@@ -96,7 +99,7 @@ class _RamadanPageState extends State<RamadanPage> {
                             : '${data.hijri.getLongMonthName().toUpperCase()} ${data.hijri.hYear}',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -106,7 +109,7 @@ class _RamadanPageState extends State<RamadanPage> {
                             : 'Ramadan plan',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.w900),
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 14),
                       Row(
@@ -133,55 +136,60 @@ class _RamadanPageState extends State<RamadanPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
+                const Divider(height: 28),
                 _FastingTodayCard(record: data.worship.fast, onLog: _logFast),
-                const SizedBox(height: 14),
-                PremiumSurface(
+                const Divider(height: 28),
+                InkWell(
+                  borderRadius: BorderRadius.circular(QuranTheme.radiusCard),
                   onTap: () => context.push(AppRoutes.readingGoalsPath()),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.menu_book_outlined),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Quran goal',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w900),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            const AppIcon(Icons.menu_book_outlined),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Quran goal',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
                             ),
-                          ),
-                          const Icon(Icons.chevron_right_rounded),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      LinearProgressIndicator(
-                        value: data.reading.goalProgress,
-                        minHeight: 9,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        '${data.reading.todayValue} of '
-                        '${data.reading.goal.dailyTarget} '
-                        '${data.reading.goal.metric.name} today',
-                      ),
-                      if (data.reading.khatma != null)
-                        Text(
-                          'Khatma pace: ${data.reading.khatma!.dailyPagesRequired(data.now)} pages today',
+                            const AppIcon(Icons.chevron_right_rounded),
+                          ],
                         ),
-                    ],
+                        const SizedBox(height: 10),
+                        LinearProgressIndicator(
+                          value: data.reading.goalProgress,
+                          minHeight: 4,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          '${data.reading.todayValue} of '
+                          '${data.reading.goal.dailyTarget} '
+                          '${data.reading.goal.metric.name} today',
+                        ),
+                        if (data.reading.khatma != null)
+                          Text(
+                            'Khatma pace: ${data.reading.khatma!.dailyPagesRequired(data.now)} pages today',
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const Divider(height: 28),
                 _LastTenNightsCard(
                   hijriYear: data.hijri.hYear,
                   night: isRamadan ? day : 21,
                   active: isRamadan && day >= 21,
                   userData: _userData,
-                  onChanged: () => setState(() {}),
+                  onChanged: () {
+                    if (mounted) setState(() {});
+                  },
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -201,6 +209,7 @@ class _RamadanPageState extends State<RamadanPage> {
   }
 
   Future<void> _refresh() async {
+    if (!mounted) return;
     setState(() => _future = _load());
     await _future;
   }
@@ -260,7 +269,7 @@ class _TimeMetric extends StatelessWidget {
           value,
           style: Theme.of(
             context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
       ],
     );
@@ -275,8 +284,8 @@ class _FastingTodayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -284,7 +293,7 @@ class _FastingTodayCard extends StatelessWidget {
             'Today’s fast',
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
@@ -297,17 +306,20 @@ class _FastingTodayCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              ActionChip(
+              ChoiceChip(
+                selected: record?.status == FastStatus.completed,
                 label: const Text('Completed'),
-                onPressed: () => onLog(FastStatus.completed),
+                onSelected: (_) => onLog(FastStatus.completed),
               ),
-              ActionChip(
+              ChoiceChip(
+                selected: record?.status == FastStatus.missed,
                 label: const Text('Missed'),
-                onPressed: () => onLog(FastStatus.missed),
+                onSelected: (_) => onLog(FastStatus.missed),
               ),
-              ActionChip(
+              ChoiceChip(
+                selected: record?.status == FastStatus.exempt,
                 label: const Text('Exempt'),
-                onPressed: () => onLog(FastStatus.exempt),
+                onSelected: (_) => onLog(FastStatus.exempt),
               ),
             ],
           ),
@@ -341,8 +353,8 @@ class _LastTenNightsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -350,7 +362,7 @@ class _LastTenNightsCard extends StatelessWidget {
             'Last ten nights plan',
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           Text(
             active

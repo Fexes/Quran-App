@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_icon.dart';
 
 class AppErrorView extends StatelessWidget {
   const AppErrorView({
@@ -20,7 +21,7 @@ class AppErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            AppIcon(
               Icons.error_outline_rounded,
               color: Theme.of(context).colorScheme.error,
               size: 32,

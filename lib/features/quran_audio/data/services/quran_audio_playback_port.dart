@@ -22,6 +22,8 @@ abstract interface class QuranAudioPlaybackPort {
   Future<void> loadAndPlay(
     List<QuranAudioQueueItem> items, {
     int startIndex = 0,
+    Duration initialPosition = Duration.zero,
+    bool autoPlay = true,
   });
 
   Future<void> setQuranRepeatMode(QuranAudioRepeatMode mode);

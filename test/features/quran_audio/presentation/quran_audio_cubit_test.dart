@@ -467,7 +467,7 @@ void main() {
       expect(playbackPort.stopCalls, 0);
       expect(playbackPort.loadCalls, 4);
       expect(playbackPort.loadedItems.map((item) => item.verseKey), ['1:3']);
-      expect(cubit.state.status, QuranAudioStatus.loading);
+      expect(cubit.state.status, QuranAudioStatus.playing);
 
       await cubit.close();
     });
@@ -587,6 +587,7 @@ void main() {
 }
 
 class _FakePlaybackPort implements QuranAudioPlaybackPort {
+  final _playbackStateController = StreamController<PlaybackState>.broadcast();
   final _mediaItemController = StreamController<MediaItem?>.broadcast();
   final _queueController = StreamController<List<MediaItem>>.broadcast();
   final _positionController = StreamController<Duration>.broadcast();
@@ -600,9 +601,10 @@ class _FakePlaybackPort implements QuranAudioPlaybackPort {
   int playCalls = 0;
   int stopCalls = 0;
   final seekedPositions = <Duration>[];
+  bool _playing = false;
 
   @override
-  Stream<PlaybackState> get playbackState => const Stream.empty();
+  Stream<PlaybackState> get playbackState => _playbackStateController.stream;
 
   @override
   Stream<MediaItem?> get mediaItem => _mediaItemController.stream;
@@ -632,7 +634,7 @@ class _FakePlaybackPort implements QuranAudioPlaybackPort {
   int? get currentIndex => startIndex;
 
   @override
-  bool get playing => false;
+  bool get playing => _playing;
 
   @override
   List<QuranAudioQueueItem> get currentQueue => loadedItems;
@@ -641,6 +643,8 @@ class _FakePlaybackPort implements QuranAudioPlaybackPort {
   Future<void> loadAndPlay(
     List<QuranAudioQueueItem> items, {
     int startIndex = 0,
+    Duration initialPosition = Duration.zero,
+    bool autoPlay = true,
   }) async {
     loadCalls += 1;
     loadedItems = items;
@@ -649,10 +653,19 @@ class _FakePlaybackPort implements QuranAudioPlaybackPort {
     _queueController.add(mediaItems);
     _mediaItemController.add(mediaItems[startIndex]);
     _currentIndexController.add(startIndex);
+    _playing = autoPlay;
+    _playbackStateController.add(
+      PlaybackState(
+        processingState: AudioProcessingState.ready,
+        playing: autoPlay,
+        updatePosition: initialPosition,
+      ),
+    );
   }
 
   @override
   Future<void> dispose() async {
+    await _playbackStateController.close();
     await _mediaItemController.close();
     await _queueController.close();
     await _positionController.close();
@@ -674,11 +687,20 @@ class _FakePlaybackPort implements QuranAudioPlaybackPort {
   }
 
   @override
-  Future<void> pause() async {}
+  Future<void> pause() async {
+    _playing = false;
+    _playbackStateController.add(
+      PlaybackState(processingState: AudioProcessingState.ready),
+    );
+  }
 
   @override
   Future<void> play() async {
     playCalls += 1;
+    _playing = true;
+    _playbackStateController.add(
+      PlaybackState(processingState: AudioProcessingState.ready, playing: true),
+    );
   }
 
   @override
@@ -701,6 +723,7 @@ class _FakePlaybackPort implements QuranAudioPlaybackPort {
   @override
   Future<void> stop() async {
     stopCalls += 1;
+    _playing = false;
   }
 }
 

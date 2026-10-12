@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../domain/entities/quran_note.dart';
@@ -13,6 +14,9 @@ class QuranUserDataStore {
 
   final Box<dynamic>? _box;
   final Map<String, Object?>? _memory;
+  final _lastReadChanges = ValueNotifier(0);
+
+  Listenable get lastReadChanges => _lastReadChanges;
 
   static const boxName = 'quran_user_data';
   static const _lastReadSurahKey = 'last_read_surah';
@@ -129,12 +133,18 @@ class QuranUserDataStore {
     required DateTime updatedAt,
     int? page,
   }) async {
-    await _write(_lastReadSurahKey, surahNumber);
-    await _write(_lastReadAyahKey, ayahNumber);
-    await _write(_lastReadUpdatedAtKey, updatedAt.toIso8601String());
-    if (page != null) {
-      await _write(_lastReadPageKey, page.clamp(1, 604));
+    final values = <String, Object>{
+      _lastReadSurahKey: surahNumber,
+      _lastReadAyahKey: ayahNumber,
+      _lastReadUpdatedAtKey: updatedAt.toIso8601String(),
+      if (page != null) _lastReadPageKey: page.clamp(1, 604),
+    };
+    if (_box != null) {
+      await _box.putAll(values);
+    } else {
+      _memory?.addAll(values);
     }
+    _lastReadChanges.value++;
   }
 
   Future<void> saveNavigationContext({
@@ -258,9 +268,13 @@ class QuranUserDataStore {
         await _write(entry.key, entry.value!);
       }
     }
+    _lastReadChanges.value++;
   }
 
-  Future<void> clearAll() => _clear();
+  Future<void> clearAll() async {
+    await _clear();
+    _lastReadChanges.value++;
+  }
 
   T _readEnum<T extends Enum>(String key, List<T> values, T fallback) {
     final raw = _read(key);

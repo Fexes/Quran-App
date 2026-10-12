@@ -14,6 +14,7 @@ class QuranReaderState extends Equatable {
   const QuranReaderState({
     required this.status,
     required this.ayahs,
+    this.bismillahAyah,
     required this.showTranslation,
     required this.bookmarkedVerseKeys,
     required this.contentSources,
@@ -39,6 +40,7 @@ class QuranReaderState extends Equatable {
   const QuranReaderState.initial()
     : status = QuranReaderStatus.initial,
       ayahs = const [],
+      bismillahAyah = null,
       showTranslation = false,
       bookmarkedVerseKeys = const {},
       contentSources = const [],
@@ -63,6 +65,7 @@ class QuranReaderState extends Equatable {
   final QuranReaderStatus status;
   final QuranSurah? surah;
   final List<QuranAyah> ayahs;
+  final QuranAyah? bismillahAyah;
   final bool showTranslation;
   final Set<String> bookmarkedVerseKeys;
   final List<ContentSource> contentSources;
@@ -83,6 +86,12 @@ class QuranReaderState extends Equatable {
   final String? activeAudioVerseKey;
   final String? errorMessage;
 
+  // Al-Fatihah's numbered opening is rendered in the header, not twice.
+  List<QuranAyah> get bodyAyahs =>
+      ayahs.isNotEmpty && ayahs.first.verseKey == '1:1'
+      ? ayahs.sublist(1)
+      : ayahs;
+
   QuranAyah? get selectedAyah {
     final verseKey = selectedVerseKey;
     if (verseKey == null) {
@@ -100,6 +109,7 @@ class QuranReaderState extends Equatable {
     QuranReaderStatus? status,
     QuranSurah? surah,
     List<QuranAyah>? ayahs,
+    QuranAyah? bismillahAyah,
     bool? showTranslation,
     Set<String>? bookmarkedVerseKeys,
     List<ContentSource>? contentSources,
@@ -127,6 +137,7 @@ class QuranReaderState extends Equatable {
       status: status ?? this.status,
       surah: surah ?? this.surah,
       ayahs: ayahs ?? this.ayahs,
+      bismillahAyah: bismillahAyah ?? this.bismillahAyah,
       showTranslation: showTranslation ?? this.showTranslation,
       bookmarkedVerseKeys: bookmarkedVerseKeys ?? this.bookmarkedVerseKeys,
       contentSources: contentSources ?? this.contentSources,
@@ -163,6 +174,7 @@ class QuranReaderState extends Equatable {
     status,
     surah,
     ayahs,
+    bismillahAyah,
     showTranslation,
     bookmarkedVerseKeys,
     contentSources,

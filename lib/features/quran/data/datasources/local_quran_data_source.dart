@@ -1,20 +1,100 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:quran_with_tafsir/quran_with_tafsir.dart' as source;
 
 import '../../../../core/content/content_cache_policy.dart';
 import '../../../../core/content/content_source.dart';
+import '../../../../core/constants/quran_arabic_script.dart';
 import '../../domain/entities/quran_audio_reciter.dart';
 import '../../domain/entities/quran_ayah.dart';
 import '../../domain/entities/quran_navigation.dart';
 import '../../domain/entities/quran_surah.dart';
+
+Map<String, ({String text, List<int> positions})> _decodeIndoPak(
+  String source,
+) {
+  final entries = jsonDecode(source) as Map<String, dynamic>;
+  if (entries.length != 6236) {
+    throw const FormatException('Incomplete bundled IndoPak Quran');
+  }
+  return Map.unmodifiable(
+    entries.map((key, value) {
+      final record = value as Map<String, dynamic>;
+      final text = record['text'] as String;
+      final positions = List<int>.unmodifiable(record['positions'] as List);
+      if (text.trim().isEmpty ||
+          positions.length != text.split(RegExp(r'\s+')).length ||
+          positions.any((index) => index < 0)) {
+        throw FormatException('Invalid IndoPak verse: $key');
+      }
+      return MapEntry(key, (text: text, positions: positions));
+    }),
+  );
+}
+
+List<String> _decodeQpcHafs(String source) {
+  final entries = jsonDecode(source) as List;
+  if (entries.length != 6236) {
+    throw const FormatException('Incomplete bundled QPC Hafs Quran');
+  }
+  final result = <String>[];
+  for (var index = 0; index < entries.length; index++) {
+    final record = entries[index] as List;
+    if (record.length != 2 ||
+        record[1] != index + 1 ||
+        record[0] is! String ||
+        (record[0] as String).trim().isEmpty ||
+        RegExp(r'[\uFC00-\uFD1D]').hasMatch(record[0] as String)) {
+      throw FormatException('Invalid QPC Hafs verse at ${index + 1}');
+    }
+    result.add(record[0] as String);
+  }
+  return List.unmodifiable(result);
+}
 
 class LocalQuranDataSource {
   LocalQuranDataSource({source.QuranService? service})
     : _service = service ?? source.QuranService.instance;
 
   final source.QuranService _service;
+  List<String> _qpcHafs = const [];
+  Future<void>? _qpcHafsLoad;
+  Map<String, ({String text, List<int> positions})> _indoPak = const {};
+  Future<void>? _indoPakLoad;
   List<source.Ayah>? _cachedAllAyahs;
+  Map<int, source.Ayah>? _cachedPageStartAyahs;
   Set<String>? _cachedPageStartKeys;
   Set<String>? _cachedJuzStartKeys;
+
+  Future<void> ensureIndoPakLoaded() => _indoPakLoad ??= _loadIndoPak();
+
+  Future<void> ensureQpcHafsLoaded() => _qpcHafsLoad ??= _loadQpcHafs();
+
+  Future<void> _loadQpcHafs() async {
+    try {
+      final text = await rootBundle.loadString(
+        'assets/data/quran/qpc_hafs.json',
+      );
+      _qpcHafs = await compute(_decodeQpcHafs, text);
+    } catch (_) {
+      _qpcHafsLoad = null;
+      rethrow;
+    }
+  }
+
+  Future<void> _loadIndoPak() async {
+    try {
+      final source = await rootBundle.loadString(
+        'assets/data/quran/indopak.json',
+      );
+      _indoPak = await compute(_decodeIndoPak, source);
+    } catch (_) {
+      _indoPakLoad = null;
+      rethrow;
+    }
+  }
 
   static const _manzilByStartKey = <String, int>{
     '1:1': 1,
@@ -29,18 +109,47 @@ class LocalQuranDataSource {
   List<ContentSource> getContentSources() {
     return const [
       ContentSource(
-        id: 'quran_with_tafsir_arabic',
-        name: 'Uthmani Quran text',
+        id: 'digitalkhatt_indopak',
+        name: 'DigitalKhatt IndoPak Quran',
         attribution:
-            'Arabic Quran text is supplied by quran_with_tafsir and attributed by that package to the King Fahd Complex.',
+            'Text by DigitalKhatt, distributed by Quran JSON; '
+            'font by Amine Anane and Tarteel Inc.',
         description:
-            'Bundled Arabic Quran text. Content redistribution approval remains a release requirement.',
-        url: 'https://pub.dev/packages/quran_with_tafsir',
-        license:
-            'Package code is MIT; bundled content redistribution requires separate review',
+            'Bundled IndoPak script aligned to this app\'s Hafs verse keys. '
+            'Al-Fatihah verse boundaries are adapted for audio and translation compatibility.',
+        url: 'https://github.com/DigitalKhatt/digitalkhatt-js',
+        license: 'Text: MIT and CC BY-SA 4.0; font: SIL OFL 1.1',
+        licenseUrl: 'https://github.com/risan/quran-json/blob/main/LICENSE.txt',
         kind: ContentKind.quranText,
-        provider: 'quran_with_tafsir',
-        edition: 'King Fahd Complex Uthmani text',
+        provider: 'DigitalKhatt / Quran JSON',
+        edition: 'IndoPak; Hafs verse-key adaptation',
+        languageCode: 'ar',
+        languageName: 'Arabic',
+        script: 'Arab',
+        textDirection: ContentTextDirection.rtl,
+        retrievalMode: ContentRetrievalMode.bundled,
+        cachePolicy: ContentCachePolicy.bundled,
+        reviewStatus: ContentReviewStatus.reviewRequired,
+      ),
+      ContentSource(
+        id: 'qpc_hafs_uthmani',
+        name: 'QPC Hafs text and UthmanicHafs font',
+        attribution:
+            'Text and font by the King Fahd Glorious Quran Printing Complex, '
+            'from the pinned Uthmanic Hafs v2.2 release archived by Nuqayah. '
+            'Font distributed unchanged with its original KFGQPC EULA.',
+        description:
+            'All 6,236 verses bundled locally, with original letters and diacritics. '
+            'Technical comparison against Quran Foundation QPC Hafs found only formatting differences.',
+        url:
+            'https://github.com/nuqayah/qpc-fonts/tree/8a4f39d563ea69c994416a1692827e38156c548d/text-mushafs/UthmanicHafs_V22',
+        license:
+            'Font: KFGQPC EULA, free use/copy/distribution, no modification or standalone sale; '
+            'text redistribution review remains a release requirement',
+        kind: ContentKind.quranText,
+        provider: 'King Fahd Complex / Nuqayah source archive',
+        edition: 'QPC Hafs Uthmani v2.2',
+        revision: '8a4f39d563ea69c994416a1692827e38156c548d',
         languageCode: 'ar',
         languageName: 'Arabic',
         script: 'Arab',
@@ -290,7 +399,7 @@ class LocalQuranDataSource {
             kind: kind,
             index: index,
             label: 'Page $index',
-            ayah: _service.getPage(index).first,
+            ayah: _pageStartAyahs[index]!,
           ),
       ],
       QuranStructureKind.sajdah => [
@@ -349,10 +458,13 @@ class LocalQuranDataSource {
     String? tafsir,
   }) {
     final verseKey = _verseKey(ayah);
+    final globalNumber = _globalAyahNumber(ayah.surahNumber, ayah.id);
     return QuranAyah(
       surahNumber: ayah.surahNumber,
       number: ayah.id,
-      text: ayah.text,
+      text: _qpcHafs.isEmpty
+          ? QuranArabicScript.cleanUthmaniText(ayah.text)
+          : _qpcHafs[globalNumber - 1],
       translation: translation,
       page: ayah.page,
       juz: ayah.juz,
@@ -361,8 +473,10 @@ class LocalQuranDataSource {
       isJuzStart: _juzStartKeys.contains(verseKey),
       rubIndex: _service.getRubIndex(ayah.surahNumber, ayah.id),
       manzil: _manzilByStartKey[verseKey],
-      globalNumber: _globalAyahNumber(ayah.surahNumber, ayah.id),
+      globalNumber: globalNumber,
       tafsir: tafsir,
+      indoPakText: _indoPak[verseKey]?.text,
+      indoPakWordPositions: _indoPak[verseKey]?.positions ?? const [],
     );
   }
 
@@ -388,11 +502,21 @@ class LocalQuranDataSource {
     ];
   }
 
+  Map<int, source.Ayah> get _pageStartAyahs {
+    final cached = _cachedPageStartAyahs;
+    if (cached != null) {
+      return cached;
+    }
+    final starts = <int, source.Ayah>{};
+    for (final ayah in _allArabicAyahs) {
+      starts.putIfAbsent(ayah.page, () => ayah);
+    }
+    return _cachedPageStartAyahs = starts;
+  }
+
   Set<String> get _pageStartKeys {
     return _cachedPageStartKeys ??= {
-      for (var page = 1; page <= 604; page++)
-        if (_service.getPage(page).isNotEmpty)
-          _verseKey(_service.getPage(page).first),
+      for (final ayah in _pageStartAyahs.values) _verseKey(ayah),
     };
   }
 

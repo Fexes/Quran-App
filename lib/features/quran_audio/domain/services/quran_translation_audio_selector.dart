@@ -10,14 +10,54 @@ List<QuranAudioReciter> quranTranslationAudioRecitersFor({
   final languageCodes = preferredCode?.isNotEmpty == true
       ? {preferredCode!}
       : quranTranslationAudioLanguageCodesFor(selectedTranslation);
-  return reciters
+  final matching = reciters
       .where(
         (reciter) =>
             reciter.isTranslation &&
             languageCodes.contains(reciter.languageCode.toLowerCase()),
       )
       .toList(growable: false);
+  return [
+    ...matching.where(
+      (voice) => _defaultVoiceIds[voice.languageCode] == voice.id,
+    ),
+    ...matching.where(
+      (voice) => _defaultVoiceIds[voice.languageCode] != voice.id,
+    ),
+  ];
 }
+
+QuranAudioReciter? preferredQuranTranslationVoice(
+  List<QuranAudioReciter> voices, {
+  String? preferredId,
+  String? legacyId,
+}) {
+  for (final id in [preferredId, legacyId]) {
+    for (final voice in voices) {
+      if (voice.id == id) return voice;
+    }
+  }
+  return voices.firstOrNull;
+}
+
+// Stable catalog defaults, not a popularity ranking. User preferences take priority.
+const _defaultVoiceIds = {
+  'en': 'alqurancloud:en.walk',
+  'ur': 'alqurancloud:ur.khan',
+  'fa': 'alqurancloud:fa.hedayatfarfooladvand',
+  'fr': 'alqurancloud:fr.leclerc',
+  'zh': 'alqurancloud:zh.chinese',
+  'ru': 'alqurancloud:ru.kuliev-audio',
+  'kk': 'alqurancloud:kk.khalifahaltai-audio',
+  'bs': 'everyayah:translations/besim_korkut_ajet_po_ajet',
+  'pt': 'quranenc:portuguese_nasr',
+  'nl': 'quranenc:dutch_center',
+  'tl': 'quranenc:tagalog_rwwad',
+  'vi': 'quranenc:vietnamese_rwwad',
+  'as': 'quranenc:assamese_rafeeq',
+  'si': 'quranenc:sinhalese_mahir',
+  'so': 'quranenc:somali_yacob',
+};
 
 Set<String> quranTranslationAudioLanguageCodesFor(
   QuranTranslationResource? selectedTranslation,
@@ -27,9 +67,9 @@ Set<String> quranTranslationAudioLanguageCodesFor(
   }
 
   final codes = <String>{};
-  final wordCode = selectedTranslation.wordTranslationLanguageCode;
-  if (wordCode != null && wordCode.trim().isNotEmpty) {
-    codes.add(wordCode.toLowerCase());
+  final languageCode = selectedTranslation.resolvedLanguageCode;
+  if (languageCode.isNotEmpty) {
+    codes.add(languageCode);
   }
 
   final tokens = selectedTranslation.languageName

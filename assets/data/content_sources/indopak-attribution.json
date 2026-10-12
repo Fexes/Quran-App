@@ -1,0 +1,15 @@
+{
+  "id": "digitalkhatt_indopak",
+  "textSource": "https://quran-json.risanb.com/text/indopak/quran.json",
+  "textPublisher": "DigitalKhatt contributors / Quran JSON by Risan Bagja",
+  "textLicense": "MIT upstream; CC BY-SA 4.0 distributed data and adaptation",
+  "textRepositoryVersion": "6523a9ad3b73bb7e8cb3a9cdf0ea774b8bab3123",
+  "originalLayoutSource": "https://github.com/DigitalKhatt/digitalkhatt-js/blob/78372d7a1e211bbab677cc0304384f278f508657/apps/site-angular/src/app/services/quran_text_indopak_15.ts",
+  "fontSource": "https://github.com/DigitalKhatt/digitalkhatt-js/blob/78372d7a1e211bbab677cc0304384f278f508657/apps/site-angular/src/assets/fonts/coretext/DigitalKhattIndoPak.ttf",
+  "fontCopyright": "Copyright 2024 Amine Anane and Tarteel Inc.",
+  "fontLicense": "SIL Open Font License 1.1",
+  "adaptation": "Al-Fatihah is aligned to the app's existing Hafs verse keys: the unnumbered basmala becomes 1:1, verses 1-5 become 1:2-1:6, and verses 6-7 are joined as 1:7. No Quran words are rewritten. Other verse boundaries remain unchanged.",
+  "wordPositions": "Only verified consonantal matches are mapped. Zero means an unverified position; word highlighting is omitted and incomplete line translations are not displayed.",
+  "verseCount": 6236,
+  "reviewStatus": "Requires human Quran text and visual review before release"
+}

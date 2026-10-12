@@ -281,6 +281,30 @@ class AppLocalizationsUr extends AppLocalizations {
   String get settingsTitle => 'سیٹنگز';
 
   @override
+  String get readingPreferencesTitle => 'مطالعہ اور زبان';
+
+  @override
+  String get downloadsDataTitle => 'ڈاؤن لوڈز اور ڈیٹا';
+
+  @override
+  String get arabicScriptTitle => 'عربی رسم الخط';
+
+  @override
+  String get offlineDownloadsTitle => 'آف لائن ڈاؤن لوڈز';
+
+  @override
+  String get offlineDownloadsSubtitle => 'تلاوت، تراجم اور تفسیر';
+
+  @override
+  String get contentSourcesTitle => 'مواد کے ماخذ';
+
+  @override
+  String get readingLanguagesSubtitle => 'قرآن، تفسیر، حدیث اور اذکار';
+
+  @override
+  String get textAppearanceTitle => 'متن کی ظاہری شکل';
+
+  @override
   String get settingsSubtitle => 'زبان، تھیم، اور پڑھنے کی سہولت تبدیل کریں۔';
 
   @override
@@ -290,16 +314,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get themeTitle => 'تھیم';
 
   @override
-  String get themeWhite => 'وائٹ';
-
-  @override
   String get themeLight => 'لائٹ';
 
   @override
   String get themeDark => 'ڈارک';
-
-  @override
-  String get themeBlack => 'بلیک';
 
   @override
   String get languageTitle => 'زبان';
@@ -364,6 +382,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get prayerJournalTitle => 'نماز اور روزے کا جرنل';
+
+  @override
+  String get fastingJournalTitle => 'روزوں کا جرنل';
 
   @override
   String get worshipToolsTitle => 'عبادت کے اوزار';

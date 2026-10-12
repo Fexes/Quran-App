@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/quran_theme.dart';
@@ -137,7 +138,7 @@ class _InterlinearDownloadSheet extends StatelessWidget {
                           Theme.of(context).colorScheme.primary,
                         ),
                       ),
-                      child: const Icon(Icons.translate_rounded),
+                      child: const AppIcon(Icons.translate_rounded),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -170,7 +171,7 @@ class _InterlinearDownloadSheet extends StatelessWidget {
                         : '${progress.completedPages} of ${progress.totalPages} pages downloaded',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: QuranTheme.subText(context, 0.66),
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],

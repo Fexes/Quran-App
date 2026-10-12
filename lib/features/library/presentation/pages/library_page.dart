@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,6 +12,9 @@ import '../../../../core/widgets/adaptive_inset_area.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/app_sheet.dart';
+import '../../../quran_audio/presentation/widgets/quran_floating_audio_player.dart';
+import '../../../quran/presentation/widgets/quran_translation_text.dart';
 import '../../../../core/widgets/section_header.dart';
 import '../../../../core/widgets/shell_screen_header.dart';
 import '../../../../l10n/gen/app_localizations.dart';
@@ -23,6 +27,7 @@ import '../../../hadith/domain/entities/hadith_item.dart';
 import '../../../hadith/domain/repositories/hadith_repository.dart';
 import '../../../hadith/presentation/bloc/hadith_library_cubit.dart';
 import '../../../hadith/presentation/bloc/hadith_library_state.dart';
+import '../../../hadith/presentation/widgets/hadith_translation_sheet.dart';
 
 enum _LibrarySection { hadith, azkar, tools }
 
@@ -59,92 +64,98 @@ class _LibraryViewState extends State<_LibraryView> {
 
   @override
   Widget build(BuildContext context) {
-    return AdaptiveInsetArea(
-      top: true,
-      bottom: true,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-            child: ShellScreenHeader(
-              icon: Icons.local_library_rounded,
-              title: 'Library',
-              subtitle: _section == _LibrarySection.tools
-                  ? 'Private worship tools and learning utilities.'
-                  : 'Hadith collections and daily remembrance.',
-              actions: [
-                if (_section == _LibrarySection.hadith)
-                  ShellHeaderAction(
-                    icon: Icons.translate_rounded,
-                    tooltip: 'Hadith translations',
-                    onTap: () => _showHadithTranslations(context),
-                  ),
-                if (_section != _LibrarySection.tools)
-                  ShellHeaderAction(
-                    icon: Icons.refresh_rounded,
-                    tooltip: 'Refresh library',
-                    onTap: () {
-                      if (_section == _LibrarySection.hadith) {
-                        context.read<HadithLibraryCubit>().load();
-                      } else {
-                        context.read<AzkarLibraryCubit>().load();
-                      }
+    return DefaultTabController(
+      length: _LibrarySection.values.length,
+      child: AdaptiveInsetArea(
+        top: true,
+        bottom: true,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+              child: ShellScreenHeader(
+                icon: Icons.local_library_rounded,
+                title: 'Library',
+                subtitle: _section == _LibrarySection.tools
+                    ? 'Private worship tools and learning utilities.'
+                    : 'Hadith collections and daily remembrance.',
+                actions: [
+                  if (_section == _LibrarySection.hadith)
+                    ShellHeaderAction(
+                      icon: Icons.translate_rounded,
+                      tooltip: 'Hadith translations',
+                      onTap: () => _showHadithTranslations(context),
+                    ),
+                  if (_section != _LibrarySection.tools)
+                    ShellHeaderAction(
+                      icon: Icons.refresh_rounded,
+                      tooltip: 'Refresh library',
+                      onTap: () {
+                        if (_section == _LibrarySection.hadith) {
+                          context.read<HadithLibraryCubit>().load();
+                        } else {
+                          context.read<AzkarLibraryCubit>().load();
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(
+                  18,
+                  0,
+                  18,
+                  QuranFloatingAudioPlayer.scrollInset(context),
+                ),
+                children: [
+                  TabBar(
+                    labelColor: QuranTheme.text(context),
+                    unselectedLabelColor: QuranTheme.subText(context),
+                    indicatorColor: QuranTheme.text(context),
+                    tabs: const [
+                      Tab(text: 'Hadith'),
+                      Tab(text: 'Azkar'),
+                      Tab(text: 'Tools'),
+                    ],
+                    onTap: (index) {
+                      setState(() => _section = _LibrarySection.values[index]);
                     },
                   ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 112),
-              children: [
-                SegmentedButton<_LibrarySection>(
-                  segments: const [
-                    ButtonSegment(
-                      value: _LibrarySection.hadith,
-                      icon: Icon(Icons.menu_book_rounded),
-                      label: Text('Hadith'),
-                    ),
-                    ButtonSegment(
-                      value: _LibrarySection.azkar,
-                      icon: Icon(Icons.favorite_rounded),
-                      label: Text('Azkar'),
-                    ),
-                    ButtonSegment(
-                      value: _LibrarySection.tools,
-                      icon: Icon(Icons.dashboard_customize_outlined),
-                      label: Text('Tools'),
-                    ),
-                  ],
-                  selected: {_section},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (value) {
-                    setState(() => _section = value.first);
+                  const SizedBox(height: 16),
+                  switch (_section) {
+                    _LibrarySection.hadith => const _HadithSection(),
+                    _LibrarySection.azkar => const _AzkarSection(),
+                    _LibrarySection.tools => const _WorshipToolsSection(),
                   },
-                ),
-                const SizedBox(height: 16),
-                switch (_section) {
-                  _LibrarySection.hadith => const _HadithSection(),
-                  _LibrarySection.azkar => const _AzkarSection(),
-                  _LibrarySection.tools => const _WorshipToolsSection(),
-                },
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   void _showHadithTranslations(BuildContext context) {
+    showHadithTranslationSheet(
+      context,
+      onHadeethEncTap: () => _showHadeethEncDownloads(context),
+    );
+  }
+
+  void _showHadeethEncDownloads(BuildContext context) {
     final cubit = context.read<HadithLibraryCubit>()..loadHadeethEncLanguages();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) =>
-          BlocProvider.value(value: cubit, child: const _HadeethEncSheet()),
+      builder: (_) => BlocProvider.value(
+        value: cubit,
+        child: const _HadeethEncDownloadSheet(),
+      ),
     );
   }
 }
@@ -203,8 +214,6 @@ class _HadithSectionState extends State<_HadithSection> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SectionHeader(title: 'Hadith'),
-            const SizedBox(height: 10),
             TextField(
               controller: _searchController,
               textInputAction: TextInputAction.search,
@@ -215,13 +224,13 @@ class _HadithSectionState extends State<_HadithSection> {
               },
               decoration: InputDecoration(
                 hintText: 'Search all hadith',
-                prefixIcon: const Icon(Icons.search_rounded),
+                prefixIcon: const AppIcon(Icons.search_rounded),
                 suffixIcon: _searchController.text.isEmpty
                     ? null
                     : IconButton(
                         tooltip: 'Clear search',
                         onPressed: _clearSearch,
-                        icon: const Icon(Icons.close_rounded),
+                        icon: const AppIcon(Icons.close_rounded),
                       ),
               ),
             ),
@@ -288,7 +297,7 @@ class _HadithContent extends StatelessWidget {
             '${state.hadiths.length} result${state.hadiths.length == 1 ? '' : 's'}',
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: QuranTheme.subText(context, 0.72),
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 10),
@@ -297,7 +306,6 @@ class _HadithContent extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: _HadithCard(
                 hadith: hadith,
-                compact: true,
                 onTap: () => context.push(
                   AppRoutes.hadithBookPath(
                     hadith.bookId,
@@ -314,30 +322,22 @@ class _HadithContent extends StatelessWidget {
   }
 }
 
-class _HadeethEncSheet extends StatelessWidget {
-  const _HadeethEncSheet();
+class _HadeethEncDownloadSheet extends StatelessWidget {
+  const _HadeethEncDownloadSheet();
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.sizeOf(context).height * 0.84;
-    return PremiumSurface(
-      margin: const EdgeInsets.all(12),
-      padding: EdgeInsets.zero,
-      height: height,
-      radius: QuranTheme.radiusSheet,
-      prominent: true,
+    return AppSheet(
+      title: 'HadeethEnc downloads',
+      scrollableChild: true,
       child: BlocBuilder<HadithLibraryCubit, HadithLibraryState>(
         builder: (context, state) {
           final cubit = context.read<HadithLibraryCubit>();
           if (state.hadeethEncLanguages.isEmpty) {
             return ListView(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
               children: [
-                _SheetTitle(
-                  title: 'Hadith translations',
-                  onClose: () => Navigator.of(context).pop(),
-                ),
-                const SizedBox(height: 20),
                 if (state.hadeethEncLoading)
                   const AppLoadingView(label: 'Loading languages')
                 else if (state.hadeethEncErrorMessage != null)
@@ -366,15 +366,11 @@ class _HadeethEncSheet extends StatelessWidget {
           final progress = state.hadeethEncDownloadProgress;
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
             children: [
-              _SheetTitle(
-                title: 'Hadith translations',
-                onClose: () => Navigator.of(context).pop(),
-              ),
-              const SizedBox(height: 12),
               Text(
-                'Download a language once, then read it offline.',
+                'A separate selection of translated hadiths, not full book translations.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: QuranTheme.subText(context, 0.72),
                 ),
@@ -383,9 +379,10 @@ class _HadeethEncSheet extends StatelessWidget {
               DropdownButtonFormField<String>(
                 initialValue: selectedLanguage.code,
                 isExpanded: true,
+                itemHeight: null,
                 decoration: const InputDecoration(
                   labelText: 'Language',
-                  prefixIcon: Icon(Icons.language_rounded),
+                  prefixIcon: AppIcon(Icons.language_rounded),
                 ),
                 items: [
                   for (final language in state.hadeethEncLanguages)
@@ -417,29 +414,27 @@ class _HadeethEncSheet extends StatelessWidget {
                 ),
               ] else if (!state.selectedHadeethEncLanguageDownloaded) ...[
                 FilledButton.icon(
-                  onPressed: cubit.downloadSelectedHadeethEncLanguage,
-                  icon: const Icon(Icons.download_rounded),
+                  onPressed: () async {
+                    await cubit.downloadSelectedHadeethEncLanguage();
+                    if (context.mounted &&
+                        ModalRoute.of(context)?.isCurrent == true &&
+                        cubit.state.selectedHadeethEncLanguageDownloaded) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  icon: const AppIcon(Icons.download_rounded),
                   label: Text('Download ${selectedLanguage.nativeName} hadith'),
                 ),
               ] else ...[
-                for (final hadith in state.hadeethEncHadiths)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _HadithCard(hadith: hadith),
-                  ),
-                if (state.hadeethEncHadiths.isEmpty)
-                  Text(
-                    'No downloaded hadith found for this language.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: QuranTheme.subText(context, 0.72),
-                    ),
-                  )
-                else if (state.hasMoreHadeethEncHadiths)
-                  OutlinedButton.icon(
-                    onPressed: cubit.loadMoreHadeethEnc,
-                    icon: const Icon(Icons.expand_more_rounded),
-                    label: const Text('Load more HadeethEnc'),
-                  ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const AppIcon(Icons.check_circle_outline_rounded),
+                  title: Text('${selectedLanguage.nativeName} downloaded'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Done'),
+                ),
               ],
               if (state.hadeethEncErrorMessage != null) ...[
                 const SizedBox(height: 8),
@@ -458,34 +453,6 @@ class _HadeethEncSheet extends StatelessWidget {
   }
 }
 
-class _SheetTitle extends StatelessWidget {
-  const _SheetTitle({required this.title, required this.onClose});
-
-  final String title;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-        ),
-        IconButton(
-          tooltip: 'Close',
-          onPressed: onClose,
-          icon: const Icon(Icons.close_rounded),
-        ),
-      ],
-    );
-  }
-}
-
 class _AzkarSection extends StatelessWidget {
   const _AzkarSection();
 
@@ -496,8 +463,6 @@ class _AzkarSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SectionHeader(title: 'Azkar'),
-            const SizedBox(height: 10),
             switch (state.status) {
               AzkarLibraryStatus.initial || AzkarLibraryStatus.loading =>
                 const AppLoadingView(label: 'Loading azkar'),
@@ -554,63 +519,34 @@ class _HadithBookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      onTap: onTap,
-      padding: const EdgeInsets.all(14),
-      child: Row(
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+      leading: SizedBox.square(
+        dimension: 36,
+        child: Center(
+          child: Text(
+            book.sortOrder.toString().padLeft(2, '0'),
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: QuranTheme.subText(context),
+            ),
+          ),
+        ),
+      ),
+      title: Text(book.englishName),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: QuranTheme.softFill(
-                context,
-                Theme.of(context).colorScheme.primary,
-              ),
-              borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
-            ),
-            child: Text(
-              book.sortOrder.toString(),
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+          const SizedBox(height: 3),
+          Text(book.arabicName, textDirection: TextDirection.rtl),
+          const SizedBox(height: 6),
+          Text(
+            '${book.hadithCount} hadiths · ${book.chapterCount} chapters',
+            style: Theme.of(context).textTheme.bodySmall,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  book.englishName,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  book.arabicName,
-                  textDirection: TextDirection.rtl,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: QuranTheme.subText(context, 0.8),
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${book.hadithCount} hadiths • ${book.chapterCount} chapters',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: QuranTheme.subText(context, 0.68),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded),
         ],
       ),
+      trailing: const AppIcon(Icons.chevron_right_rounded),
+      onTap: onTap,
     );
   }
 }
@@ -623,56 +559,25 @@ class _AzkarCategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      onTap: onTap,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          Icon(
-            _azkarIcon(category.iconKey),
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  category.englishName,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  category.arabicName,
-                  textDirection: TextDirection.rtl,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: QuranTheme.subText(context, 0.8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '${category.itemCount}',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+      leading: AppIcon(_azkarIcon(category.iconKey)),
+      title: Text(category.englishName),
+      subtitle: Text(category.arabicName, textDirection: TextDirection.rtl),
+      trailing: Text(
+        '${category.itemCount}',
+        style: Theme.of(context).textTheme.labelLarge,
       ),
+      onTap: onTap,
     );
   }
 }
 
 class _HadithCard extends StatelessWidget {
-  const _HadithCard({required this.hadith, this.onTap, this.compact = false});
+  const _HadithCard({required this.hadith, required this.onTap});
 
   final HadithItem hadith;
-  final VoidCallback? onTap;
-  final bool compact;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -689,24 +594,23 @@ class _HadithCard extends StatelessWidget {
                   hadith.reference,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              if (onTap != null)
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: QuranTheme.subText(context, 0.6),
-                  size: 20,
-                ),
+              AppIcon(
+                Icons.chevron_right_rounded,
+                color: QuranTheme.subText(context, 0.6),
+                size: 20,
+              ),
             ],
           ),
           if (hadith.arabic.trim().isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
               hadith.arabic,
-              maxLines: compact ? 4 : null,
-              overflow: compact ? TextOverflow.ellipsis : null,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
               textDirection: TextDirection.rtl,
               textAlign: TextAlign.right,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -717,10 +621,10 @@ class _HadithCard extends StatelessWidget {
           ],
           if (hadith.translation.trim().isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(
-              hadith.translation,
-              maxLines: compact ? 5 : null,
-              overflow: compact ? TextOverflow.ellipsis : null,
+            QuranTranslationText(
+              text: hadith.translation,
+              maxLines: 5,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: QuranTheme.subText(context, 0.82),
                 height: 1.45,
@@ -797,43 +701,18 @@ class _WorshipToolsSection extends StatelessWidget {
       children: [
         SectionHeader(title: l10n.worshipToolsTitle),
         const SizedBox(height: 10),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: tools.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.94,
+        for (final tool in tools)
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            leading: AppIcon(
+              tool.$3,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            title: Text(tool.$1),
+            subtitle: Text(tool.$2),
+            trailing: const AppIcon(Icons.chevron_right_rounded),
+            onTap: () => context.push(tool.$4),
           ),
-          itemBuilder: (context, index) {
-            final tool = tools[index];
-            return PremiumSurface(
-              onTap: () => context.push(tool.$4),
-              padding: const EdgeInsets.all(14),
-              prominent: true,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(child: Icon(tool.$3)),
-                  const Spacer(),
-                  Text(
-                    tool.$1,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    tool.$2,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
       ],
     );
   }
@@ -856,7 +735,7 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          Icon(icon, color: Theme.of(context).colorScheme.primary),
+          AppIcon(icon, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -869,7 +748,7 @@ class _EmptyState extends StatelessWidget {
           IconButton(
             tooltip: 'Refresh',
             onPressed: onRefresh,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const AppIcon(Icons.refresh_rounded),
           ),
         ],
       ),

@@ -22,11 +22,12 @@ class HadithChapter extends Equatable {
   final String endHadithNumber;
 
   factory HadithChapter.fromMap(Map<String, dynamic> map) {
+    final englishTitle = (map['englishTitle'] as String? ?? '').trim();
     return HadithChapter(
       id: map['id'] as String? ?? '',
       bookId: map['bookId'] as String? ?? '',
       number: map['number'] as int? ?? 0,
-      englishTitle: map['englishTitle'] as String? ?? '',
+      englishTitle: englishTitle.isEmpty ? 'Uncategorized' : englishTitle,
       arabicTitle: map['arabicTitle'] as String? ?? '',
       hadithCount: map['hadithCount'] as int? ?? 0,
       startHadithNumber: map['startHadithNumber'] as String? ?? '',

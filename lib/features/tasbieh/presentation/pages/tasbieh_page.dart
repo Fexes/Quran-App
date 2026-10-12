@@ -1,14 +1,16 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/app_sheet.dart';
 import '../cubit/tasbieh_cubit.dart';
 import '../cubit/tasbieh_state.dart';
 
@@ -34,115 +36,37 @@ class _TasbiehView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TasbiehCubit, TasbiehState>(
-      builder: (context, state) {
-        return Scaffold(
-          body: Stack(
+      builder: (context, state) => Scaffold(
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _TasbiehBackdropPainter(
-                    background: Theme.of(context).scaffoldBackgroundColor,
-                    primary: Theme.of(context).colorScheme.primary,
-                    text: QuranTheme.text(context),
-                  ),
-                ),
-              ),
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
-                  child: Column(
-                    children: [
-                      _TasbiehHeader(state: state),
-                      const SizedBox(height: 10),
-                      _TasbiehProgressStrip(state: state),
-                      const SizedBox(height: 10),
-                      Expanded(child: _TasbiehClassicStage(state: state)),
-                      const SizedBox(height: 12),
-                      _TasbiehControls(state: state),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _TasbiehHeader extends StatelessWidget {
-  const _TasbiehHeader({required this.state});
-
-  final TasbiehState state;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        PremiumSurface(
-          onTap: () {
-            if (context.canPop()) {
-              context.pop();
-            }
-          },
-          width: 44,
-          height: 44,
-          padding: EdgeInsets.zero,
-          radius: 16,
-          child: Icon(
-            Icons.arrow_back_rounded,
-            color: QuranTheme.text(context),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: QuranTheme.softFill(
-                    context,
-                    Theme.of(context).colorScheme.primary,
-                  ),
-                  border: Border.all(color: QuranTheme.outline(context)),
-                ),
-                child: Icon(
-                  Icons.circle_outlined,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tasbieh',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w700, height: 1),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      state.isComplete
-                          ? 'Target complete'
-                          : '${state.count} of ${state.target}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: QuranTheme.subText(context),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+              const Text('Tasbieh'),
+              Text(
+                state.isComplete
+                    ? 'Target complete'
+                    : '${state.count} of ${state.target}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: QuranTheme.subText(context),
                 ),
               ),
             ],
           ),
         ),
-      ],
+        body: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+            child: Column(
+              children: [
+                _TasbiehProgressStrip(state: state),
+                Expanded(child: _TasbiehClassicStage(state: state)),
+                _TasbiehControls(state: state),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -154,85 +78,20 @@ class _TasbiehProgressStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    final percent = (state.progress * 100).round();
-    return PremiumSurface(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      radius: 24,
-      prominent: true,
-      child: Row(
-        children: [
-          _MiniStat(label: 'Count', value: state.count.toString()),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: SizedBox(
-                height: 8,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ColoredBox(color: QuranTheme.outline(context)),
-                    FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: state.progress,
-                      child: ColoredBox(color: primary),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          _MiniStat(label: 'Target', value: state.target.toString()),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: QuranTheme.softFill(context, primary),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: QuranTheme.outline(context)),
-            ),
-            child: Text(
-              '$percent%',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
         Text(
-          value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: QuranTheme.text(context),
-            fontWeight: FontWeight.w700,
-            height: 1,
-          ),
+          '${state.count} / ${state.target}',
+          style: Theme.of(context).textTheme.labelLarge,
         ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: QuranTheme.subText(context, 0.68),
-            fontWeight: FontWeight.w800,
+        const SizedBox(width: 16),
+        Expanded(
+          child: LinearProgressIndicator(
+            value: state.progress,
+            minHeight: 3,
+            borderRadius: BorderRadius.circular(QuranTheme.radiusPill),
+            semanticsLabel: 'Target progress',
+            semanticsValue: '${(state.progress * 100).round()}%',
           ),
         ),
       ],
@@ -247,103 +106,18 @@ class _TasbiehClassicStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final disableAnimations = MediaQuery.disableAnimationsOf(context);
     return Center(
       child: FittedBox(
         fit: BoxFit.scaleDown,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RepaintBoundary(
-              child: _TasbiehSwipeCounter(
-                state: state,
-                disableAnimations: disableAnimations,
-                onCount: context.read<TasbiehCubit>().increment,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.78),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: QuranTheme.outline(context)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.swipe_rounded,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Drag in any direction',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: QuranTheme.subText(context, 0.78),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        child: RepaintBoundary(
+          child: _TasbiehSwipeCounter(
+            state: state,
+            disableAnimations: MediaQuery.disableAnimationsOf(context),
+            onCount: context.read<TasbiehCubit>().increment,
+          ),
         ),
       ),
     );
-  }
-}
-
-class _TasbiehBackdropPainter extends CustomPainter {
-  const _TasbiehBackdropPainter({
-    required this.background,
-    required this.primary,
-    required this.text,
-  });
-
-  final Color background;
-  final Color primary;
-  final Color text;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    canvas.drawRect(rect, Paint()..color = background);
-
-    final topWash = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(0.15, -0.76),
-        radius: 0.86,
-        colors: [
-          primary.withValues(alpha: 0.13),
-          primary.withValues(alpha: 0.035),
-          Colors.transparent,
-        ],
-      ).createShader(rect);
-    canvas.drawRect(rect, topWash);
-
-    final dot = Paint()..color = primary.withValues(alpha: 0.08);
-    for (var y = 92.0; y < size.height - 70; y += 54) {
-      for (var x = 28.0; x < size.width; x += 54) {
-        final drift = math.sin((x + y) * 0.02) * 2.5;
-        canvas.drawCircle(Offset(x + drift, y), 1.2, dot);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _TasbiehBackdropPainter oldDelegate) {
-    return oldDelegate.background != background ||
-        oldDelegate.primary != primary ||
-        oldDelegate.text != text;
   }
 }
 
@@ -365,49 +139,58 @@ class _TasbiehSwipeCounter extends StatefulWidget {
 class _TasbiehSwipeCounterState extends State<_TasbiehSwipeCounter>
     with TickerProviderStateMixin {
   static const _threshold = 44.0;
-  static const _maxDrag = 96.0;
+  static const _maxDrag = 72.0;
+  static const _stageSize = Size(352, 400);
 
   late final AnimationController _returnController;
   late final AnimationController _pulseController;
   late final AnimationController _shineController;
-  late final AnimationController _classicAmbientController;
+  late final AnimationController _pressController;
   Animation<Offset>? _returnAnimation;
   Offset _dragOffset = Offset.zero;
+  Offset _grabOffset = Offset.zero;
+  Offset _pointerOrigin = Offset.zero;
+  Offset _localOrigin = Offset.zero;
+  double _travel = 0;
+  double _farthestTravel = 0;
+  int? _pointer;
+  bool _tapStartedOnBead = false;
+
+  Offset get _visualDrag => _returnController.isAnimating
+      ? _returnAnimation?.value ?? Offset.zero
+      : _dragOffset;
 
   @override
   void initState() {
     super.initState();
     _returnController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 380),
     );
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 520),
+      duration: const Duration(milliseconds: 460),
     );
     _shineController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 780),
+      duration: const Duration(milliseconds: 620),
     );
-    _classicAmbientController = AnimationController(
+    _pressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3800),
+      duration: const Duration(milliseconds: 90),
+      reverseDuration: const Duration(milliseconds: 200),
     );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _syncAmbient();
   }
 
   @override
   void didUpdateWidget(covariant _TasbiehSwipeCounter oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _syncAmbient();
-    if (oldWidget.state.count != widget.state.count &&
-        !widget.disableAnimations) {
-      _shineController.forward(from: 0);
+    if (widget.disableAnimations && !oldWidget.disableAnimations) {
+      _dragOffset = Offset.zero;
+      _returnController.stop();
+      _pulseController.reset();
+      _shineController.reset();
+      _pressController.reset();
     }
   }
 
@@ -416,32 +199,34 @@ class _TasbiehSwipeCounterState extends State<_TasbiehSwipeCounter>
     _returnController.dispose();
     _pulseController.dispose();
     _shineController.dispose();
-    _classicAmbientController.dispose();
+    _pressController.dispose();
     super.dispose();
   }
 
-  void _syncAmbient() {
-    final shouldAnimate =
-        TickerMode.valuesOf(context).enabled &&
-        !widget.disableAnimations &&
-        mounted;
-    if (shouldAnimate) {
-      if (!_classicAmbientController.isAnimating) {
-        _classicAmbientController.repeat();
-      }
-    } else {
-      _classicAmbientController.stop();
+  void _onPointerDown(PointerDownEvent event) {
+    if (_pointer != null || event.buttons != kPrimaryButton) return;
+    _pointer = event.pointer;
+    _pointerOrigin = event.position;
+    _localOrigin = event.localPosition;
+    _travel = _farthestTravel = 0;
+    _grabOffset = _visualDrag;
+    final touch =
+        event.localPosition - (_stageSize.center(Offset.zero) + _grabOffset);
+    _tapStartedOnBead =
+        math.pow(touch.dx / 108, 2) + math.pow(touch.dy / 124, 2) <= 1;
+    _returnController.stop();
+    setState(() => _dragOffset = _grabOffset);
+    if (_tapStartedOnBead && !widget.disableAnimations) {
+      _pressController.forward();
     }
   }
 
-  void _onPointerDown(PointerDownEvent event) {
-    _returnController.stop();
-  }
-
   void _onPointerMove(PointerMoveEvent event) {
-    _returnController.stop();
+    if (event.pointer != _pointer) return;
+    _travel = (event.position - _pointerOrigin).distance;
+    _farthestTravel = math.max(_farthestTravel, _travel);
     setState(() {
-      final next = _dragOffset + event.delta;
+      final next = _grabOffset + event.localPosition - _localOrigin;
       if (next.distance <= _maxDrag) {
         _dragOffset = next;
       } else {
@@ -450,82 +235,96 @@ class _TasbiehSwipeCounterState extends State<_TasbiehSwipeCounter>
     });
   }
 
-  Future<void> _onPointerUp(PointerUpEvent event) async {
-    final accepted = _dragOffset.distance >= _threshold;
-    if (accepted) {
-      await _acceptCount();
-    }
+  void _onPointerUp(PointerUpEvent event) {
+    if (event.pointer != _pointer) return;
+    _pointer = null;
+    final tapped = _tapStartedOnBead && _farthestTravel <= 12;
+    if (tapped || _travel >= _threshold) unawaited(_acceptCount());
     _animateBack();
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
+    if (event.pointer != _pointer) return;
+    _pointer = null;
     _animateBack();
   }
 
   Future<void> _acceptCount() async {
-    HapticFeedback.mediumImpact();
-    await widget.onCount();
+    unawaited(HapticFeedback.mediumImpact());
     if (!widget.disableAnimations) {
       _pulseController.forward(from: 0);
+      _shineController.forward(from: 0);
+    }
+    try {
+      await widget.onCount();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your count could not be saved. It may reset when you reopen the app.',
+            ),
+          ),
+        );
+      }
     }
   }
 
   void _animateBack() {
-    final begin = _dragOffset;
-    _returnAnimation = Tween<Offset>(begin: begin, end: Offset.zero).animate(
-      CurvedAnimation(parent: _returnController, curve: Curves.easeOutBack),
-    );
-    _returnController
-      ..removeListener(_handleReturnTick)
-      ..addListener(_handleReturnTick)
-      ..forward(from: 0);
-  }
-
-  void _handleReturnTick() {
-    if (!mounted) {
+    if (widget.disableAnimations) {
+      setState(() => _dragOffset = Offset.zero);
       return;
     }
-    setState(() {
-      _dragOffset = _returnAnimation?.value ?? Offset.zero;
-    });
+    _pressController.reverse();
+    final begin = _dragOffset;
+    _dragOffset = Offset.zero;
+    _returnAnimation = Tween<Offset>(
+      begin: begin,
+      end: Offset.zero,
+    ).chain(CurveTween(curve: Curves.easeOutBack)).animate(_returnController);
+    _returnController.forward(from: 0);
   }
 
   @override
   Widget build(BuildContext context) {
-    final dragProgress = (_dragOffset.distance / _threshold).clamp(0.0, 1.0);
     final child = AnimatedBuilder(
       animation: Listenable.merge([
         _returnController,
         _pulseController,
         _shineController,
-        _classicAmbientController,
+        _pressController,
       ]),
       builder: (context, _) {
         return _ClassicBeadConcept(
           key: const ValueKey('tasbieh-classic-bead'),
           data: _TasbiehClassicData(
             count: widget.state.count,
-            target: widget.state.target,
-            progress: widget.state.progress,
-            isComplete: widget.state.isComplete,
-            dragOffset: _dragOffset,
-            dragProgress: dragProgress,
+            dragOffset: _visualDrag,
+            dragProgress: (_visualDrag.distance / _threshold).clamp(0.0, 1.0),
             pulse: widget.disableAnimations ? 0 : _pulseController.value,
             shine: widget.disableAnimations ? 0 : _shineController.value,
+            press: widget.disableAnimations ? 0 : _pressController.value,
           ),
-          ambient: _classicAmbientController.value,
         );
       },
     );
 
-    return Listener(
-      key: const ValueKey('tasbieh-bead'),
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: _onPointerDown,
-      onPointerMove: _onPointerMove,
-      onPointerUp: _onPointerUp,
-      onPointerCancel: _onPointerCancel,
-      child: SizedBox(width: 318, height: 360, child: child),
+    return Semantics(
+      button: true,
+      label: 'Tasbieh bead',
+      value: '${widget.state.count} of ${widget.state.target}',
+      onTap: () => unawaited(_acceptCount()),
+      child: Listener(
+        key: const ValueKey('tasbieh-bead'),
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _onPointerDown,
+        onPointerMove: _onPointerMove,
+        onPointerUp: _onPointerUp,
+        onPointerCancel: _onPointerCancel,
+        child: ExcludeSemantics(
+          child: SizedBox.fromSize(size: _stageSize, child: child),
+        ),
+      ),
     );
   }
 }
@@ -533,42 +332,35 @@ class _TasbiehSwipeCounterState extends State<_TasbiehSwipeCounter>
 class _TasbiehClassicData {
   const _TasbiehClassicData({
     required this.count,
-    required this.target,
-    required this.progress,
-    required this.isComplete,
     required this.dragOffset,
     required this.dragProgress,
     required this.pulse,
     required this.shine,
+    required this.press,
   });
 
   final int count;
-  final int target;
-  final double progress;
-  final bool isComplete;
   final Offset dragOffset;
   final double dragProgress;
   final double pulse;
   final double shine;
+  final double press;
 }
 
 class _ClassicBeadConcept extends StatelessWidget {
-  const _ClassicBeadConcept({
-    super.key,
-    required this.data,
-    required this.ambient,
-  });
+  const _ClassicBeadConcept({super.key, required this.data});
 
   final _TasbiehClassicData data;
-  final double ambient;
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final primary = QuranTheme.isDark(context)
+        ? const Color(0xFFB7DACC)
+        : const Color(0xFF477C68);
     final pulse = math.sin(data.pulse * math.pi);
     final dragAngle = data.dragOffset.direction;
-    final stretch = 1 + data.dragProgress * 0.12;
-    final squeeze = 1 - data.dragProgress * 0.045;
+    final stretch = 1 + data.dragProgress * 0.12 + data.press * 0.025;
+    final squeeze = 1 - data.dragProgress * 0.045 - data.press * 0.055;
     return Stack(
       alignment: Alignment.center,
       children: [
@@ -577,9 +369,7 @@ class _ClassicBeadConcept extends StatelessWidget {
             painter: _ClassicBeadPainter(
               primary: primary,
               pulse: data.pulse,
-              shine: data.shine,
-              ambient: ambient,
-              complete: data.isComplete,
+              dragOffset: data.dragOffset,
             ),
           ),
         ),
@@ -593,13 +383,11 @@ class _ClassicBeadConcept extends StatelessWidget {
               child: Transform.rotate(
                 angle: -dragAngle,
                 child: Transform.scale(
-                  scale: 1 + pulse * 0.05,
-                  child: _PearlCountBead(
+                  scale: 1 + pulse * 0.035 - data.press * 0.025,
+                  child: _JadeCountBead(
                     count: data.count,
-                    size: 172,
-                    foreground: QuranTheme.text(context),
-                    glow: primary,
                     shine: data.shine,
+                    dragOffset: data.dragOffset,
                   ),
                 ),
               ),
@@ -611,136 +399,191 @@ class _ClassicBeadConcept extends StatelessWidget {
   }
 }
 
-class _PearlCountBead extends StatelessWidget {
-  const _PearlCountBead({
+class _JadeCountBead extends StatelessWidget {
+  const _JadeCountBead({
     required this.count,
-    required this.size,
-    required this.foreground,
-    required this.glow,
     required this.shine,
+    required this.dragOffset,
   });
 
   final int count;
-  final double size;
-  final Color foreground;
-  final Color glow;
   final double shine;
+  final Offset dragOffset;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          center: Alignment(-0.42, -0.54),
-          radius: 1.15,
-          colors: [Colors.white, Color(0xFFF7FAF9), Color(0xFFE4ECE8)],
-          stops: [0.0, 0.56, 1.0],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 30,
-            offset: const Offset(0, 16),
-          ),
-          BoxShadow(
-            color: glow.withValues(alpha: 0.18),
-            blurRadius: 34,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: size * 0.16,
-            left: size * 0.24,
-            right: size * 0.24,
-            child: Transform.translate(
-              offset: Offset((shine - 0.5) * size * 0.18, 0),
-              child: Container(
-                height: size * 0.14,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.82),
-                  borderRadius: BorderRadius.circular(999),
+    return SizedBox(
+      width: 180,
+      height: 210,
+      child: CustomPaint(
+        painter: _JadeBeadPainter(shine: shine, dragOffset: dragOffset),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                count.toString(),
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  fontSize: 52,
+                  color: const Color(0xFFFFF9E9),
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0,
+                  height: 1,
+                  shadows: const [
+                    Shadow(
+                      color: Color(0x660D3026),
+                      offset: Offset(0, 2),
+                      blurRadius: 4,
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          Center(
-            child: Text(
-              count.toString(),
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                color: foreground,
-                fontWeight: FontWeight.w700,
-                height: 1,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class _JadeBeadPainter extends CustomPainter {
+  const _JadeBeadPainter({required this.shine, required this.dragOffset});
+
+  final double shine;
+  final Offset dragOffset;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 180, size.height / 210);
+    final body = Path()
+      ..moveTo(90, 3)
+      ..cubicTo(145, 3, 177, 45, 177, 101)
+      ..cubicTo(177, 159, 147, 207, 90, 207)
+      ..cubicTo(33, 207, 3, 159, 3, 101)
+      ..cubicTo(3, 45, 35, 3, 90, 3)
+      ..close();
+    const bounds = Rect.fromLTWH(0, 0, 180, 210);
+    canvas.drawShadow(body, const Color(0x70203D32), 12, false);
+    canvas.drawPath(
+      body,
+      Paint()
+        ..shader = RadialGradient(
+          center: Alignment(
+            -0.55 + dragOffset.dx / 350,
+            -0.65 + dragOffset.dy / 350,
+          ),
+          radius: 1.35,
+          colors: const [
+            Color(0xFFBDDACC),
+            Color(0xFF669C84),
+            Color(0xFF2C6853),
+            Color(0xFF123E31),
+            Color(0xFF082B24),
+          ],
+          stops: const [0, 0.25, 0.54, 0.83, 1],
+        ).createShader(bounds),
+    );
+    canvas.save();
+    canvas.clipPath(body);
+    // Carved flutes stay on the stone; only the reflected light moves.
+    for (var i = 0; i < 5; i++) {
+      final x = 22.0 + i * 31;
+      canvas.drawPath(
+        Path()
+          ..moveTo(90 + (x - 90) * 0.35, 0)
+          ..cubicTo(x - 24, 58, x + 18, 142, 90 + (x - 90) * 0.6, 210),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8
+          ..color = const Color(
+            0xFFF0E2BA,
+          ).withValues(alpha: i.isEven ? 0.11 : 0.055),
+      );
+    }
+    canvas.drawOval(
+      const Rect.fromLTWH(22, 19, 53, 19),
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0xB3FFFFFF), Color(0x00FFFFFF)],
+        ).createShader(const Rect.fromLTWH(22, 19, 53, 19)),
+    );
+    final sweep = math.sin(shine * math.pi);
+    if (sweep > 0.001) {
+      final light = Rect.fromLTWH(-100 + shine * 320, -20, 90, 260);
+      canvas.drawRect(
+        light,
+        Paint()
+          ..shader = LinearGradient(
+            colors: [
+              Colors.transparent,
+              Colors.white.withValues(alpha: sweep * 0.15),
+              Colors.transparent,
+            ],
+          ).createShader(light),
+      );
+    }
+    canvas.restore();
+    canvas.drawPath(
+      body,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE5D5A8), Color(0x4434765D), Color(0xAA9B8759)],
+        ).createShader(bounds),
+    );
+    final engraving = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFFD6C693);
+    for (final y in [53.0, 159.0]) {
+      canvas.drawPath(
+        Path()
+          ..moveTo(75, y)
+          ..quadraticBezierTo(83, y - 1, 90, y - 7)
+          ..quadraticBezierTo(97, y - 1, 105, y)
+          ..quadraticBezierTo(97, y + 1, 90, y + 7)
+          ..quadraticBezierTo(83, y + 1, 75, y),
+        engraving,
+      );
+      canvas.drawCircle(Offset(90, y), 1.4, Paint()..color = engraving.color);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_JadeBeadPainter oldDelegate) =>
+      oldDelegate.shine != shine || oldDelegate.dragOffset != dragOffset;
 }
 
 class _ClassicBeadPainter extends CustomPainter {
   const _ClassicBeadPainter({
     required this.primary,
     required this.pulse,
-    required this.shine,
-    required this.ambient,
-    required this.complete,
+    required this.dragOffset,
   });
 
   final Color primary;
   final double pulse;
-  final double shine;
-  final double ambient;
-  final bool complete;
+  final Offset dragOffset;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final ripplePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = primary.withValues(alpha: 0.055);
-    for (var index = 0; index < 7; index++) {
-      final radius = 76.0 + index * 42;
-      canvas.drawCircle(center, radius, ripplePaint);
-    }
+    final center = size.center(Offset.zero) + dragOffset;
 
-    if (pulse > 0) {
-      final p = math.sin(pulse * math.pi);
+    if (pulse > 0 && pulse < 1) {
       canvas.drawCircle(
         center,
-        92 + 72 * pulse,
+        112 + 45 * pulse,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.2
-          ..color = primary.withValues(alpha: 0.22 * (1 - pulse)),
-      );
-      for (var index = 0; index < 18; index++) {
-        final angle = index * math.pi * 2 / 18 + shine * math.pi;
-        final distance = 88 + p * 88;
-        canvas.drawCircle(
-          center + Offset(math.cos(angle), math.sin(angle)) * distance,
-          1.8 + p * 1.8,
-          Paint()..color = primary.withValues(alpha: (1 - pulse) * 0.5),
-        );
-      }
-    }
-
-    if (complete) {
-      canvas.drawCircle(
-        center,
-        136 + math.sin(ambient * math.pi * 2) * 3,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2
-          ..color = primary.withValues(alpha: 0.22),
+          ..strokeWidth = 1
+          ..color = primary.withValues(alpha: 0.16 * math.sin(pulse * math.pi)),
       );
     }
   }
@@ -748,9 +591,7 @@ class _ClassicBeadPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ClassicBeadPainter oldDelegate) {
     return oldDelegate.pulse != pulse ||
-        oldDelegate.shine != shine ||
-        oldDelegate.ambient != ambient ||
-        oldDelegate.complete != complete ||
+        oldDelegate.dragOffset != dragOffset ||
         oldDelegate.primary != primary;
   }
 }
@@ -762,38 +603,33 @@ class _TasbiehControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(10),
-      radius: 26,
-      prominent: true,
-      child: Row(
-        children: [
-          Expanded(
-            child: _TasbiehControlButton(
-              icon: Icons.undo_rounded,
-              label: 'Undo',
-              onTap: state.count > 0 ? context.read<TasbiehCubit>().undo : null,
-            ),
+    return Row(
+      children: [
+        Expanded(
+          child: _TasbiehControlButton(
+            icon: Icons.undo_rounded,
+            label: 'Undo',
+            onTap: state.count > 0 ? context.read<TasbiehCubit>().undo : null,
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _TasbiehControlButton(
-              key: const ValueKey('tasbieh-target-button'),
-              icon: Icons.flag_rounded,
-              label: 'Target ${state.target}',
-              onTap: () => _showTargetSheet(context, state.target),
-            ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _TasbiehControlButton(
+            key: const ValueKey('tasbieh-target-button'),
+            icon: Icons.flag_rounded,
+            label: 'Target ${state.target}',
+            onTap: () => _showTargetSheet(context, state.target),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _TasbiehControlButton(
-              icon: Icons.refresh_rounded,
-              label: 'Reset',
-              onTap: state.count > 0 ? () => _confirmReset(context) : null,
-            ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _TasbiehControlButton(
+            icon: Icons.refresh_rounded,
+            label: 'Reset',
+            onTap: state.count > 0 ? () => _confirmReset(context) : null,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -851,18 +687,15 @@ class _TasbiehControlButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      radius: 20,
-      color: QuranTheme.softFill(
-        context,
-        Theme.of(context).colorScheme.primary,
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          AppIcon(
             icon,
             color: onTap == null
                 ? QuranTheme.subText(context, 0.36)
@@ -877,7 +710,7 @@ class _TasbiehControlButton extends StatelessWidget {
               color: onTap == null
                   ? QuranTheme.subText(context, 0.36)
                   : QuranTheme.text(context),
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -927,164 +760,89 @@ class _TasbiehTargetSheetState extends State<_TasbiehTargetSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
     final primary = Theme.of(context).colorScheme.primary;
-    return SafeArea(
-      top: false,
-      child: Container(
-        key: const ValueKey('tasbieh-target-sheet-surface'),
-        margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-        padding: EdgeInsets.fromLTRB(18, 10, 18, bottom + 18),
-        decoration: BoxDecoration(
-          color: QuranTheme.surface(context),
-          borderRadius: BorderRadius.circular(QuranTheme.radiusSheet),
-          border: Border.all(color: QuranTheme.outline(context)),
-          boxShadow: QuranTheme.premiumShadow(context, prominent: true),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: QuranTheme.outline(context),
-                  borderRadius: BorderRadius.circular(999),
+    return AppSheet(
+      key: const ValueKey('tasbieh-target-sheet-surface'),
+      title: 'Tasbieh Target',
+      subtitle: 'Current target ${widget.currentTarget}',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Common targets',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _TargetPreset(
+                  label: '33',
+                  subtitle: 'Classic',
+                  icon: Icons.looks_3_rounded,
+                  selected: widget.currentTarget == 33,
+                  onTap: () => _select(33),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: QuranTheme.softFill(context, primary),
-                    border: Border.all(color: QuranTheme.outline(context)),
-                  ),
-                  child: Icon(Icons.flag_rounded, color: primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _TargetPreset(
+                  label: '99',
+                  subtitle: 'Full set',
+                  icon: Icons.all_inclusive_rounded,
+                  selected: widget.currentTarget == 99,
+                  onTap: () => _select(99),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Tasbieh Target',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Current target ${widget.currentTarget}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: QuranTheme.subText(context),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PremiumSurface(
-                  onTap: () => Navigator.of(context).pop(),
-                  width: 40,
-                  height: 40,
-                  padding: EdgeInsets.zero,
-                  radius: 16,
-                  child: Icon(
-                    Icons.close_rounded,
-                    color: QuranTheme.subText(context),
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'Common targets',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _TargetPreset(
-                    label: '33',
-                    subtitle: 'Classic',
-                    icon: Icons.looks_3_rounded,
-                    selected: widget.currentTarget == 33,
-                    onTap: () => _select(33),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _TargetPreset(
-                    label: '99',
-                    subtitle: 'Full set',
-                    icon: Icons.all_inclusive_rounded,
-                    selected: widget.currentTarget == 99,
-                    onTap: () => _select(99),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            PremiumSurface(
-              padding: const EdgeInsets.all(14),
-              radius: 24,
-              prominent: true,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.tune_rounded, color: primary, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Custom target',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    key: const ValueKey('tasbieh-custom-target-field'),
-                    controller: _controller,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(
-                      hintText: 'Enter a number',
-                      prefixIcon: const Icon(Icons.tag_rounded),
-                      filled: true,
-                      fillColor: QuranTheme.surfaceVariant(context),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          QuranTheme.radiusControl,
-                        ),
-                      ),
+                  AppIcon(Icons.tune_rounded, color: primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Custom target',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
-                    onSubmitted: (_) => _submitCustom(),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: _submitCustom,
-                    icon: const Icon(Icons.check_rounded),
-                    label: const Text('Set Custom Target'),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 10),
+              TextField(
+                key: const ValueKey('tasbieh-custom-target-field'),
+                controller: _controller,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  hintText: 'Enter a number',
+                  prefixIcon: const AppIcon(Icons.tag_rounded),
+                  filled: true,
+                  fillColor: QuranTheme.surfaceVariant(context),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(
+                      QuranTheme.radiusControl,
+                    ),
+                  ),
+                ),
+                onSubmitted: (_) => _submitCustom(),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _submitCustom,
+                icon: const AppIcon(Icons.check_rounded),
+                label: const Text('Set Custom Target'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1115,54 +873,22 @@ class _TargetPreset extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return PremiumSurface(
-      onTap: onTap,
-      padding: const EdgeInsets.all(14),
-      radius: 24,
-      color: selected ? QuranTheme.softFill(context, primary) : null,
-      prominent: selected,
-      child: Stack(
-        children: [
-          if (selected)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Icon(Icons.check_circle_rounded, color: primary, size: 20),
-            ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: QuranTheme.softFill(context, primary),
-                ),
-                child: Icon(icon, color: primary, size: 20),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: primary,
-                  fontWeight: FontWeight.w700,
-                  height: 1,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: QuranTheme.subText(context),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ],
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(QuranTheme.radiusCard),
       ),
+      selected: selected,
+      selectedTileColor: QuranTheme.softFill(
+        context,
+        Theme.of(context).colorScheme.primary,
+      ),
+      title: Text(label, style: Theme.of(context).textTheme.titleMedium),
+      subtitle: Text(subtitle),
+      trailing: selected
+          ? const AppIcon(Icons.check_rounded)
+          : AppIcon(icon, size: 20),
+      onTap: onTap,
     );
   }
 }

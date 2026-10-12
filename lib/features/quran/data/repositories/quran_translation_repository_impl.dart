@@ -2,12 +2,35 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../../../core/content/content_cache_policy.dart';
+import '../../../../core/storage/settings_store.dart';
 import '../../domain/entities/quran_translation.dart';
 import '../../domain/repositories/quran_translation_repository.dart';
 import '../stores/quran_translation_store.dart';
 
 typedef QuranTranslationResourcesFetcher =
     Future<Map<String, Object?>> Function();
+
+// Quran.com locale defaults where available; Urdu is the requested Jalandhari edition.
+const _recommendedTranslationIds = {
+  'ur': 234,
+  'en': 85,
+  'bn': 161,
+  'es': 83,
+  'fa': 29,
+  'fr': 31,
+  'id': 33,
+  'it': 153,
+  'ms': 39,
+  'nl': 144,
+  'pt': 43,
+  'ru': 45,
+  'sq': 47,
+  'sw': 49,
+  'th': 230,
+  'tr': 77,
+  'vi': 220,
+  'zh': 56,
+};
 
 typedef QuranChapterTranslationFetcher =
     Future<Map<String, Object?>> Function({
@@ -22,11 +45,13 @@ class QuranTranslationRepositoryImpl
         QuranMultiTranslationRepository {
   QuranTranslationRepositoryImpl({
     required QuranTranslationStore store,
+    SettingsStore? settingsStore,
     QuranTranslationResourcesFetcher? resourcesFetcher,
     QuranChapterTranslationFetcher? chapterTranslationFetcher,
     int totalChaptersForDownload = 114,
     int totalVersesForDownload = 6236,
   }) : _store = store,
+       _settingsStore = settingsStore,
        _resourcesFetcher = resourcesFetcher ?? _fetchResourcesJson,
        _chapterTranslationFetcher =
            chapterTranslationFetcher ?? _fetchChapterTranslationJson,
@@ -37,6 +62,7 @@ class QuranTranslationRepositoryImpl
   static const contentCachePolicy = ContentCachePolicy.quranFoundation;
 
   final QuranTranslationStore _store;
+  final SettingsStore? _settingsStore;
   final QuranTranslationResourcesFetcher _resourcesFetcher;
   final QuranChapterTranslationFetcher _chapterTranslationFetcher;
   final int _totalChaptersForDownload;
@@ -58,6 +84,7 @@ class QuranTranslationRepositoryImpl
     if (resourceId == null) {
       await _store.saveSelectedResource(null);
       await _store.saveSelectedResources(const []);
+      await _settingsStore?.setAudioMeaningLanguageCode('');
       return;
     }
     final resources = await _resources();
@@ -71,6 +98,9 @@ class QuranTranslationRepositoryImpl
         selected,
         ..._store.selectedResources().where((item) => item.id != selected.id),
       ]);
+      await _settingsStore?.setAudioMeaningLanguageCode(
+        selected.resolvedLanguageCode,
+      );
     }
   }
 
@@ -92,6 +122,9 @@ class QuranTranslationRepositoryImpl
     }
     await _store.saveSelectedResources(selected);
     await _store.saveSelectedResource(selected.firstOrNull);
+    await _settingsStore?.setAudioMeaningLanguageCode(
+      selected.firstOrNull?.resolvedLanguageCode ?? '',
+    );
   }
 
   @override
@@ -463,7 +496,7 @@ class QuranTranslationRepositoryImpl
     return result;
   }
 
-  static List<QuranTranslationLanguage> _languagesFromResources(
+  List<QuranTranslationLanguage> _languagesFromResources(
     List<QuranTranslationResource> resources,
   ) {
     final grouped = <String, List<QuranTranslationResource>>{};
@@ -476,12 +509,39 @@ class QuranTranslationRepositoryImpl
           languageName: entry.key,
           displayName: entry.value.first.displayLanguage,
           resourceCount: entry.value.length,
-          defaultResource: entry.value.first,
+          defaultResource: _defaultResource(entry.key, entry.value),
           resources: List.unmodifiable(entry.value),
         ),
     ];
     languages.sort((a, b) => a.languageName.compareTo(b.languageName));
     return languages;
+  }
+
+  QuranTranslationResource _defaultResource(
+    String language,
+    List<QuranTranslationResource> resources,
+  ) {
+    final preferredId = _store.preferredResourceId(language);
+    final bundled = fallbackTranslationResources
+        .where(
+          (resource) =>
+              resource.languageName.toLowerCase() == language.toLowerCase(),
+        )
+        .firstOrNull;
+    for (final id in [
+      preferredId,
+      _recommendedTranslationIds[resources.first.resolvedLanguageCode],
+      bundled?.id,
+    ]) {
+      for (final resource in resources) {
+        if (resource.id == id) return resource;
+      }
+    }
+    // shortcut: providers publish no popularity ranking; use their first text edition for new languages.
+    return resources.firstWhere(
+      (resource) => !resource.name.toLowerCase().contains('transliteration'),
+      orElse: () => resources.first,
+    );
   }
 
   static Future<Map<String, Object?>> _fetchResourcesJson() async {

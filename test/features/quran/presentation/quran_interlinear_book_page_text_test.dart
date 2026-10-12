@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:quran/core/constants/quran_arabic_script.dart';
 import 'package:quran/core/theme/quran_theme.dart';
 import 'package:quran/features/quran/domain/entities/quran_ayah.dart';
 import 'package:quran/features/quran/domain/entities/quran_translation.dart';
@@ -235,7 +236,10 @@ void main() {
     );
 
     for (final paragraph in paragraphs) {
-      expect(paragraph.size.height, lessThanOrEqualTo(45));
+      expect(
+        paragraph.size.height,
+        lessThanOrEqualTo(26 * QuranArabicScript.uthmani.readerLineHeight + 1),
+      );
     }
   });
 

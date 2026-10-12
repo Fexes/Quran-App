@@ -67,6 +67,73 @@ abstract interface class HadithScopedSearchRepository {
   });
 }
 
+extension HadithLanguageDownloads on HadithRepository {
+  Future<Map<String, List<HadithBook>>> bookTranslationCatalog() async {
+    final catalog = <String, List<HadithBook>>{};
+    for (final book in await getBooks()) {
+      for (final code in await availableTranslationLanguagesForBook(book.id)) {
+        (catalog[code] ??= []).add(book);
+      }
+    }
+    return catalog;
+  }
+
+  Stream<HadithLanguageDownloadProgress> downloadTranslationLanguage(
+    String languageCode,
+  ) async* {
+    final code = languageCode.trim().toLowerCase();
+    final books = (await bookTranslationCatalog())[code] ?? const [];
+    var completed = 0;
+    final failed = <String>[];
+    for (final book in books) {
+      yield HadithLanguageDownloadProgress(
+        completedBooks: completed,
+        totalBooks: books.length,
+        currentBook: book.englishName,
+      );
+      try {
+        if (!await hasFullTranslation(book.id, code)) {
+          await for (final _ in downloadBookTranslation(book.id, code)) {}
+        }
+        if (await hasFullTranslation(book.id, code)) {
+          completed++;
+        } else {
+          failed.add(book.englishName);
+        }
+      } catch (_) {
+        failed.add(book.englishName);
+      }
+    }
+    yield HadithLanguageDownloadProgress(
+      completedBooks: completed,
+      totalBooks: books.length,
+      failedBooks: List.unmodifiable(failed),
+      isFinished: true,
+    );
+  }
+}
+
+class HadithLanguageDownloadProgress {
+  const HadithLanguageDownloadProgress({
+    required this.completedBooks,
+    required this.totalBooks,
+    this.currentBook,
+    this.failedBooks = const [],
+    this.isFinished = false,
+  });
+
+  final int completedBooks;
+  final int totalBooks;
+  final String? currentBook;
+  final List<String> failedBooks;
+  final bool isFinished;
+
+  bool get isComplete =>
+      isFinished && totalBooks > 0 && completedBooks == totalBooks;
+
+  double get percent => totalBooks == 0 ? 0 : completedBooks / totalBooks;
+}
+
 class HadeethEncDownloadProgress {
   const HadeethEncDownloadProgress({
     required this.languageCode,

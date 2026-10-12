@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/constants/quran_arabic_script.dart';
+
 class QuranAyah extends Equatable {
   const QuranAyah({
     required this.surahNumber,
@@ -15,6 +17,8 @@ class QuranAyah extends Equatable {
     this.manzil,
     this.globalNumber = 0,
     this.tafsir,
+    this.indoPakText,
+    this.indoPakWordPositions = const [],
   });
 
   final int surahNumber;
@@ -30,6 +34,42 @@ class QuranAyah extends Equatable {
   final int? manzil;
   final int globalNumber;
   final String? tafsir;
+  final String? indoPakText;
+  final List<int> indoPakWordPositions;
+
+  String textForScript(QuranArabicScript script) =>
+      script == QuranArabicScript.indoPak
+      ? indoPakText ?? QuranArabicScript.cleanUthmaniText(text)
+      : QuranArabicScript.cleanUthmaniText(text);
+
+  int? wordIndexForScript(QuranArabicScript script, int? wordIndex) {
+    if (wordIndex == null || script == QuranArabicScript.uthmani) {
+      return wordIndex;
+    }
+    final index = indoPakWordPositions.indexOf(wordIndex);
+    return index < 0 ? null : index + 1;
+  }
+
+  QuranAyah forScript(QuranArabicScript script) {
+    if (script == QuranArabicScript.uthmani) return this;
+    return QuranAyah(
+      surahNumber: surahNumber,
+      number: number,
+      text: textForScript(script),
+      translation: translation,
+      page: page,
+      juz: juz,
+      isSajda: isSajda,
+      isPageStart: isPageStart,
+      isJuzStart: isJuzStart,
+      rubIndex: rubIndex,
+      manzil: manzil,
+      globalNumber: globalNumber,
+      tafsir: tafsir,
+      indoPakText: indoPakText,
+      indoPakWordPositions: indoPakWordPositions,
+    );
+  }
 
   String get verseKey => '$surahNumber:$number';
   bool get isRubBoundary => rubIndex != null;
@@ -51,5 +91,7 @@ class QuranAyah extends Equatable {
     manzil,
     globalNumber,
     tafsir,
+    indoPakText,
+    indoPakWordPositions,
   ];
 }

@@ -14,6 +14,10 @@ class SurahImageCatalog {
     return '$baseUrl/cover_$normalized.jpeg';
   }
 
+  static String fallbackAssetPathFor(int surahNumber) {
+    return 'assets/images/surah_cover/cover_${normalize(surahNumber)}.jpeg';
+  }
+
   @Deprecated('Use imageUrlFor. Surah covers are hosted remotely.')
   static String assetPathFor(int surahNumber) {
     return imageUrlFor(surahNumber);

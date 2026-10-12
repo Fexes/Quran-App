@@ -32,11 +32,8 @@ class HadithTranslationStore {
     required String languageCode,
     required String hadithNumber,
   }) {
-    final translations = translationsForBook(
-      bookId: bookId,
-      languageCode: languageCode,
-    );
-    return translations[hadithNumber];
+    final translations = _read(_itemsKey(bookId, languageCode));
+    return translations is Map ? translations[hadithNumber]?.toString() : null;
   }
 
   Map<String, String> translationsForBook({

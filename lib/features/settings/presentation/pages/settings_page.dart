@@ -1,28 +1,31 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../app/router/app_routes.dart';
+import '../../../../core/constants/quran_arabic_script.dart';
 import '../../../../core/localization/locale_cubit.dart';
 import '../../../../core/localization/locale_state.dart';
 import '../../../../core/storage/settings_store.dart';
-import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/theme/quran_theme_cubit.dart';
 import '../../../../core/theme/quran_theme_state.dart';
 import '../../../../core/widgets/adaptive_inset_area.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/app_sheet.dart';
 import '../../../../core/widgets/section_header.dart';
 import '../../../../core/widgets/shell_screen_header.dart';
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../quran_audio/presentation/widgets/quran_floating_audio_player.dart';
 import '../../../azkar/domain/repositories/azkar_repository.dart';
-import '../../../hadith/domain/repositories/hadith_repository.dart';
+import '../../../hadith/presentation/widgets/hadith_translation_sheet.dart';
 import '../../../library/domain/library_translation_language_mapper.dart';
 import '../../../quran/domain/entities/quran_tafsir.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
 import '../../../quran/domain/repositories/quran_repository.dart';
 import '../../../quran/domain/repositories/quran_tafsir_repository.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
+import '../widgets/prayer_calculation_settings_tile.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -45,27 +48,141 @@ class SettingsPage extends StatelessWidget {
           ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 112),
+              padding: EdgeInsets.fromLTRB(
+                18,
+                0,
+                18,
+                QuranFloatingAudioPlayer.scrollInset(context),
+              ),
               children: [
                 SectionHeader(title: l10n.appearanceTitle),
                 const SizedBox(height: 10),
                 const _ThemeSelector(),
                 const SizedBox(height: 14),
-                const _FontControls(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const AppIcon(Icons.format_size_rounded),
+                  title: Text(l10n.textAppearanceTitle),
+                  trailing: const AppIcon(Icons.chevron_right_rounded),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => AppSheet(
+                      title: l10n.textAppearanceTitle,
+                      child: BlocProvider.value(
+                        value: context.read<QuranThemeCubit>(),
+                        child: const _FontControls(),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 22),
-                SectionHeader(title: l10n.languageTitle),
-                const SizedBox(height: 10),
+                SectionHeader(title: l10n.readingPreferencesTitle),
                 const _LanguageSelector(),
-                const SizedBox(height: 14),
-                const _ContentLanguageSettings(),
+                const _ArabicScriptSetting(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const AppIcon(Icons.translate_rounded),
+                  title: Text(l10n.contentLanguagesTitle),
+                  subtitle: Text(l10n.readingLanguagesSubtitle),
+                  trailing: const AppIcon(Icons.chevron_right_rounded),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (_) => AppSheet(
+                      title: l10n.contentLanguagesTitle,
+                      child: const _ContentLanguageSettings(),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 22),
-                SectionHeader(title: l10n.settingsPrivacyDataTitle),
-                const SizedBox(height: 10),
+                const SectionHeader(title: 'Prayer preferences'),
+                const PrayerCalculationSettingsTile(),
+                const SizedBox(height: 22),
+                SectionHeader(title: l10n.downloadsDataTitle),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const AppIcon(Icons.download_for_offline_outlined),
+                  title: Text(l10n.offlineDownloadsTitle),
+                  subtitle: Text(l10n.offlineDownloadsSubtitle),
+                  trailing: const AppIcon(Icons.chevron_right_rounded),
+                  onTap: () => context.push(AppRoutes.quranDownloadsPath()),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const AppIcon(Icons.library_books_outlined),
+                  title: Text(l10n.translationManageAction),
+                  trailing: const AppIcon(Icons.chevron_right_rounded),
+                  onTap: () => context.push(AppRoutes.quranTranslationsPath()),
+                ),
                 const _BackupSettingsTile(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const AppIcon(Icons.verified_outlined),
+                  title: Text(l10n.contentSourcesTitle),
+                  trailing: const AppIcon(Icons.chevron_right_rounded),
+                  onTap: () => _showContentSources(context),
+                ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showContentSources(BuildContext context) {
+    final sources = getIt<QuranRepository>().getContentSources();
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => AppSheet(
+        title: 'Quran content sources',
+        child: FutureBuilder(
+          future: sources,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text('Content sources could not be loaded.'),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final source in snapshot.data!) ...[
+                  const Divider(height: 24),
+                  Text(
+                    source.name,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    [
+                      if (source.edition?.isNotEmpty == true) source.edition!,
+                      if (source.provider?.isNotEmpty == true) source.provider!,
+                      if (source.license?.isNotEmpty == true) source.license!,
+                      if (source.cachePolicy.maxAge != null)
+                        'Offline cache: up to ${source.cachePolicy.maxAge!.inDays} days',
+                      'Release review: ${source.reviewStatus.name}',
+                      source.attribution,
+                    ].join('\n'),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -77,15 +194,58 @@ class _BackupSettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return PremiumSurface(
-      padding: EdgeInsets.zero,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: const Icon(Icons.lock_person_rounded),
-        title: Text(l10n.backupPrivacyTitle),
-        subtitle: Text(l10n.backupPrivacySubtitle),
-        trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: () => context.push(AppRoutes.backupPath()),
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const AppIcon(Icons.lock_person_rounded),
+      title: Text(l10n.backupPrivacyTitle),
+      subtitle: Text(l10n.backupPrivacySubtitle),
+      trailing: const AppIcon(Icons.chevron_right_rounded),
+      onTap: () => context.push(AppRoutes.backupPath()),
+    );
+  }
+}
+
+class _ArabicScriptSetting extends StatelessWidget {
+  const _ArabicScriptSetting();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<QuranThemeCubit, QuranThemeState>(
+      buildWhen: (previous, current) =>
+          previous.quranArabicScript != current.quranArabicScript,
+      builder: (context, state) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const AppIcon(Icons.text_fields_rounded),
+        title: Text(AppLocalizations.of(context).arabicScriptTitle),
+        subtitle: Text(state.quranArabicScript.label),
+        trailing: const AppIcon(Icons.chevron_right_rounded),
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (sheetContext) => AppSheet(
+            title: AppLocalizations.of(context).arabicScriptTitle,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final script in QuranArabicScript.values)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(script.label),
+                    trailing: state.quranArabicScript == script
+                        ? const AppIcon(Icons.check_rounded)
+                        : null,
+                    onTap: () {
+                      context.read<QuranThemeCubit>().setQuranArabicScript(
+                        script,
+                      );
+                      Navigator.of(sheetContext).pop();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -96,14 +256,12 @@ class _ContentLanguageOptions {
     required this.selectedTranslation,
     required this.tafsirResources,
     required this.audioLanguageCodes,
-    required this.hadithLanguageCodes,
     required this.azkarLanguageCodes,
   });
 
   final QuranTranslationResource? selectedTranslation;
   final List<QuranTafsirResource> tafsirResources;
   final List<String> audioLanguageCodes;
-  final List<String> hadithLanguageCodes;
   final List<String> azkarLanguageCodes;
 }
 
@@ -141,16 +299,6 @@ class _ContentLanguageSettingsState extends State<_ContentLanguageSettings> {
       _store.audioMeaningLanguageCode,
     }.toList()..sort();
 
-    final hadithCodes = <String>{'en', _store.hadithLanguageCode};
-    if (getIt.isRegistered<HadithRepository>()) {
-      final repository = getIt<HadithRepository>();
-      for (final book in await repository.getBooks()) {
-        hadithCodes.addAll(
-          await repository.availableTranslationLanguagesForBook(book.id),
-        );
-      }
-    }
-
     final azkarCodes = <String>{'en', _store.azkarLanguageCode};
     if (getIt.isRegistered<AzkarRepository>()) {
       azkarCodes.addAll(
@@ -162,148 +310,115 @@ class _ContentLanguageSettingsState extends State<_ContentLanguageSettings> {
       selectedTranslation: selectedTranslation,
       tafsirResources: tafsirResources,
       audioLanguageCodes: audioCodes,
-      hadithLanguageCodes: hadithCodes.toList()..sort(),
       azkarLanguageCodes: azkarCodes.toList()..sort(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return PremiumSurface(
-      padding: const EdgeInsets.all(14),
-      child: FutureBuilder<_ContentLanguageOptions>(
-        future: _optionsFuture,
-        builder: (context, snapshot) {
-          final options = snapshot.data;
-          if (options == null) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(12),
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-          final selectedTafsirId = _selectedTafsirId(options.tafsirResources);
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.contentLanguagesTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                l10n.contentLanguagesSubtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: QuranTheme.subText(context, 0.66),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.translate_rounded),
-                title: const Text('Quran translation'),
-                subtitle: Text(
-                  options.selectedTranslation == null
-                      ? 'Bundled English'
-                      : '${options.selectedTranslation!.displayLanguage} • ${options.selectedTranslation!.name}',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => context.push(
-                  AppRoutes.quranDownloadsPath(showTranslations: true),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    context.push(AppRoutes.quranTranslationsPath()),
-                icon: const Icon(Icons.compare_arrows_rounded),
-                label: Text(l10n.translationManageAction),
-              ),
-              if (options.tafsirResources.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                DropdownButtonFormField<int>(
-                  initialValue: selectedTafsirId,
-                  decoration: const InputDecoration(
-                    labelText: 'Tafsir edition',
-                    prefixIcon: Icon(Icons.menu_book_rounded),
-                  ),
-                  items: [
-                    for (final resource in options.tafsirResources)
-                      DropdownMenuItem(
-                        value: resource.id,
-                        child: Text(
-                          '${resource.displayLanguage} • ${resource.name}',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (id) async {
-                    if (id == null) {
-                      return;
-                    }
-                    final resource = options.tafsirResources.firstWhere(
-                      (item) => item.id == id,
-                    );
-                    await _store.setTafsirPreference(
-                      languageName: resource.languageName,
-                      resourceId: resource.id,
-                    );
-                    if (mounted) {
-                      setState(() {});
-                    }
-                  },
+    return FutureBuilder<_ContentLanguageOptions>(
+      future: _optionsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Language options could not be loaded.'),
+                TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _optionsFuture = _loadOptions()),
+                  icon: const AppIcon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
                 ),
               ],
-              const SizedBox(height: 10),
-              _languageDropdown(
-                label: 'Word meanings',
-                icon: Icons.segment_rounded,
-                value: _store.wordMeaningLanguageCode,
-                values: const ['en', 'fa', 'tr', 'ur'],
-                onChanged: _store.setWordMeaningLanguageCode,
-              ),
-              const SizedBox(height: 10),
-              _languageDropdown(
-                label: 'Audio meaning',
-                icon: Icons.record_voice_over_rounded,
-                value: _store.audioMeaningLanguageCode,
-                values: options.audioLanguageCodes,
-                onChanged: (code) async {
-                  await _store.setAudioMeaningLanguageCode(code);
-                  await _store.setAudioTranslationReciterId('');
-                },
-              ),
-              const SizedBox(height: 10),
-              _languageDropdown(
-                label: 'Hadith translation',
-                icon: Icons.library_books_rounded,
-                value: _store.hadithLanguageCode,
-                values: options.hadithLanguageCodes,
-                onChanged: _store.setHadithLanguageCode,
-              ),
-              const SizedBox(height: 10),
-              _languageDropdown(
-                label: 'Azkar translation',
-                icon: Icons.auto_stories_rounded,
-                value: _store.azkarLanguageCode,
-                values: options.azkarLanguageCodes,
-                onChanged: _store.setAzkarLanguageCode,
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    context.push(AppRoutes.onboardingPath(edit: true)),
-                icon: const Icon(Icons.tune_rounded),
-                label: const Text('Review setup journey'),
-              ),
-            ],
+            ),
           );
-        },
-      ),
+        }
+        final options = snapshot.data;
+        if (options == null) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final tafsirId = options.tafsirResources.isEmpty
+            ? null
+            : _selectedTafsirId(options.tafsirResources);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const AppIcon(Icons.translate_rounded),
+              title: const Text('Quran translation'),
+              subtitle: Text(
+                options.selectedTranslation?.displayLanguage ??
+                    'Select language',
+              ),
+              trailing: const AppIcon(Icons.chevron_right_rounded),
+              onTap: () async {
+                await context.push(
+                  AppRoutes.quranDownloadsPath(showTranslations: true),
+                );
+                if (mounted) setState(() => _optionsFuture = _loadOptions());
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const AppIcon(Icons.menu_book_outlined),
+              title: const Text('Tafsir edition'),
+              subtitle: Text(
+                tafsirId == null
+                    ? 'No editions available'
+                    : options.tafsirResources
+                          .firstWhere((r) => r.id == tafsirId)
+                          .name,
+              ),
+              trailing: const AppIcon(Icons.chevron_right_rounded),
+              onTap: tafsirId == null
+                  ? null
+                  : () => _chooseTafsir(options, tafsirId),
+            ),
+            const Divider(height: 24),
+            _languageRow(
+              label: 'Word meanings',
+              icon: Icons.segment_rounded,
+              value: _store.wordMeaningLanguageCode,
+              values: const ['en', 'fa', 'tr', 'ur'],
+              onChanged: _store.setWordMeaningLanguageCode,
+            ),
+            _languageRow(
+              label: 'Audio meaning',
+              icon: Icons.record_voice_over_outlined,
+              value: _store.audioMeaningLanguageCode,
+              values: options.audioLanguageCodes,
+              onChanged: (code) async {
+                await _store.setAudioMeaningLanguageCode(code);
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const AppIcon(Icons.library_books_outlined),
+              title: const Text('Hadith translation'),
+              subtitle: Text(libraryLanguageLabel(_store.hadithLanguageCode)),
+              trailing: const AppIcon(Icons.chevron_right_rounded),
+              onTap: () async {
+                await showHadithTranslationSheet(context);
+                if (mounted) setState(() {});
+              },
+            ),
+            _languageRow(
+              label: 'Azkar translation',
+              icon: Icons.auto_stories_outlined,
+              value: _store.azkarLanguageCode,
+              values: options.azkarLanguageCodes,
+              onChanged: _store.setAzkarLanguageCode,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -312,78 +427,100 @@ class _ContentLanguageSettingsState extends State<_ContentLanguageSettings> {
     if (storedId != null && resources.any((item) => item.id == storedId)) {
       return storedId;
     }
-    for (final resource in resources) {
-      if (resource.languageName.toLowerCase() ==
-          _store.tafsirLanguageName.toLowerCase()) {
-        return resource.id;
-      }
-    }
-    return resources.first.id;
+    return resources
+        .firstWhere(
+          (resource) =>
+              resource.languageName.toLowerCase() ==
+              _store.tafsirLanguageName.toLowerCase(),
+          orElse: () => resources.first,
+        )
+        .id;
   }
 
-  Widget _languageDropdown({
+  Future<void> _chooseTafsir(
+    _ContentLanguageOptions options,
+    int selectedId,
+  ) async {
+    final resource = await showModalBottomSheet<QuranTafsirResource>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => AppSheet(
+        title: 'Tafsir edition',
+        scrollableChild: true,
+        child: ListView.separated(
+          shrinkWrap: true,
+          itemCount: options.tafsirResources.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final item = options.tafsirResources[index];
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(item.name),
+              subtitle: Text(
+                [
+                  item.displayLanguage,
+                  if (item.authorName.isNotEmpty) item.authorName,
+                ].join(' · '),
+              ),
+              trailing: item.id == selectedId
+                  ? const AppIcon(Icons.check_rounded)
+                  : null,
+              onTap: () => Navigator.of(sheetContext).pop(item),
+            );
+          },
+        ),
+      ),
+    );
+    if (resource == null) return;
+    await _store.setTafsirPreference(
+      languageName: resource.languageName,
+      resourceId: resource.id,
+    );
+    if (mounted) setState(() {});
+  }
+
+  Widget _languageRow({
     required String label,
     required IconData icon,
     required String value,
     required List<String> values,
     required Future<void> Function(String value) onChanged,
   }) {
-    final normalizedValues = {...values, value}.toList()..sort();
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
-      items: [
-        for (final code in normalizedValues)
-          DropdownMenuItem(
-            value: code,
-            child: Text(
-              '${libraryLanguageLabel(code)} (${code.toUpperCase()})',
+    final codes = {...values, value}.toList()..sort();
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: AppIcon(icon),
+      title: Text(label),
+      subtitle: Text(libraryLanguageLabel(value)),
+      trailing: const AppIcon(Icons.chevron_right_rounded),
+      onTap: () async {
+        final next = await showModalBottomSheet<String>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (sheetContext) => AppSheet(
+            title: label,
+            scrollableChild: true,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: codes.length,
+              itemBuilder: (_, index) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(libraryLanguageLabel(codes[index])),
+                trailing: codes[index] == value
+                    ? const AppIcon(Icons.check_rounded)
+                    : null,
+                onTap: () => Navigator.of(sheetContext).pop(codes[index]),
+              ),
             ),
           ),
-      ],
-      onChanged: (next) async {
-        if (next == null) {
-          return;
-        }
+        );
+        if (next == null) return;
         await onChanged(next);
-        if (mounted) {
-          setState(() {});
-        }
+        if (mounted) setState(() {});
       },
     );
-  }
-
-  Future<void> _pickTafsir(List<QuranTafsirResource> resources) async {
-    final selectedId = _selectedTafsirId(resources);
-    final resource = await showModalBottomSheet<QuranTafsirResource>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (context) => ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-        children: [
-          for (final item in resources)
-            RadioListTile<int>(
-              value: item.id,
-              groupValue: selectedId,
-              title: Text(item.name),
-              subtitle: Text('${item.displayLanguage} • ${item.authorName}'),
-              onChanged: (_) => Navigator.of(context).pop(item),
-            ),
-        ],
-      ),
-    );
-    if (resource == null) {
-      return;
-    }
-    await _store.setTafsirPreference(
-      languageName: resource.languageName,
-      resourceId: resource.id,
-    );
-    if (mounted) {
-      setState(() {});
-    }
   }
 }
 
@@ -394,163 +531,96 @@ class _ThemeSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return BlocBuilder<QuranThemeCubit, QuranThemeState>(
-      builder: (context, state) {
-        return PremiumSurface(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.themeTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 12),
-              _ThemeChoiceTile(
-                presetId: 'white-glass',
-                label: l10n.themeWhite,
-                icon: Icons.grid_view_rounded,
-                selected: state.presetId == 'white-glass',
-              ),
-              const SizedBox(height: 8),
-              _ThemeChoiceTile(
-                presetId: 'light-sanctuary',
-                label: l10n.themeLight,
-                icon: Icons.wb_sunny_rounded,
-                selected: state.presetId == 'light-sanctuary',
-              ),
-              const SizedBox(height: 8),
-              _ThemeChoiceTile(
-                presetId: 'dark-minbar',
-                label: l10n.themeDark,
-                icon: Icons.bedtime_rounded,
-                selected: state.presetId == 'dark-minbar',
-              ),
-              const SizedBox(height: 8),
-              _ThemeChoiceTile(
-                presetId: 'black-gold',
-                label: l10n.themeBlack,
-                icon: Icons.contrast_rounded,
-                selected: state.presetId == 'black-gold',
-              ),
-            ],
+      buildWhen: (previous, current) => previous.presetId != current.presetId,
+      builder: (context, state) => SegmentedButton<String>(
+        showSelectedIcon: false,
+        segments: [
+          ButtonSegment(
+            value: 'white-glass',
+            icon: const AppIcon(Icons.light_mode_outlined),
+            label: Text(l10n.themeLight),
           ),
-        );
-      },
-    );
-  }
-}
-
-class _ThemeChoiceTile extends StatelessWidget {
-  const _ThemeChoiceTile({
-    required this.presetId,
-    required this.label,
-    required this.icon,
-    required this.selected,
-  });
-
-  final String presetId;
-  final String label;
-  final IconData icon;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return InkWell(
-      onTap: () => context.read<QuranThemeCubit>().setPreset(presetId),
-      borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? QuranTheme.softFill(context, primary) : null,
-          borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
-          border: Border.all(
-            color: selected
-                ? primary.withValues(alpha: 0.30)
-                : QuranTheme.outline(context),
+          ButtonSegment(
+            value: 'dark-minbar',
+            icon: const AppIcon(Icons.dark_mode_outlined),
+            label: Text(l10n.themeDark),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: QuranTheme.softFill(context, primary),
-                borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                ),
-              ),
-            ),
-            Icon(
-              selected
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: selected ? primary : QuranTheme.subText(context, 0.36),
-            ),
-          ],
-        ),
+        ],
+        selected: {state.presetId},
+        onSelectionChanged: (value) =>
+            context.read<QuranThemeCubit>().setPreset(value.first),
       ),
     );
   }
 }
 
-class _FontControls extends StatelessWidget {
+class _FontControls extends StatefulWidget {
   const _FontControls();
+
+  @override
+  State<_FontControls> createState() => _FontControlsState();
+}
+
+class _FontControlsState extends State<_FontControls> {
+  late double _scale;
+  late double _weight;
+
+  @override
+  void initState() {
+    super.initState();
+    final state = context.read<QuranThemeCubit>().state;
+    _scale = state.fontScale;
+    _weight = state.fontWeightScale;
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return BlocBuilder<QuranThemeCubit, QuranThemeState>(
-      builder: (context, state) {
-        final themeCubit = context.read<QuranThemeCubit>();
-        return PremiumSurface(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.fontSizeTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              Slider(
-                value: state.fontScale,
-                min: 0.88,
-                max: 1.28,
-                divisions: 8,
-                label: state.fontScale.toStringAsFixed(2),
-                onChanged: themeCubit.setFontScale,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.fontWeightTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              Slider(
-                value: state.fontWeightScale,
-                min: 0.72,
-                max: 1.08,
-                divisions: 9,
-                label: state.fontWeightScale.toStringAsFixed(2),
-                onChanged: themeCubit.setFontWeightScale,
-              ),
-            ],
-          ),
-        );
-      },
+    final themeCubit = context.read<QuranThemeCubit>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(l10n.fontSizeTitle),
+          trailing: Text('${(_scale * 100).round()}%'),
+        ),
+        Slider(
+          value: _scale,
+          min: 0.88,
+          max: 1.28,
+          divisions: 8,
+          label: '${(_scale * 100).round()}%',
+          onChanged: (value) => setState(() => _scale = value),
+          onChangeEnd: themeCubit.setFontScale,
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(l10n.fontWeightTitle),
+          trailing: Text('${(_weight * 100).round()}%'),
+        ),
+        Slider(
+          value: _weight,
+          min: 0.72,
+          max: 1.08,
+          divisions: 9,
+          label: '${(_weight * 100).round()}%',
+          onChanged: (value) => setState(() => _weight = value),
+          onChangeEnd: themeCubit.setFontWeightScale,
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: () {
+            setState(() {
+              _scale = 1.0;
+              _weight = 0.88;
+            });
+            themeCubit.resetTextAppearance();
+          },
+          icon: const AppIcon(Icons.restart_alt_rounded, size: 18),
+          label: const Text('Reset to default'),
+        ),
+      ],
     );
   }
 }
@@ -561,33 +631,45 @@ class _LanguageSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final languages = {
+      'system': l10n.systemLanguage,
+      'en': 'English',
+      'ur': 'اردو',
+      'ar': 'العربية',
+    };
     return BlocBuilder<LocaleCubit, LocaleState>(
-      builder: (context, state) {
-        return PremiumSurface(
-          padding: const EdgeInsets.all(14),
-          child: DropdownButtonFormField<String>(
-            initialValue: state.preferenceCode,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.language_rounded),
+      builder: (context, state) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const AppIcon(Icons.language_rounded),
+        title: Text(l10n.languageTitle),
+        subtitle: Text(languages[state.preferenceCode] ?? l10n.systemLanguage),
+        trailing: const AppIcon(Icons.chevron_right_rounded),
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (sheetContext) => AppSheet(
+            title: l10n.languageTitle,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final entry in languages.entries)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(entry.value),
+                    trailing: entry.key == state.preferenceCode
+                        ? const AppIcon(Icons.check_rounded)
+                        : null,
+                    onTap: () {
+                      context.read<LocaleCubit>().setLocale(entry.key);
+                      Navigator.of(sheetContext).pop();
+                    },
+                  ),
+              ],
             ),
-            items: [
-              DropdownMenuItem(
-                value: 'system',
-                child: Text(l10n.systemLanguage),
-              ),
-              const DropdownMenuItem(value: 'en', child: Text('English')),
-              const DropdownMenuItem(value: 'ur', child: Text('اردو')),
-              const DropdownMenuItem(value: 'ar', child: Text('العربية')),
-            ],
-            onChanged: (value) {
-              if (value == null) {
-                return;
-              }
-              context.read<LocaleCubit>().setLocale(value);
-            },
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

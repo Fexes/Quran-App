@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/app_sheet.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../core/storage/settings_store.dart';
 import '../../../quran/domain/entities/quran_audio_reciter.dart';
 import '../../../quran/domain/entities/quran_tafsir.dart';
@@ -13,6 +15,7 @@ import '../../../quran/domain/entities/quran_translation.dart';
 import '../../../quran/domain/repositories/quran_repository.dart';
 import '../../../quran/domain/repositories/quran_tafsir_repository.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
+import '../../../quran/presentation/widgets/quran_translation_picker.dart';
 import '../../data/repositories/quran_audio_download_repository.dart';
 import '../../data/services/quran_audio_download_service.dart';
 import '../../domain/entities/quran_audio_download_item.dart';
@@ -95,7 +98,10 @@ class _QuranDownloadsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Downloads')),
+      appBar: AppBar(
+        title: const Text('Downloads'),
+        flexibleSpace: const ArchitecturalBackdrop(),
+      ),
       body: Stack(
         children: [
           BlocBuilder<QuranAudioDownloadsCubit, QuranAudioDownloadsState>(
@@ -140,32 +146,49 @@ class _DownloadsContent extends StatelessWidget {
       QuranAudioDownloadsFilter.active => state.activeGroups,
       QuranAudioDownloadsFilter.downloaded => state.downloadedGroups,
     };
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 140),
-      children: [
-        _DownloadsHeader(state: state),
-        const SizedBox(height: 12),
-        _AudioTypeSelector(state: state),
-        const SizedBox(height: 12),
-        _ReciterSelector(state: state),
-        const SizedBox(height: 12),
-        _DownloadsFilters(state: state),
-        const SizedBox(height: 12),
-        if (groups.isEmpty)
-          PremiumSurface(
-            padding: const EdgeInsets.all(18),
-            child: Text(
-              _emptyMessage(state.filter),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: QuranTheme.subText(context),
-              ),
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          sliver: SliverList.list(
+            children: [
+              _DownloadsHeader(state: state),
+              const Divider(height: 28),
+              _AudioTypeSelector(state: state),
+              const SizedBox(height: 12),
+              _ReciterSelector(state: state),
+              const SizedBox(height: 12),
+              _DownloadsFilters(state: state),
+              const SizedBox(height: 12),
+              if (groups.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  child: Text(
+                    _emptyMessage(state.filter),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: QuranTheme.subText(context),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverList.builder(
+            itemCount: groups.length,
+            itemBuilder: (context, index) => _DownloadGroupTile(
+              key: ValueKey(groups[index].id),
+              group: groups[index],
+              filter: state.filter,
             ),
-          )
-        else
-          for (final group in groups) ...[
-            _DownloadGroupTile(group: group, filter: state.filter),
-            const SizedBox(height: 10),
-          ],
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: QuranFloatingAudioPlayer.scrollInset(context),
+          ),
+        ),
       ],
     );
   }
@@ -194,8 +217,8 @@ class _DownloadsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<QuranAudioDownloadsCubit>();
-    return PremiumSurface(
-      padding: const EdgeInsets.all(18),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -229,7 +252,7 @@ class _DownloadsHeader extends StatelessWidget {
               onPressed: state.selectedArabicReciter == null
                   ? null
                   : () => _confirmCompleteOffline(context),
-              icon: const Icon(Icons.offline_bolt_rounded),
+              icon: const AppIcon(Icons.offline_bolt_rounded),
               label: const Text('Complete Offline'),
             ),
           ),
@@ -250,6 +273,7 @@ class _DownloadsHeader extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('Download complete offline audio?'),
         content: Text(
           'Arabic audio: ${arabic.name}.\n'
@@ -289,37 +313,30 @@ class _HeaderStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: QuranTheme.softFill(context, primary),
-          borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: primary),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
+      child: Row(
+        children: [
+          AppIcon(icon, color: primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
-                  Text(
-                    label,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: QuranTheme.subText(context),
-                    ),
+                ),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: QuranTheme.subText(context),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -337,12 +354,12 @@ class _AudioTypeSelector extends StatelessWidget {
       segments: const [
         ButtonSegment(
           value: QuranAudioDownloadAudioType.arabic,
-          icon: Icon(Icons.menu_book_rounded),
+          icon: AppIcon(Icons.menu_book_rounded),
           label: Text('Arabic'),
         ),
         ButtonSegment(
           value: QuranAudioDownloadAudioType.translation,
-          icon: Icon(Icons.translate_rounded),
+          icon: AppIcon(Icons.translate_rounded),
           label: Text('Translation'),
         ),
       ],
@@ -382,33 +399,28 @@ class _ReciterSelector extends StatelessWidget {
             const SizedBox(height: 10),
           ],
         ],
-        PremiumSurface(
-          padding: const EdgeInsets.all(14),
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: reciter == null
-                ? CircleAvatar(
-                    radius: 26,
-                    backgroundColor: QuranTheme.softFill(
-                      context,
-                      Theme.of(context).colorScheme.primary,
-                    ),
-                    child: Icon(
-                      isTranslation
-                          ? Icons.translate_rounded
-                          : Icons.record_voice_over_rounded,
-                    ),
-                  )
-                : QuranReciterAvatar(reciter: reciter, size: 52),
-            title: Text(title),
-            subtitle: Text(subtitle),
-            trailing: canChoose
-                ? const Icon(Icons.keyboard_arrow_down_rounded)
-                : null,
-            onTap: canChoose
-                ? () => _showReciterSheet(context, state.reciters)
-                : null,
-          ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: reciter == null
+              ? CircleAvatar(
+                  radius: 21,
+                  backgroundColor: QuranTheme.softFill(
+                    context,
+                    Theme.of(context).colorScheme.primary,
+                  ),
+                  child: AppIcon(
+                    isTranslation
+                        ? Icons.translate_rounded
+                        : Icons.record_voice_over_rounded,
+                  ),
+                )
+              : QuranReciterAvatar(reciter: reciter, size: 42),
+          title: Text(title),
+          subtitle: Text(subtitle),
+          trailing: canChoose ? const AppIcon(Icons.chevron_right_rounded) : null,
+          onTap: canChoose
+              ? () => _showReciterSheet(context, state.reciters)
+              : null,
         ),
         const SizedBox(height: 10),
         Row(
@@ -418,7 +430,7 @@ class _ReciterSelector extends StatelessWidget {
                 onPressed: state.selectedReciter == null
                     ? null
                     : () => _confirmFullDownload(context),
-                icon: const Icon(Icons.download_for_offline_rounded),
+                icon: const AppIcon(Icons.download_for_offline_rounded),
                 label: Text('Download Full ${state.audioTypeLabel}'),
               ),
             ),
@@ -429,7 +441,7 @@ class _ReciterSelector extends StatelessWidget {
               onPressed: state.selectedReciter == null
                   ? null
                   : () => _confirmDeleteSelected(context),
-              icon: const Icon(Icons.delete_sweep_rounded),
+              icon: const AppIcon(Icons.delete_sweep_rounded),
             ),
           ],
         ),
@@ -462,7 +474,7 @@ class _ReciterSelector extends StatelessWidget {
     }
     final language = state.selectedTranslation?.displayLanguage;
     if (language == null || language.isEmpty) {
-      return 'Choose a translation language in Quran reader settings.';
+      return 'Select a translation language.';
     }
     return 'No audio available for $language language.';
   }
@@ -492,6 +504,7 @@ class _ReciterSelector extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: Text('Download full ${state.audioTypeLabel.toLowerCase()}?'),
         content: Text(
           'This will queue 6,236 audio files for ${reciter.name}. '
@@ -522,6 +535,7 @@ class _ReciterSelector extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: Text('Delete ${state.audioTypeLabel.toLowerCase()} audio?'),
         content: Text(
           'Downloaded audio for ${reciter.name} will be removed. '
@@ -545,10 +559,46 @@ class _ReciterSelector extends StatelessWidget {
   }
 }
 
-class _TranslationTextDownloadActions extends StatelessWidget {
+class _TranslationTextDownloadActions extends StatefulWidget {
   const _TranslationTextDownloadActions({required this.translation});
 
   final QuranTranslationResource translation;
+
+  @override
+  State<_TranslationTextDownloadActions> createState() =>
+      _TranslationTextDownloadActionsState();
+}
+
+class _TranslationTextDownloadActionsState
+    extends State<_TranslationTextDownloadActions> {
+  late Future<_TranslationCacheStatus> _cacheStatus;
+  Future<QuranTafsirResource?>? _tafsirResource;
+
+  QuranTranslationResource get translation => widget.translation;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatus();
+  }
+
+  @override
+  void didUpdateWidget(_TranslationTextDownloadActions oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.translation.id != translation.id) _loadStatus();
+  }
+
+  void _loadStatus() {
+    _cacheStatus = _translationCacheStatus(
+      getIt<QuranTranslationRepository>(),
+      translation.id,
+    );
+    _tafsirResource = getIt.isRegistered<QuranTafsirRepository>()
+        ? getIt<QuranTafsirRepository>().defaultResourceForLanguage(
+            translation.languageName,
+          )
+        : null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -556,8 +606,8 @@ class _TranslationTextDownloadActions extends StatelessWidget {
     final tafsirRepository = getIt.isRegistered<QuranTafsirRepository>()
         ? getIt<QuranTafsirRepository>()
         : null;
-    return PremiumSurface(
-      padding: const EdgeInsets.all(14),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -565,22 +615,19 @@ class _TranslationTextDownloadActions extends StatelessWidget {
             '${translation.displayLanguage} text',
             style: Theme.of(
               context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
             'Quran translation and tafsir are downloaded separately for offline reading.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: QuranTheme.subText(context, 0.66),
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 12),
           FutureBuilder<_TranslationCacheStatus>(
-            future: _translationCacheStatus(
-              translationRepository,
-              translation.id,
-            ),
+            future: _cacheStatus,
             builder: (context, snapshot) {
               final status = snapshot.data;
               final downloaded = status?.downloaded ?? false;
@@ -594,7 +641,7 @@ class _TranslationTextDownloadActions extends StatelessWidget {
                             context,
                             translationRepository,
                           ),
-                    icon: Icon(
+                    icon: AppIcon(
                       downloaded
                           ? Icons.download_done_rounded
                           : Icons.download_rounded,
@@ -621,9 +668,7 @@ class _TranslationTextDownloadActions extends StatelessWidget {
           if (tafsirRepository != null) ...[
             const SizedBox(height: 8),
             FutureBuilder<QuranTafsirResource?>(
-              future: tafsirRepository.defaultResourceForLanguage(
-                translation.languageName,
-              ),
+              future: _tafsirResource,
               builder: (context, snapshot) {
                 final resource = snapshot.data;
                 final checking =
@@ -632,7 +677,7 @@ class _TranslationTextDownloadActions extends StatelessWidget {
                   onPressed: resource == null || checking
                       ? null
                       : () => _downloadTafsir(context, tafsirRepository),
-                  icon: Icon(
+                  icon: AppIcon(
                     resource == null
                         ? Icons.info_outline_rounded
                         : Icons.library_books_rounded,
@@ -660,6 +705,7 @@ class _TranslationTextDownloadActions extends StatelessWidget {
     final downloaded = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       isDismissible: false,
       enableDrag: false,
       useSafeArea: true,
@@ -694,6 +740,7 @@ class _TranslationTextDownloadActions extends StatelessWidget {
     await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       isDismissible: false,
       enableDrag: false,
       useSafeArea: true,
@@ -740,13 +787,13 @@ class _DownloadQuranTextSheetState extends State<_DownloadQuranTextSheet> {
       await for (final progress in widget.repository.downloadFullTranslation(
         widget.resource.id,
       )) {
-        if (!mounted) {
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
           return;
         }
         setState(() => _progress = progress);
         if (progress.isComplete) {
           await widget.repository.setSelectedTranslation(widget.resource.id);
-          if (mounted) {
+          if (mounted && ModalRoute.of(context)?.isCurrent == true) {
             Navigator.of(context).pop(true);
           }
           return;
@@ -765,59 +812,41 @@ class _DownloadQuranTextSheetState extends State<_DownloadQuranTextSheet> {
   @override
   Widget build(BuildContext context) {
     final progress = _progress;
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: PremiumSurface(
-        radius: QuranTheme.radiusSheet,
-        prominent: true,
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Downloading Quran in ${widget.resource.displayLanguage}',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+    return AppSheet(
+      title: 'Downloading Quran in ${widget.resource.displayLanguage}',
+      subtitle: widget.resource.name,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 18),
+          LinearProgressIndicator(value: progress?.percent),
+          const SizedBox(height: 10),
+          Text(
+            progress == null
+                ? 'Starting download...'
+                : '${progress.completedChapters}/${progress.totalChapters} chapters',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: QuranTheme.subText(context, 0.66),
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(height: 6),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
             Text(
-              widget.resource.name,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: QuranTheme.subText(context, 0.68),
-                fontWeight: FontWeight.w800,
+              _error!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w400,
               ),
-            ),
-            const SizedBox(height: 18),
-            LinearProgressIndicator(value: progress?.percent),
-            const SizedBox(height: 10),
-            Text(
-              progress == null
-                  ? 'Starting download...'
-                  : '${progress.completedChapters}/${progress.totalChapters} chapters',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: QuranTheme.subText(context, 0.66),
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(_error == null ? 'Cancel' : 'Close'),
             ),
           ],
-        ),
+          const SizedBox(height: 16),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(_error == null ? 'Cancel' : 'Close'),
+          ),
+        ],
       ),
     );
   }
@@ -866,7 +895,7 @@ class _DownloadTafsirSheetState extends State<_DownloadTafsirSheet> {
   Future<void> _download() async {
     try {
       for (var surah = 1; surah <= _totalSurahs; surah += 1) {
-        if (!mounted) {
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
           return;
         }
         setState(() {
@@ -878,7 +907,7 @@ class _DownloadTafsirSheetState extends State<_DownloadTafsirSheet> {
           surahNumber: surah,
           languageName: widget.languageName,
         )) {
-          if (!mounted) {
+          if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
             return;
           }
           setState(() => _surahProgress = progress);
@@ -890,7 +919,7 @@ class _DownloadTafsirSheetState extends State<_DownloadTafsirSheet> {
             break;
           }
         }
-        if (!mounted) {
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
           return;
         }
         setState(() {
@@ -901,7 +930,7 @@ class _DownloadTafsirSheetState extends State<_DownloadTafsirSheet> {
           }
         });
       }
-      if (!mounted) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
         return;
       }
       if (_failedSurahs == 0) {
@@ -920,67 +949,48 @@ class _DownloadTafsirSheetState extends State<_DownloadTafsirSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: PremiumSurface(
-        radius: QuranTheme.radiusSheet,
-        prominent: true,
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Downloading ${widget.languageLabel} tafsir',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+    return AppSheet(
+      title: 'Downloading ${widget.languageLabel} tafsir',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 18),
+          LinearProgressIndicator(value: _percent),
+          const SizedBox(height: 10),
+          Text(
+            'Surah $_currentSurah of $_totalSurahs • $_completedSurahs complete',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: QuranTheme.subText(context, 0.66),
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(height: 6),
+          ),
+          if (_surahProgress != null) ...[
+            const SizedBox(height: 4),
             Text(
-              'This downloads tafsir separately from Quran translation text.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: QuranTheme.subText(context, 0.68),
-                fontWeight: FontWeight.w800,
+              '${_surahProgress!.completedVerses}/${_surahProgress!.totalVerses} ayahs in current surah',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: QuranTheme.subText(context, 0.58),
+                fontWeight: FontWeight.w500,
               ),
-            ),
-            const SizedBox(height: 18),
-            LinearProgressIndicator(value: _percent),
-            const SizedBox(height: 10),
-            Text(
-              'Surah $_currentSurah of $_totalSurahs • $_completedSurahs complete',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: QuranTheme.subText(context, 0.66),
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (_surahProgress != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                '${_surahProgress!.completedVerses}/${_surahProgress!.totalVerses} ayahs in current surah',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: QuranTheme.subText(context, 0.58),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(_error == null ? 'Cancel' : 'Close'),
             ),
           ],
-        ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(_error == null ? 'Cancel' : 'Close'),
+          ),
+        ],
       ),
     );
   }
@@ -994,46 +1004,13 @@ class _TranslationLanguageSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = quranTranslationAudioLanguageLabel(selectedTranslation);
-    return PremiumSurface(
-      padding: const EdgeInsets.all(14),
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
       onTap: () => _showTranslationSheet(context),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: QuranTheme.softFill(
-              context,
-              Theme.of(context).colorScheme.primary,
-            ),
-            child: const Icon(Icons.language_rounded),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Translation language',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: QuranTheme.subText(context, 0.66),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.keyboard_arrow_down_rounded),
-        ],
-      ),
+      leading: const AppIcon(Icons.language_rounded),
+      title: const Text('Translation language'),
+      subtitle: Text(label),
+      trailing: const AppIcon(Icons.chevron_right_rounded),
     );
   }
 
@@ -1043,7 +1020,7 @@ class _TranslationLanguageSelector extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => _DownloadTranslationPickerSheet(
+      builder: (context) => QuranTranslationPicker(
         repository: repository,
         currentResource: selectedTranslation,
       ),
@@ -1053,269 +1030,6 @@ class _TranslationLanguageSelector extends StatelessWidget {
         selected.id,
       );
     }
-  }
-}
-
-class _DownloadTranslationPickerSheet extends StatefulWidget {
-  const _DownloadTranslationPickerSheet({
-    required this.repository,
-    required this.currentResource,
-  });
-
-  final QuranTranslationRepository repository;
-  final QuranTranslationResource? currentResource;
-
-  @override
-  State<_DownloadTranslationPickerSheet> createState() =>
-      _DownloadTranslationPickerSheetState();
-}
-
-class _DownloadTranslationPickerSheetState
-    extends State<_DownloadTranslationPickerSheet> {
-  final _queryController = TextEditingController();
-  late final Future<List<QuranTranslationLanguage>> _languagesFuture;
-  String _query = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _languagesFuture = widget.repository.translationLanguages();
-    _queryController.addListener(() {
-      setState(() => _query = _queryController.text.trim().toLowerCase());
-    });
-  }
-
-  @override
-  void dispose() {
-    _queryController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.86,
-      maxChildSize: 0.92,
-      minChildSize: 0.58,
-      builder: (context, scrollController) {
-        return PremiumSurface(
-          margin: const EdgeInsets.all(12),
-          radius: QuranTheme.radiusSheet,
-          prominent: true,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Select translation',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _queryController,
-                decoration: InputDecoration(
-                  hintText: 'Search language or translator',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: FutureBuilder<List<QuranTranslationLanguage>>(
-                  future: _languagesFuture,
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final groups = [
-                      for (final language in snapshot.data!)
-                        (
-                          language: language,
-                          resources: _matchingResources(language),
-                        ),
-                    ].where((group) => group.resources.isNotEmpty).toList();
-                    if (groups.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No translations match your search.',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: QuranTheme.subText(context, 0.66),
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                      );
-                    }
-                    return ListView(
-                      controller: scrollController,
-                      children: [
-                        for (final group in groups) ...[
-                          if (group.resources.length > 1)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
-                              child: Text(
-                                '${group.language.displayName} • ${group.resources.length} editions',
-                                style: Theme.of(context).textTheme.labelLarge
-                                    ?.copyWith(
-                                      color: QuranTheme.subText(context, 0.72),
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                              ),
-                            ),
-                          for (final resource in group.resources) ...[
-                            FutureBuilder<bool>(
-                              future: widget.repository.hasFullTranslation(
-                                resource.id,
-                              ),
-                              builder: (context, cacheSnapshot) {
-                                return _DownloadTranslationLanguageTile(
-                                  title: group.resources.length == 1
-                                      ? group.language.displayName
-                                      : resource.name,
-                                  subtitle:
-                                      [
-                                            resource.displayEndonym,
-                                            resource.name,
-                                            resource.translator,
-                                            resource.isRtl ? 'RTL' : 'LTR',
-                                            Uri.tryParse(
-                                                  resource.sourceUrl,
-                                                )?.host ??
-                                                resource.sourceUrl,
-                                            resource.license,
-                                          ]
-                                          .where((item) => item.isNotEmpty)
-                                          .join(' • '),
-                                  selected:
-                                      widget.currentResource?.id == resource.id,
-                                  downloaded: cacheSnapshot.data ?? false,
-                                  onTap: () =>
-                                      Navigator.of(context).pop(resource),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                        ],
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  List<QuranTranslationResource> _matchingResources(
-    QuranTranslationLanguage language,
-  ) {
-    if (_query.isEmpty) {
-      return language.availableResources;
-    }
-    return language.availableResources
-        .where((resource) {
-          final haystack =
-              '${language.displayName} ${resource.displayEndonym} ${resource.languageName} ${resource.name} ${resource.translator} ${resource.publisher} ${resource.license}'
-                  .toLowerCase();
-          return haystack.contains(_query);
-        })
-        .toList(growable: false);
-  }
-}
-
-class _DownloadTranslationLanguageTile extends StatelessWidget {
-  const _DownloadTranslationLanguageTile({
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.downloaded,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final bool downloaded;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return PremiumSurface(
-      radius: 18,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      borderColor: selected ? primary.withValues(alpha: 0.42) : null,
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: selected
-                  ? QuranTheme.softFill(context, primary)
-                  : QuranTheme.surfaceVariant(context).withValues(alpha: 0.55),
-            ),
-            child: Icon(
-              selected ? Icons.check_rounded : Icons.translate_rounded,
-              size: 20,
-              color: selected ? primary : QuranTheme.subText(context, 0.72),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: QuranTheme.subText(context, 0.66),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Icon(
-            downloaded ? Icons.download_done_rounded : Icons.download_rounded,
-            color: downloaded ? primary : QuranTheme.subText(context, 0.58),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -1331,17 +1045,14 @@ class _DownloadsFilters extends StatelessWidget {
       segments: const [
         ButtonSegment(
           value: QuranAudioDownloadsFilter.surahs,
-          icon: Icon(Icons.menu_book_rounded),
           label: Text('Surahs'),
         ),
         ButtonSegment(
           value: QuranAudioDownloadsFilter.active,
-          icon: Icon(Icons.downloading_rounded),
           label: Text('Active'),
         ),
         ButtonSegment(
           value: QuranAudioDownloadsFilter.downloaded,
-          icon: Icon(Icons.offline_pin_rounded),
           label: Text('Saved'),
         ),
       ],
@@ -1354,7 +1065,11 @@ class _DownloadsFilters extends StatelessWidget {
 }
 
 class _DownloadGroupTile extends StatelessWidget {
-  const _DownloadGroupTile({required this.group, required this.filter});
+  const _DownloadGroupTile({
+    super.key,
+    required this.group,
+    required this.filter,
+  });
 
   final QuranAudioDownloadGroup group;
   final QuranAudioDownloadsFilter filter;
@@ -1364,8 +1079,8 @@ class _DownloadGroupTile extends StatelessWidget {
     final paused = group.items.any(
       (item) => item.status == QuranAudioDownloadStatus.paused,
     );
-    return PremiumSurface(
-      padding: const EdgeInsets.all(14),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1380,7 +1095,7 @@ class _DownloadGroupTile extends StatelessWidget {
                     Text(
                       group.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
@@ -1398,7 +1113,9 @@ class _DownloadGroupTile extends StatelessWidget {
           const SizedBox(height: 12),
           _GroupLinearProgress(group: group),
           const SizedBox(height: 8),
-          Row(
+          Wrap(
+            spacing: 12,
+            alignment: WrapAlignment.spaceBetween,
             children: [
               Text(
                 '${group.downloadedAyahs}/${group.totalAyahs} ayahs',
@@ -1406,7 +1123,6 @@ class _DownloadGroupTile extends StatelessWidget {
                   color: QuranTheme.subText(context),
                 ),
               ),
-              const Spacer(),
               if (group.hasFailures)
                 Text(
                   '${group.failedAyahs} failed',
@@ -1440,7 +1156,7 @@ class _GroupLinearProgress extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(QuranTheme.radiusPill),
       child: LinearProgressIndicator(
-        minHeight: 8,
+        minHeight: 3,
         value: group.progress,
         backgroundColor: QuranTheme.softFill(context, primary),
       ),
@@ -1466,28 +1182,28 @@ class _GroupActionButton extends StatelessWidget {
       return IconButton.filledTonal(
         tooltip: 'Pause',
         onPressed: () => cubit.pauseGroup(group),
-        icon: const Icon(Icons.pause_rounded),
+        icon: const AppIcon(Icons.pause_rounded),
       );
     }
     if (paused) {
       return IconButton.filledTonal(
         tooltip: 'Resume',
         onPressed: () => cubit.resumeGroup(group),
-        icon: const Icon(Icons.play_arrow_rounded),
+        icon: const AppIcon(Icons.play_arrow_rounded),
       );
     }
     if (group.hasFailures) {
       return IconButton.filledTonal(
         tooltip: 'Retry',
         onPressed: () => cubit.retryGroup(group),
-        icon: const Icon(Icons.refresh_rounded),
+        icon: const AppIcon(Icons.refresh_rounded),
       );
     }
     if (group.isDownloaded || filter == QuranAudioDownloadsFilter.downloaded) {
       return IconButton.filledTonal(
         tooltip: 'Delete',
         onPressed: () => cubit.deleteGroup(group),
-        icon: const Icon(Icons.delete_outline_rounded),
+        icon: const AppIcon(Icons.delete_outline_rounded),
       );
     }
     return IconButton.filled(
@@ -1495,7 +1211,7 @@ class _GroupActionButton extends StatelessWidget {
       onPressed: group.surahNumber == null
           ? null
           : () => cubit.downloadSurah(group.surahNumber!),
-      icon: const Icon(Icons.download_rounded),
+      icon: const AppIcon(Icons.download_rounded),
     );
   }
 }

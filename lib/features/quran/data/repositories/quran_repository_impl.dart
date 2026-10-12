@@ -66,6 +66,8 @@ class QuranRepositoryImpl
 
   @override
   Future<List<QuranAyah>> getAyahs(int surahNumber) async {
+    await _localDataSource.ensureQpcHafsLoaded();
+    await _localDataSource.ensureIndoPakLoaded();
     return _localDataSource.getAyahs(surahNumber);
   }
 
@@ -75,6 +77,8 @@ class QuranRepositoryImpl
     bool includeTranslation = false,
     bool includeTafsir = false,
   }) async {
+    await _localDataSource.ensureIndoPakLoaded();
+    await _localDataSource.ensureQpcHafsLoaded();
     return _localDataSource.getPageAyahs(
       pageNumber,
       includeTranslation: includeTranslation,
@@ -95,6 +99,7 @@ class QuranRepositoryImpl
 
   @override
   Future<List<QuranAyah>> search(String query, {int limit = 30}) async {
+    await _localDataSource.ensureQpcHafsLoaded();
     return _localDataSource.search(query, limit: limit);
   }
 
@@ -144,6 +149,7 @@ class QuranRepositoryImpl
   Future<List<QuranNavigationPoint>> getNavigationPoints(
     QuranStructureKind kind,
   ) async {
+    await _localDataSource.ensureQpcHafsLoaded();
     return _localDataSource.getNavigationPoints(kind);
   }
 

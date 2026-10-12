@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/app_error_view.dart';
+import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../domain/entities/quran_surah.dart';
 import '../../domain/entities/quran_translation.dart';
@@ -71,12 +73,19 @@ class _QuranTranslationManagerPageState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.quranTranslationsTitle)),
+      appBar: AppBar(
+        title: Text(l10n.quranTranslationsTitle),
+        flexibleSpace: const ArchitecturalBackdrop(),
+      ),
       body: FutureBuilder<_ManagerData>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text(snapshot.error.toString()));
+            return AppErrorView(
+              title: 'Translations unavailable',
+              message: 'Translation packs could not be loaded.',
+              onRetry: _reload,
+            );
           }
           final data = snapshot.data;
           if (data == null) {
@@ -93,124 +102,167 @@ class _QuranTranslationManagerPageState
                         .contains(normalized);
               })
               .toList(growable: false);
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 40),
-            children: [
-              PremiumSurface(
-                padding: const EdgeInsets.all(16),
-                prominent: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                sliver: SliverList.list(
                   children: [
-                    Text(
-                      l10n.translationCompareTitle,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            l10n.translationCompareTitle,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(l10n.translationCompareDescription),
+                          if (data.selected.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            for (
+                              var index = 0;
+                              index < data.selected.length;
+                              index++
+                            )
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: AppIcon(
+                                  index == 0
+                                      ? Icons.radio_button_checked_rounded
+                                      : Icons.compare_arrows_rounded,
+                                ),
+                                title: Text(data.selected[index].name),
+                                subtitle: Text(
+                                  '${data.selected[index].displayEndonym} • '
+                                  '${index == 0 ? l10n.translationPrimary : l10n.translationComparison}',
+                                ),
+                                trailing: index == 0
+                                    ? null
+                                    : IconButton(
+                                        tooltip: l10n.translationMakePrimary,
+                                        onPressed:
+                                            _downloadingResourceId != null
+                                            ? null
+                                            : () => _makePrimary(
+                                                data.selected,
+                                                data.selected[index],
+                                              ),
+                                        icon: const AppIcon(
+                                          Icons.vertical_align_top_rounded,
+                                        ),
+                                      ),
+                              ),
+                          ],
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(l10n.translationCompareDescription),
-                    if (data.selected.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      for (var index = 0; index < data.selected.length; index++)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(
-                            index == 0
-                                ? Icons.radio_button_checked_rounded
-                                : Icons.compare_arrows_rounded,
+                    const SizedBox(height: 12),
+                    TextField(
+                      onChanged: (value) => setState(() => _query = value),
+                      decoration: InputDecoration(
+                        hintText: l10n.translationSearchHint,
+                        prefixIcon: const AppIcon(Icons.search_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<int>(
+                      initialValue: _surahNumber,
+                      isExpanded: true,
+                      itemHeight: null,
+                      decoration: InputDecoration(
+                        labelText: l10n.translationSurahPack,
+                        prefixIcon: const AppIcon(Icons.download_outlined),
+                      ),
+                      items: [
+                        for (final surah in data.surahs)
+                          DropdownMenuItem(
+                            value: surah.number,
+                            child: Text(
+                              '${surah.number}. ${surah.englishName}',
+                            ),
                           ),
-                          title: Text(data.selected[index].name),
-                          subtitle: Text(
-                            '${data.selected[index].displayEndonym} • '
-                            '${index == 0 ? l10n.translationPrimary : l10n.translationComparison}',
-                          ),
-                          trailing: index == 0
-                              ? null
-                              : TextButton(
-                                  onPressed: () => _makePrimary(
-                                    data.selected,
-                                    data.selected[index],
-                                  ),
-                                  child: Text(l10n.translationMakePrimary),
-                                ),
-                        ),
+                      ],
+                      onChanged: _downloadingResourceId != null
+                          ? null
+                          : (value) {
+                              if (value != null) {
+                                setState(() => _surahNumber = value);
+                              }
+                            },
+                    ),
+                    if (_downloadingResourceId != null) ...[
+                      const SizedBox(height: 12),
+                      LinearProgressIndicator(value: _progress?.percent),
+                      const SizedBox(height: 5),
+                      Text(
+                        _progress == null
+                            ? 'Starting download'
+                            : '${_progress!.completedChapters} of '
+                                  '${_progress!.totalChapters} Surah packs',
+                      ),
                     ],
+                    const SizedBox(height: 14),
+                    if (visible.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Text('No matching translations.'),
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                onChanged: (value) => setState(() => _query = value),
-                decoration: InputDecoration(
-                  hintText: l10n.translationSearchHint,
-                  prefixIcon: const Icon(Icons.search_rounded),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList.builder(
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final resource = visible[index];
+                    return Padding(
+                      key: ValueKey(resource.id),
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: _TranslationResourceCard(
+                        resource: resource,
+                        status:
+                            data.statuses[resource.id] ??
+                            const QuranTranslationPackStatus(
+                              downloadedSurahs: [],
+                              cachedBytes: 0,
+                            ),
+                        selected: selectedIds.contains(resource.id),
+                        primary:
+                            selectedIds.isNotEmpty &&
+                            selectedIds.first == resource.id,
+                        busy: _downloadingResourceId != null,
+                        onToggleSelected: () =>
+                            _toggleSelected(selectedIds, resource),
+                        onDownloadSurah: () => _downloadSurah(resource),
+                        onDownloadFull: () => _downloadFull(resource),
+                        onDelete: () => _delete(resource),
+                      ),
+                    );
+                  },
                 ),
               ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<int>(
-                initialValue: _surahNumber,
-                decoration: InputDecoration(
-                  labelText: l10n.translationSurahPack,
-                  prefixIcon: const Icon(Icons.download_outlined),
-                ),
-                items: [
-                  for (final surah in data.surahs)
-                    DropdownMenuItem(
-                      value: surah.number,
-                      child: Text('${surah.number}. ${surah.englishName}'),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _surahNumber = value);
-                  }
-                },
-              ),
-              if (_downloadingResourceId != null) ...[
-                const SizedBox(height: 12),
-                LinearProgressIndicator(value: _progress?.percent),
-                const SizedBox(height: 5),
-                Text(
-                  _progress == null
-                      ? 'Starting download'
-                      : '${_progress!.completedChapters} of '
-                            '${_progress!.totalChapters} Surah packs',
-                ),
-              ],
-              const SizedBox(height: 14),
-              for (final resource in visible)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _TranslationResourceCard(
-                    resource: resource,
-                    status:
-                        data.statuses[resource.id] ??
-                        const QuranTranslationPackStatus(
-                          downloadedSurahs: [],
-                          cachedBytes: 0,
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+                sliver: SliverToBoxAdapter(
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: const Text('Offline cache and sources'),
+                    children: [
+                      Text(
+                        'Downloaded Quran Foundation resources have a seven-day cache '
+                        'window. Each edition keeps its translator, language, direction, '
+                        'source, and license attribution. Religious translations are '
+                        'never machine generated by this app.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: QuranTheme.subText(context, 0.62),
                         ),
-                    selected: selectedIds.contains(resource.id),
-                    primary:
-                        selectedIds.isNotEmpty &&
-                        selectedIds.first == resource.id,
-                    busy: _downloadingResourceId != null,
-                    onToggleSelected: () =>
-                        _toggleSelected(selectedIds, resource),
-                    onDownloadSurah: () => _downloadSurah(resource),
-                    onDownloadFull: () => _downloadFull(resource),
-                    onDelete: () => _delete(resource),
+                      ),
+                    ],
                   ),
-                ),
-              const SizedBox(height: 8),
-              Text(
-                'Downloaded Quran Foundation resources have a seven-day cache '
-                'window. Each edition keeps its translator, language, direction, '
-                'source, and license attribution. Religious translations are '
-                'never machine generated by this app.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: QuranTheme.subText(context, 0.62),
                 ),
               ),
             ],
@@ -256,22 +308,28 @@ class _QuranTranslationManagerPageState
       _downloadingResourceId = resource.id;
       _progress = null;
     });
-    await for (final progress in _multiRepository.downloadSurahTranslation(
-      resource.id,
-      _surahNumber,
-    )) {
-      if (mounted) {
+    try {
+      await for (final progress in _multiRepository.downloadSurahTranslation(
+        resource.id,
+        _surahNumber,
+      )) {
+        if (!mounted) return;
         setState(() => _progress = progress);
       }
+      final failed = _progress?.failedChapters ?? 1;
+      _message(
+        failed == 0
+            ? 'Surah $_surahNumber downloaded for ${resource.displayEndonym}.'
+            : 'Could not download this Surah pack.',
+      );
+    } catch (_) {
+      _message('Could not download this Surah pack. Please retry.');
+    } finally {
+      if (mounted) {
+        setState(() => _downloadingResourceId = null);
+        _reload();
+      }
     }
-    final failed = _progress?.failedChapters ?? 1;
-    _message(
-      failed == 0
-          ? 'Surah $_surahNumber downloaded for ${resource.displayEndonym}.'
-          : 'Could not download this Surah pack.',
-    );
-    setState(() => _downloadingResourceId = null);
-    _reload();
   }
 
   Future<void> _downloadFull(QuranTranslationResource resource) async {
@@ -279,21 +337,25 @@ class _QuranTranslationManagerPageState
       _downloadingResourceId = resource.id;
       _progress = null;
     });
-    await for (final progress in _repository.downloadFullTranslation(
-      resource.id,
-    )) {
-      if (mounted) {
+    try {
+      await for (final progress in _repository.downloadFullTranslation(
+        resource.id,
+      )) {
+        if (!mounted) return;
         setState(() => _progress = progress);
       }
-    }
-    _message(
-      _progress?.isComplete == true
-          ? '${resource.displayEndonym} full pack downloaded.'
-          : 'Download paused with ${_progress?.failedChapters ?? 0} failed packs. Retry resumes completed Surahs.',
-    );
-    if (mounted) {
-      setState(() => _downloadingResourceId = null);
-      _reload();
+      _message(
+        _progress?.isComplete == true
+            ? '${resource.displayEndonym} full pack downloaded.'
+            : 'Download paused with ${_progress?.failedChapters ?? 0} failed packs. Retry resumes completed Surahs.',
+      );
+    } catch (_) {
+      _message('Download interrupted. Retry to resume completed Surahs.');
+    } finally {
+      if (mounted) {
+        setState(() => _downloadingResourceId = null);
+        _reload();
+      }
     }
   }
 
@@ -301,6 +363,7 @@ class _QuranTranslationManagerPageState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: Text('Delete ${resource.name}?'),
         content: const Text(
           'Downloaded Surah packs for this edition will be removed. Notes and '
@@ -379,9 +442,8 @@ class _TranslationResourceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return PremiumSurface(
-      padding: const EdgeInsets.all(15),
-      prominent: selected,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -393,7 +455,7 @@ class _TranslationResourceCard extends StatelessWidget {
                   children: [
                     Text(
                       '${resource.displayEndonym} • ${resource.displayLanguage}',
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     Text(resource.name),
                   ],
@@ -405,43 +467,55 @@ class _TranslationResourceCard extends StatelessWidget {
               ),
             ],
           ),
-          Text('${l10n.translationTranslator}: ${resource.translator}'),
-          Text(
-            'Script ${resource.resolvedScript} • '
-            '${resource.isRtl ? 'RTL' : 'LTR'} • '
-            'Resource ${resource.id}',
-          ),
-          Text(
-            resource.publisher.isEmpty
-                ? l10n.translationPublisherUnavailable
-                : 'Publisher: ${resource.publisher}',
-          ),
-          Text('${l10n.translationLicense}: ${resource.license}'),
-          Text('${l10n.translationSource}: ${resource.sourceUrl}'),
-          Text(
-            resource.revision.isEmpty
-                ? l10n.translationRevisionUnavailable
-                : 'Revision: ${resource.revision}',
-          ),
           const SizedBox(height: 8),
           Text(
             '${status.downloadedSurahs.length}/114 Surah packs • '
-            '${_size(status.cachedBytes)} cached'
-            '${status.downloadedAt == null ? '' : ' • saved ${DateFormat.yMMMd().format(status.downloadedAt!)}'}'
-            '${status.expiresAt == null ? '' : ' • refresh ${DateFormat.yMMMd().format(status.expiresAt!)}'}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: QuranTheme.subText(context, 0.68),
-              fontWeight: FontWeight.w800,
-            ),
+            '${_size(status.cachedBytes)} cached',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: QuranTheme.subText(context)),
           ),
           if (primary)
-            const Padding(
-              padding: EdgeInsets.only(top: 5),
-              child: Text(
-                'Primary continuous translation',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Text(l10n.translationPrimary),
             ),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Edition details'),
+            expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('${l10n.translationTranslator}: ${resource.translator}'),
+              Text(
+                'Script ${resource.resolvedScript} • '
+                '${resource.isRtl ? 'RTL' : 'LTR'} • '
+                'Resource ${resource.id}',
+              ),
+              Text(
+                resource.publisher.isEmpty
+                    ? l10n.translationPublisherUnavailable
+                    : 'Publisher: ${resource.publisher}',
+              ),
+              Text('${l10n.translationLicense}: ${resource.license}'),
+              Text('${l10n.translationSource}: ${resource.sourceUrl}'),
+              Text(
+                resource.revision.isEmpty
+                    ? l10n.translationRevisionUnavailable
+                    : 'Revision: ${resource.revision}',
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${status.downloadedSurahs.length}/114 Surah packs • '
+                '${_size(status.cachedBytes)} cached'
+                '${status.downloadedAt == null ? '' : ' • saved ${DateFormat.yMMMd().format(status.downloadedAt!)}'}'
+                '${status.expiresAt == null ? '' : ' • refresh ${DateFormat.yMMMd().format(status.expiresAt!)}'}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: QuranTheme.subText(context, 0.68),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
@@ -449,7 +523,7 @@ class _TranslationResourceCard extends StatelessWidget {
             children: [
               FilledButton.tonalIcon(
                 onPressed: busy ? null : onDownloadSurah,
-                icon: const Icon(Icons.download_outlined),
+                icon: const AppIcon(Icons.download_outlined),
                 label: Text(l10n.translationDownloadSurah),
               ),
               OutlinedButton(
@@ -464,7 +538,7 @@ class _TranslationResourceCard extends StatelessWidget {
                 IconButton(
                   tooltip: l10n.translationDeletePacks,
                   onPressed: busy ? null : onDelete,
-                  icon: const Icon(Icons.delete_outline_rounded),
+                  icon: const AppIcon(Icons.delete_outline_rounded),
                 ),
             ],
           ),

@@ -359,7 +359,7 @@ class HadithRepositoryImpl
                 languageCode: normalized,
                 hadithNumber: item.hadithNumber,
               ) ??
-              item.translation,
+              '',
         ),
     ];
   }

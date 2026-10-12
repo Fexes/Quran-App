@@ -2,8 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_pretext/flutter_pretext.dart' as pretext;
 
+import '../../../../core/constants/quran_arabic_script.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/premium_surface.dart';
 import '../../domain/entities/quran_ayah.dart';
 import '../../domain/entities/quran_surah.dart';
 import '../../domain/entities/quran_translation.dart';
@@ -14,106 +14,17 @@ bool hasNextSurah(QuranSurah? surah) {
   return surah != null && surah.number < 114;
 }
 
-int nextSurahNumber(QuranSurah surah) {
-  return (surah.number + 1).clamp(1, 114).toInt();
-}
+class QuranBookScrollController {
+  final _anchors = <Map<String, GlobalKey>>{};
 
-class NextSurahCapsule extends StatefulWidget {
-  const NextSurahCapsule({
-    super.key,
-    required this.progress,
-    required this.onTap,
-  });
-
-  final double progress;
-  final VoidCallback onTap;
-
-  @override
-  State<NextSurahCapsule> createState() => _NextSurahCapsuleState();
-}
-
-class _NextSurahCapsuleState extends State<NextSurahCapsule> {
-  static const _swipeTriggerDistance = 48.0;
-  static const _swipeTriggerVelocity = -420.0;
-
-  var _dragExtent = 0.0;
-
-  void _resetDrag() {
-    if (_dragExtent == 0) {
-      return;
+  BuildContext? contextForVerse(String verseKey) {
+    for (final keys in _anchors) {
+      final context = keys[verseKey]?.currentContext;
+      if (context != null && context.findRenderObject()?.attached == true) {
+        return context;
+      }
     }
-    setState(() => _dragExtent = 0);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dragProgress = (_dragExtent / _swipeTriggerDistance).clamp(0.0, 1.0);
-    final clamped = widget.progress.clamp(0.0, 1.0);
-    final progress = clamped > dragProgress ? clamped : dragProgress;
-    final scale = 1.0 + (0.045 * progress);
-    return Center(
-      child: Transform.scale(
-        scale: scale,
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onVerticalDragUpdate: (details) {
-            final delta = details.primaryDelta ?? 0;
-            final next = delta < 0
-                ? _dragExtent - delta
-                : (_dragExtent - delta).clamp(0.0, _swipeTriggerDistance);
-            setState(() => _dragExtent = next.clamp(0.0, 96.0).toDouble());
-          },
-          onVerticalDragEnd: (details) {
-            final velocity = details.primaryVelocity ?? 0;
-            final shouldOpen =
-                _dragExtent >= _swipeTriggerDistance ||
-                velocity <= _swipeTriggerVelocity;
-            _resetDrag();
-            if (shouldOpen) {
-              widget.onTap();
-            }
-          },
-          onVerticalDragCancel: _resetDrag,
-          child: PremiumSurface(
-            radius: QuranTheme.radiusPill,
-            padding: EdgeInsets.zero,
-            prominent: progress > 0.45,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(QuranTheme.radiusPill),
-              onTap: widget.onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.keyboard_double_arrow_up_rounded,
-                      size: 20,
-                      color: progress > 0.6
-                          ? Theme.of(context).colorScheme.primary
-                          : QuranTheme.subText(context, 0.72),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Swipe up to go to next surah',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: progress > 0.6
-                            ? Theme.of(context).colorScheme.primary
-                            : QuranTheme.text(context),
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    return null;
   }
 }
 
@@ -133,7 +44,9 @@ class CombinedPageText extends StatefulWidget {
     this.translationsByVerse = const {},
     this.selectedTranslation,
     this.selectionEnabled = true,
+    this.arabicScript = QuranArabicScript.uthmani,
     this.verseKeys,
+    this.scrollController,
     required this.onAyahTap,
   });
 
@@ -150,7 +63,9 @@ class CombinedPageText extends StatefulWidget {
   final Map<String, String> translationsByVerse;
   final QuranTranslationResource? selectedTranslation;
   final bool selectionEnabled;
+  final QuranArabicScript arabicScript;
   final Map<String, GlobalKey>? verseKeys;
+  final QuranBookScrollController? scrollController;
   final ValueChanged<QuranAyah> onAyahTap;
 
   @override
@@ -159,10 +74,40 @@ class CombinedPageText extends StatefulWidget {
 
 class _CombinedPageTextState extends State<CombinedPageText> {
   final _recognizers = <String, TapGestureRecognizer>{};
+  // Positioned lists can mount a second copy while jumping. Each copy owns its keys.
+  final _localVerseKeys = <String, GlobalKey>{};
+
+  Map<String, GlobalKey>? get _verseKeys =>
+      widget.scrollController == null ? widget.verseKeys : _localVerseKeys;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncVerseKeys();
+    widget.scrollController?._anchors.add(_localVerseKeys);
+  }
+
+  void _syncVerseKeys() {
+    final verses = widget.ayahs.map((ayah) => ayah.verseKey).toSet();
+    _localVerseKeys.removeWhere((verse, _) => !verses.contains(verse));
+    if (widget.scrollController != null) {
+      for (final verse in verses) {
+        _localVerseKeys.putIfAbsent(
+          verse,
+          () => GlobalKey(debugLabel: 'book-verse-$verse'),
+        );
+      }
+    }
+  }
 
   @override
   void didUpdateWidget(CombinedPageText oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.scrollController != widget.scrollController) {
+      oldWidget.scrollController?._anchors.remove(_localVerseKeys);
+      widget.scrollController?._anchors.add(_localVerseKeys);
+    }
+    _syncVerseKeys();
     if (!widget.selectionEnabled) {
       for (final recognizer in _recognizers.values) {
         recognizer.dispose();
@@ -181,6 +126,7 @@ class _CombinedPageTextState extends State<CombinedPageText> {
 
   @override
   void dispose() {
+    widget.scrollController?._anchors.remove(_localVerseKeys);
     for (final recognizer in _recognizers.values) {
       recognizer.dispose();
     }
@@ -191,13 +137,16 @@ class _CombinedPageTextState extends State<CombinedPageText> {
   Widget build(BuildContext context) {
     final baseStyle = Theme.of(context).textTheme.headlineMedium?.copyWith(
       fontSize: 26 * widget.arabicFontScale,
-      height: 2.05,
+      fontFamily: widget.arabicScript.fontFamily,
+      height: widget.arabicScript.readerLineHeight,
       color: QuranTheme.quranTextNormal(context),
       fontWeight: FontWeight.w700,
     );
     if (widget.showTranslation) {
       if (widget.pageWords.isNotEmpty) {
         return InterlinearBookPageText(
+          key: ValueKey(widget.arabicScript),
+          arabicScript: widget.arabicScript,
           words: widget.pageWords,
           selectedVerseKey: widget.selectedVerseKey,
           activeAudioVerseKey: widget.activeAudioVerseKey,
@@ -219,10 +168,12 @@ class _CombinedPageTextState extends State<CombinedPageText> {
             ),
           ),
           selectionEnabled: widget.selectionEnabled,
-          verseKeys: widget.verseKeys,
+          verseKeys: _verseKeys,
         );
       }
       return _FallbackBookPageText(
+        key: ValueKey(widget.arabicScript),
+        arabicScript: widget.arabicScript,
         ayahs: widget.ayahs,
         selectedVerseKey: widget.selectedVerseKey,
         activeAudioVerseKey: widget.activeAudioVerseKey,
@@ -235,7 +186,7 @@ class _CombinedPageTextState extends State<CombinedPageText> {
         translationResource: widget.selectedTranslation,
         onAyahTap: widget.onAyahTap,
         selectionEnabled: widget.selectionEnabled,
-        verseKeys: widget.verseKeys,
+        verseKeys: _verseKeys,
       );
     }
 
@@ -330,13 +281,11 @@ class _CombinedPageTextState extends State<CombinedPageText> {
     final inactiveWordColor = ayahSelected
         ? QuranTheme.quranTextSelected(context)
         : QuranTheme.quranTextNormal(context);
-    final words = _cleanArabicText(
-      ayah.text,
-    ).split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
+    final words = QuranArabicScript.wordSpans(_cleanArabicText(ayah.text));
     return [
       for (var index = 0; index < words.length; index++)
         TextSpan(
-          text: '${words[index]} ',
+          text: index == words.length - 1 ? '${words[index]} ' : words[index],
           recognizer: _recognizerFor(ayah),
           style: base?.copyWith(
             color: index + 1 == activeWordIndex
@@ -350,12 +299,12 @@ class _CombinedPageTextState extends State<CombinedPageText> {
   }
 
   InlineSpan _anchorSpan(String verseKey) {
-    final key = widget.verseKeys?[verseKey];
+    final key = _verseKeys?[verseKey];
     if (key == null) {
       return const TextSpan(text: '');
     }
     return WidgetSpan(
-      child: SizedBox(key: key, width: 1, height: 1),
+      child: SizedBox(key: key, width: 0, height: 1),
       alignment: PlaceholderAlignment.middle,
     );
   }
@@ -363,6 +312,7 @@ class _CombinedPageTextState extends State<CombinedPageText> {
 
 class _FallbackBookPageText extends StatefulWidget {
   const _FallbackBookPageText({
+    super.key,
     required this.ayahs,
     required this.selectedVerseKey,
     required this.activeAudioVerseKey,
@@ -376,6 +326,7 @@ class _FallbackBookPageText extends StatefulWidget {
     required this.onAyahTap,
     required this.selectionEnabled,
     required this.verseKeys,
+    required this.arabicScript,
   });
 
   final List<QuranAyah> ayahs;
@@ -391,6 +342,7 @@ class _FallbackBookPageText extends StatefulWidget {
   final ValueChanged<QuranAyah> onAyahTap;
   final bool selectionEnabled;
   final Map<String, GlobalKey>? verseKeys;
+  final QuranArabicScript arabicScript;
 
   @override
   State<_FallbackBookPageText> createState() => _FallbackBookPageTextState();
@@ -407,7 +359,8 @@ class _FallbackBookPageTextState extends State<_FallbackBookPageText> {
   Widget build(BuildContext context) {
     final arabicStyle = Theme.of(context).textTheme.headlineMedium?.copyWith(
       fontSize: 26 * widget.arabicFontScale,
-      height: 1.55,
+      fontFamily: widget.arabicScript.fontFamily,
+      height: widget.arabicScript.readerLineHeight,
       color: QuranTheme.quranTextNormal(context),
       fontWeight: FontWeight.w700,
     );
@@ -532,15 +485,13 @@ class _FallbackBookLineBuilder {
   static List<_FallbackBookToken> _tokensFor(List<QuranAyah> ayahs) {
     final tokens = <_FallbackBookToken>[];
     for (final ayah in ayahs) {
-      final words = _cleanArabicText(
-        ayah.text,
-      ).split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
+      final words = QuranArabicScript.wordSpans(_cleanArabicText(ayah.text));
       for (var index = 0; index < words.length; index++) {
         tokens.add(
           _FallbackBookToken(
             ayah: ayah,
             wordIndex: index + 1,
-            arabicText: words[index],
+            arabicText: words[index].trimRight(),
             isAyahEnd: index == words.length - 1,
           ),
         );
@@ -818,7 +769,7 @@ class _FallbackBookLineViewState extends State<_FallbackBookLineView> {
       return const TextSpan(text: '');
     }
     return WidgetSpan(
-      child: SizedBox(key: key, width: 1, height: 1),
+      child: SizedBox(key: key, width: 0, height: 1),
       alignment: PlaceholderAlignment.middle,
     );
   }
@@ -888,6 +839,7 @@ class InterlinearBookPageText extends StatefulWidget {
     required this.onAyahTap,
     this.translationResource,
     this.selectionEnabled = true,
+    this.arabicScript = QuranArabicScript.uthmani,
     this.verseKeys,
   });
 
@@ -902,6 +854,7 @@ class InterlinearBookPageText extends StatefulWidget {
   final void Function(int surahNumber, int ayahNumber) onAyahTap;
   final QuranTranslationResource? translationResource;
   final bool selectionEnabled;
+  final QuranArabicScript arabicScript;
   final Map<String, GlobalKey>? verseKeys;
 
   @override
@@ -920,7 +873,8 @@ class _InterlinearBookPageTextState extends State<InterlinearBookPageText> {
   Widget build(BuildContext context) {
     final arabicStyle = Theme.of(context).textTheme.headlineMedium?.copyWith(
       fontSize: 26 * widget.arabicFontScale,
-      height: 1.55,
+      fontFamily: widget.arabicScript.fontFamily,
+      height: widget.arabicScript.readerLineHeight,
       color: QuranTheme.quranTextNormal(context),
       fontWeight: FontWeight.w700,
     );
@@ -953,6 +907,8 @@ class _InterlinearBookPageTextState extends State<InterlinearBookPageText> {
             maxWidth: lineWidth,
             arabicStyle: arabicStyle ?? const TextStyle(fontSize: 26),
             textScaler: textScaler,
+            requireCompleteTranslation:
+                widget.arabicScript == QuranArabicScript.indoPak,
           );
         }
         return Column(
@@ -1034,6 +990,7 @@ class QuranInterlinearLineBuilder {
     required double maxWidth,
     required TextStyle arabicStyle,
     TextScaler textScaler = TextScaler.noScaling,
+    bool requireCompleteTranslation = false,
   }) {
     if (words.isEmpty) {
       return const [];
@@ -1047,14 +1004,30 @@ class QuranInterlinearLineBuilder {
       final candidate = [...current, words[index]];
       if (current.isNotEmpty &&
           !_fitsArabicLine(candidate, words, effectiveWidth, arabicStyle)) {
-        lines.add(_lineFor(current, words, effectiveWidth, arabicStyle));
+        lines.add(
+          _lineFor(
+            current,
+            words,
+            effectiveWidth,
+            arabicStyle,
+            requireCompleteTranslation,
+          ),
+        );
         current = [words[index]];
         continue;
       }
       current = candidate;
     }
     if (current.isNotEmpty) {
-      lines.add(_lineFor(current, words, effectiveWidth, arabicStyle));
+      lines.add(
+        _lineFor(
+          current,
+          words,
+          effectiveWidth,
+          arabicStyle,
+          requireCompleteTranslation,
+        ),
+      );
     }
     return lines;
   }
@@ -1086,6 +1059,7 @@ class QuranInterlinearLineBuilder {
     List<QuranWord> allWords,
     double maxWidth,
     TextStyle arabicStyle,
+    bool requireCompleteTranslation,
   ) {
     final displayArabic = _arabicFor(lineWords, allWords);
     final arabicWidth = _lineWidth(displayArabic, maxWidth, arabicStyle);
@@ -1093,7 +1067,11 @@ class QuranInterlinearLineBuilder {
     return QuranInterlinearLine(
       words: List<QuranWord>.unmodifiable(lineWords),
       displayArabic: displayArabic,
-      displayTranslation: _translationFor(lineWords),
+      displayTranslation:
+          requireCompleteTranslation &&
+              lineWords.any((word) => word.translation.trim().isEmpty)
+          ? ''
+          : _translationFor(lineWords),
       arabicWidth: arabicWidth,
       gapCount: gapCount,
       wordSpacing: _wordSpacingFor(
@@ -1350,7 +1328,7 @@ class _InterlinearLineViewState extends State<_InterlinearLineView> {
       return const TextSpan(text: '');
     }
     return WidgetSpan(
-      child: SizedBox(key: key, width: 1, height: 1),
+      child: SizedBox(key: key, width: 0, height: 1),
       alignment: PlaceholderAlignment.middle,
     );
   }
@@ -1394,7 +1372,7 @@ class _InterlinearLineViewState extends State<_InterlinearLineView> {
 }
 
 String _cleanArabicText(String value) {
-  return value.replaceAll(RegExp(r'[\uFC00-\uFCFF]'), '').trim();
+  return QuranArabicScript.cleanUthmaniText(value);
 }
 
 String _cleanTranslationText(String value) {

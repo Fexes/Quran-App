@@ -43,10 +43,14 @@ void main() {
     await getIt.reset();
   });
 
-  testWidgets('reader settings dialog can read route scoped blocs', (
+  testWidgets('reader settings screen can read route scoped blocs', (
     tester,
   ) async {
-    final repository = _FakeQuranRepository();
+    tester.view.physicalSize = const Size(390, 620);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repository = _FakeQuranRepository(ayahCount: 80);
     final settingsStore = SettingsStore.memory();
     final downloadStore = QuranAudioDownloadStore.memory();
     final playbackPort = _FakePlaybackPort();
@@ -105,21 +109,47 @@ void main() {
     await tester.tap(find.byTooltip('Reader settings'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 240));
+    await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
     expect(find.text('Reader settings'), findsOneWidget);
-    expect(find.text('Ayah layout'), findsOneWidget);
+    expect(find.text('Layout'), findsOneWidget);
     expect(find.text('Combined'), findsOneWidget);
     expect(find.text('Separated'), findsOneWidget);
-    expect(find.text('Auto follow audio'), findsOneWidget);
-    expect(find.text('Tafsir language'), findsOneWidget);
-    expect(find.text('Translation size'), findsOneWidget);
+    expect(find.text('Preview'), findsOneWidget);
+    final preview = find.byKey(const ValueKey('reader-settings-preview'));
+    final previewRect = tester.getRect(preview);
+    expect(previewRect.height, greaterThan(210));
+    expect(previewRect.height, lessThanOrEqualTo(320));
+    expect(
+      find.descendant(of: preview, matching: find.byType(Scrollable)),
+      findsOneWidget,
+    );
+    final controls = find.byKey(const ValueKey('reader-settings-controls'));
+    expect(tester.widget<Scrollbar>(controls).thumbVisibility, true);
+    expect(find.text('Tafsir language'), findsNothing);
     expect(find.text('Choose reciter'), findsNothing);
     expect(find.text('Test Alafasy'), findsNothing);
 
     await tester.tap(find.text('Combined'));
     await tester.pump();
     expect(repository.ayahTextLayout, QuranAyahTextLayout.combined);
+    await tester.scrollUntilVisible(
+      find.text('Auto follow audio'),
+      200,
+      scrollable: find.descendant(
+        of: controls,
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(find.text('Auto follow audio'), findsOneWidget);
+    expect(find.text('Translation size'), findsNothing);
+    expect(tester.getRect(preview), previewRect);
+    expect(
+      tester.widget<Scrollbar>(controls).controller!.offset,
+      greaterThan(0),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('reader font slider commits after drag ends', (tester) async {
@@ -261,6 +291,15 @@ void main() {
 
     await tester.tap(find.byTooltip('Reader settings'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Translation'),
+      150,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('reader-settings-controls')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Translation'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('English'));
@@ -328,9 +367,19 @@ void main() {
 
     await tester.tap(find.byTooltip('Reader settings'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Translation'),
+      150,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('reader-settings-controls')),
+        matching: find.byType(Scrollable),
+      ),
+    );
     final switchFinder = find.byType(Switch);
     expect(switchFinder, findsAtLeastNWidgets(1));
 
+    await tester.ensureVisible(switchFinder.first);
+    await tester.pumpAndSettle();
     await tester.tap(switchFinder.first);
     await tester.pumpAndSettle();
     expect(find.text('Hide ayah translation'), findsNothing);
@@ -343,9 +392,7 @@ void main() {
     expect(find.text('Translated opening.'), findsNothing);
   });
 
-  testWidgets('ayah mode renders RTL selected translation on the right', (
-    tester,
-  ) async {
+  testWidgets('Bismillah translation stays RTL and centered', (tester) async {
     final repository = _FakeQuranRepository();
     final translationRepository = _FakeTranslationRepository(
       resource: _urduTranslation,
@@ -409,7 +456,9 @@ void main() {
     final translation = tester.widget<Text>(find.text('اردو ترجمہ'));
 
     expect(translation.textDirection, TextDirection.rtl);
-    expect(translation.textAlign, TextAlign.right);
+    expect(translation.textAlign, TextAlign.center);
+    expect(translation.style?.fontFamily, 'NotoNastaliqUrdu');
+    expect(translation.style?.height, greaterThanOrEqualTo(2.15));
   });
 
   testWidgets('ayah mode shows follow audio when follow is disabled', (
@@ -713,11 +762,16 @@ void main() {
     expect(combined.activeAudioVerseKey, '1:2');
   });
 
-  testWidgets('ayah combined layout selects active audio ayah on change', (
+  testWidgets('ayah combined layout selects and follows active audio ayah', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final repository = _FakeQuranRepository(
       ayahTextLayout: QuranAyahTextLayout.combined,
+      ayahCount: 80,
     );
     final settingsStore = SettingsStore.memory();
     final downloadStore = QuranAudioDownloadStore.memory();
@@ -777,30 +831,64 @@ void main() {
     final ayahs = await repository.getAyahs(1);
     final surah = await repository.getSurah(1);
     final reciter = (await repository.getAudioReciters()).first;
-    playbackPort.emitPlaying(
-      QuranAudioQueueItem.fromAyah(
-        ayah: ayahs[1],
-        surah: surah,
-        reciter: reciter,
-      ),
-    );
+    final readerBloc = tester
+        .element(find.byType(CombinedPageText).first)
+        .read<QuranReaderBloc>();
+    readerBloc.add(const QuranReaderFollowAudioChanged(true));
+    await tester.pump();
 
-    for (var index = 0; index < 10; index++) {
-      await tester.pump(const Duration(milliseconds: 50));
-      final combined = tester.widget<CombinedPageText>(
-        find.byType(CombinedPageText),
-      );
-      if (combined.selectedVerseKey == '1:2') {
-        break;
+    for (final number in [18, 58, 77]) {
+      if (number == 58) {
+        await themeCubit.setQuranArabicFontScale(1.42);
+        await tester.pump();
       }
+      if (number == 77) {
+        readerBloc.add(const QuranReaderTranslationToggled());
+        await tester.pump();
+      }
+      playbackPort.emitPlaying(
+        QuranAudioQueueItem.fromAyah(
+          ayah: ayahs[number - 1],
+          surah: surah,
+          reciter: reciter,
+        ),
+      );
+      for (var tick = 0; tick < 20; tick++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      final combined = tester.widget<CombinedPageText>(
+        find.byType(CombinedPageText).first,
+      );
+      expect(combined.selectedVerseKey, '1:$number');
+      expect(combined.activeAudioVerseKey, '1:$number');
+      final anchor = combined.scrollController!.contextForVerse('1:$number');
+      expect(anchor, isNotNull);
+      final box = anchor!.findRenderObject()! as RenderBox;
+      expect(box.localToGlobal(Offset.zero).dy, inInclusiveRange(100, 600));
+      expect(tester.takeException(), isNull);
     }
 
-    final combined = tester.widget<CombinedPageText>(
-      find.byType(CombinedPageText),
+    await tester.drag(
+      find.byType(ScrollablePositionedList),
+      const Offset(0, 1200),
     );
-
-    expect(combined.selectedVerseKey, '1:2');
-    expect(combined.activeAudioVerseKey, '1:2');
+    for (var tick = 0; tick < 15; tick++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(readerBloc.state.followAudio, false);
+    await tester.tap(find.text('Follow audio'));
+    for (var tick = 0; tick < 20; tick++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(readerBloc.state.followAudio, true);
+    final combined = tester.widget<CombinedPageText>(
+      find.byType(CombinedPageText).first,
+    );
+    final anchor = combined.scrollController!.contextForVerse('1:77');
+    expect(anchor, isNotNull);
+    final box = anchor!.findRenderObject()! as RenderBox;
+    expect(box.localToGlobal(Offset.zero).dy, inInclusiveRange(100, 600));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('ayah separated layout keeps tap selection while audio plays', (
@@ -950,6 +1038,19 @@ void main() {
       }
 
       expect(find.byType(CombinedPageText), findsAtLeastNWidgets(2));
+      final chunks = tester.widgetList<CombinedPageText>(
+        find.byType(CombinedPageText),
+      );
+      for (final chunk in chunks) {
+        expect(chunk.ayahs.map((ayah) => ayah.page).toSet(), hasLength(1));
+        expect(chunk.ayahs.length, lessThanOrEqualTo(20));
+      }
+      final pageLabel = tester.widget<Text>(find.text('Page 1'));
+      expect(pageLabel.style?.fontSize, 11.5);
+      expect(pageLabel.style?.fontWeight, FontWeight.w400);
+      expect(find.text('Page 2'), findsOneWidget);
+      expect(find.text('Juz 1 · Hizb 1 · Manzil 1'), findsOneWidget);
+      expect(find.byType(Divider), findsAtLeastNWidgets(4));
     },
   );
 
@@ -1229,10 +1330,15 @@ void main() {
 
     await tester.ensureVisible(find.text('Swipe up to go to next surah'));
     await tester.pump();
-    await tester.drag(
-      find.text('Swipe up to go to next surah'),
-      const Offset(0, -72),
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Swipe up to go to next surah')),
     );
+    await gesture.moveBy(const Offset(0, -24));
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, -450));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1650));
+    await gesture.up();
     await tester.pumpAndSettle();
 
     final readerBloc = tester
@@ -1306,10 +1412,15 @@ void main() {
 
     await tester.ensureVisible(find.text('Swipe up to go to next surah'));
     await tester.pump();
-    await tester.drag(
-      find.byType(ScrollablePositionedList),
-      const Offset(0, -120),
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ScrollablePositionedList)),
     );
+    await gesture.moveBy(const Offset(0, -24));
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, -450));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1650));
+    await gesture.up();
     await tester.pumpAndSettle();
 
     final readerBloc = tester
@@ -1530,7 +1641,11 @@ class _FakeQuranRepository implements QuranRepository {
               ? 'بسم الله الرحمن الرحيم'
               : 'الحمد لله رب العالمين',
           translation: 'Translation $index.',
-          page: 1,
+          page: 1 + (index - 1) ~/ 13,
+          isPageStart: (index - 1) % 13 == 0,
+          isJuzStart: index == 1,
+          rubIndex: (index - 1) % 26 == 0 ? 1 + (index - 1) ~/ 26 : null,
+          manzil: index == 1 ? 1 : null,
           juz: 1,
           isSajda: false,
         ),
@@ -1843,6 +1958,8 @@ class _FakePlaybackPort implements QuranAudioPlaybackPort {
   Future<void> loadAndPlay(
     List<QuranAudioQueueItem> items, {
     int startIndex = 0,
+    Duration initialPosition = Duration.zero,
+    bool autoPlay = true,
   }) async {}
 
   @override

@@ -14,6 +14,8 @@ class AppRoutes {
   static const hifzReview = '/hifz/review/:collectionId';
   static const backup = '/backup';
   static const prayerTracking = '/prayer-tracking';
+  static const qibla = '/qibla';
+  static const fastingJournal = '/fasting-journal';
   static const duas = '/worship-tools/duas';
   static const divineNames = '/worship-tools/names';
   static const zakat = '/worship-tools/zakat';
@@ -84,6 +86,10 @@ class AppRoutes {
   static String backupPath() => backup;
 
   static String prayerTrackingPath() => prayerTracking;
+
+  static String qiblaPath() => qibla;
+
+  static String fastingJournalPath() => fastingJournal;
 
   static String duasPath() => duas;
 

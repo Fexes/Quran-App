@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 
-enum QuranThemeMode { light, dark, black }
+import '../constants/quran_arabic_script.dart';
+
+enum QuranThemeMode { light, dark }
 
 class QuranThemeState extends Equatable {
   const QuranThemeState({
@@ -10,6 +12,7 @@ class QuranThemeState extends Equatable {
     required this.fontWeightScale,
     required this.quranArabicFontScale,
     required this.quranTranslationFontScale,
+    this.quranArabicScript = QuranArabicScript.uthmani,
   });
 
   final QuranThemeMode mode;
@@ -18,6 +21,7 @@ class QuranThemeState extends Equatable {
   final double fontWeightScale;
   final double quranArabicFontScale;
   final double quranTranslationFontScale;
+  final QuranArabicScript quranArabicScript;
 
   QuranThemeState copyWith({
     QuranThemeMode? mode,
@@ -26,6 +30,7 @@ class QuranThemeState extends Equatable {
     double? fontWeightScale,
     double? quranArabicFontScale,
     double? quranTranslationFontScale,
+    QuranArabicScript? quranArabicScript,
   }) {
     return QuranThemeState(
       mode: mode ?? this.mode,
@@ -35,6 +40,7 @@ class QuranThemeState extends Equatable {
       quranArabicFontScale: quranArabicFontScale ?? this.quranArabicFontScale,
       quranTranslationFontScale:
           quranTranslationFontScale ?? this.quranTranslationFontScale,
+      quranArabicScript: quranArabicScript ?? this.quranArabicScript,
     );
   }
 
@@ -46,5 +52,6 @@ class QuranThemeState extends Equatable {
     fontWeightScale,
     quranArabicFontScale,
     quranTranslationFontScale,
+    quranArabicScript,
   ];
 }

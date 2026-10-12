@@ -91,21 +91,23 @@ class QuranAudioDownloadRepository {
   Future<QuranAudioDownloadItem> itemForQueueItem(
     QuranAudioQueueItem item,
   ) async {
+    final surahNumber = item.audioSurahNumber;
+    final ayahNumber = item.audioAyahNumber;
     return QuranAudioDownloadItem(
       id: QuranAudioDownloadItem.idFor(
         reciterId: item.reciterId,
-        surahNumber: item.surahNumber,
-        ayahNumber: item.ayahNumber,
+        surahNumber: surahNumber,
+        ayahNumber: ayahNumber,
       ),
       reciterId: item.reciterId,
       reciterName: item.reciterName,
-      surahNumber: item.surahNumber,
-      ayahNumber: item.ayahNumber,
-      verseKey: item.verseKey,
-      page: item.page,
+      surahNumber: surahNumber,
+      ayahNumber: ayahNumber,
+      verseKey: '$surahNumber:$ayahNumber',
+      page: item.isBismillah ? 1 : item.page,
       remoteUrl: item.remoteAudioUrl,
-      relativeDirectory: _relativeDirectory(item.reciterId, item.surahNumber),
-      filename: _filename(item.ayahNumber),
+      relativeDirectory: _relativeDirectory(item.reciterId, surahNumber),
+      filename: _filename(ayahNumber),
       status: QuranAudioDownloadStatus.notDownloaded,
       updatedAt: DateTime.now().toUtc(),
     );
@@ -152,7 +154,14 @@ class QuranAudioDownloadRepository {
   }) async {
     final surah = await _quranRepository.getSurah(surahNumber);
     final ayahs = await _quranRepository.getAyahs(surahNumber);
+    final bismillah = surahNumber != 1 && surahNumber != 9
+        ? (await _quranRepository.getAyahs(
+            1,
+          )).firstWhere((ayah) => ayah.number == 1)
+        : null;
     return [
+      if (bismillah != null)
+        itemForAyah(ayah: bismillah, surah: surah, reciter: reciter),
       for (final ayah in ayahs)
         itemForAyah(ayah: ayah, surah: surah, reciter: reciter),
     ];
@@ -181,12 +190,23 @@ class QuranAudioDownloadRepository {
     for (final item in existing) {
       bySurah.putIfAbsent(item.surahNumber, () => []).add(item);
     }
+    final bismillah = _store.itemById(
+      QuranAudioDownloadItem.idFor(
+        reciterId: reciter.id,
+        surahNumber: 1,
+        ayahNumber: 1,
+      ),
+    );
     return [
       for (final surah in surahs)
         _groupForSurah(
           reciter: reciter,
           surah: surah,
-          items: bySurah[surah.number] ?? const [],
+          items: [
+            ...?bySurah[surah.number],
+            if (surah.number != 1 && surah.number != 9 && bismillah != null)
+              bismillah,
+          ],
         ),
     ];
   }
@@ -316,7 +336,8 @@ class QuranAudioDownloadRepository {
       reciterId: reciter.id,
       scope: QuranAudioDownloadScope.surah,
       surahNumber: surah.number,
-      totalAyahs: surah.ayahCount,
+      totalAyahs:
+          surah.ayahCount + (surah.number != 1 && surah.number != 9 ? 1 : 0),
       downloadedAyahs: items
           .where((item) => item.status == QuranAudioDownloadStatus.downloaded)
           .length,

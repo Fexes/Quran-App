@@ -1,0 +1,87 @@
+{
+  "generator": "OpenAI built-in image generation",
+  "purpose": "Offline Home and Daily Companions tile images",
+  "encoding": "720px JPEG, quality 75",
+  "images": [
+    {
+      "file": "holy-quran.jpg",
+      "prompt": "Use case: photorealistic-natural. Asset type: permanent Holy Quran navigation card image in a refined Islamic mobile app. Create one landscape 3:2 editorial still-life photograph, not a UI mockup. Main subject: a single closed ivory leather Quran-inspired volume with exquisite but restrained gold geometric embossing, absolutely no lettering or calligraphy, placed respectfully on a low carved walnut reading stand. Three-quarter view from slightly above so the beautiful closed cover is clearly visible, horizontally composed and centered. Soft jade-green mosque wall and a graceful shallow arch in the background, subtle natural window light, tactile ivory leather, gold details, walnut wood, one dark teal silk bookmark. Keep the main book large and fully visible with generous safe margins so it remains recognizable in a small 170 by 113 pixel card. Bright, crisp, elegant, reverent, quiet premium travel-editorial photography with natural texture. No open pages, no visible scripture, no Arabic or English text, no people, no hands, no extra books, no lanterns, no floating particles, no border or frame around the image, no logos, no watermark. This image represents the entire Holy Quran and must not refer to any individual surah.",
+      "source": "exec-7dfa0c4d-9adf-4c3b-bc02-0e725d5f09b3.png"
+    },
+    {
+      "file": "tasbieh.jpg",
+      "prompt": "Use case: photorealistic-natural. Create one square editorial photograph for a small Islamic app dashboard tile. Subject: a complete strand of polished deep jade-green tasbih prayer beads, with elegant short gold silk tassel, resting loosely on pale cool limestone. Macro tactile details, physically realistic beads, soft daylight from a nearby mosque arch, restrained premium travel photography. Center the beads so they remain readable in a wide crop, with enough space around them. No humans, hands, words, letters, scripture, logos, border, frame, icon, gradient illustration, collage or watermark. This is a real-looking photo, not a UI mockup.",
+      "source": "exec-3687128d-1156-4023-84c1-8ff6730294f9.png"
+    },
+    {
+      "file": "qibla.jpg",
+      "prompt": "Create a single square premium editorial image for the Qibla direction tile in an Islamic mobile app. Show the Kaaba clearly as the main subject, photographed-looking and reverent, three-quarter view of its black kiswah and restrained authentic gold embroidered band, pale marble courtyard and arcades of Masjid al-Haram behind it. Place the entire Kaaba centrally in the lower two thirds, with a calm pale blue early-morning sky and simple distant architectural background in the upper third so the app can overlay a short white title. Bright, crisp and refined travel editorial photography, subtle natural grain, charcoal black, muted gold, pale stone and clear blue. Ensure the Kaaba remains recognizable in a narrow portrait crop and at thumbnail scale. No people, no hands, no compass, no added text, no captions, no invented decorative writing, no UI, no icons, no logo, no watermark, no border, no frame. Exactly one finished image.",
+      "source": "exec-4420686d-7884-48fb-b941-6b14b6430f17.png"
+    },
+    {
+      "file": "reading.jpg",
+      "prompt": "Use case: photorealistic-natural. One square premium editorial photograph for an Islamic reading app dashboard. Three beautiful closed clothbound volumes stacked respectfully on a clean oak reading table, emerald and muted sage covers with subtle gold geometric embossing and a single burgundy ribbon bookmark. All books closed, no visible script or text whatsoever. Quiet sunlit library with arched wooden shelving in soft focus. Main stack centrally composed so it reads clearly at small tile size and wide crops. Cool daylight, natural wood and teal-green details, realistic photography. No people, hands, loose pages, fake Arabic, words, labels, logos, frame, collage, or watermark.",
+      "source": "exec-17e60ace-c792-4eb7-88f2-276f3ffb437a.png"
+    },
+    {
+      "file": "fasting.jpg",
+      "prompt": "Use case: photorealistic-natural. One square premium editorial still-life photo for the fasting tile of an Islamic app. A small beautiful teal ceramic plate of dates with a clear glass of water on a pale stone tabletop; a small elegant brass lantern farther behind near an open arch with gentle dusk sky. Abundant negative breathing room; dates and glass grouped centrally and all visible in a wide crop. Rich natural color, inviting fresh dates, clean glass, soft natural dusk light, calm respectful mood. No humans, hands, text, books, logos, borders, frame, collage or watermark. Real photograph not illustration or UI.",
+      "source": "exec-db6818b9-f811-41fb-b6ea-c62bee0ff959.png"
+    },
+    {
+      "file": "journal.jpg",
+      "prompt": "Use case: photorealistic-natural. One square refined editorial photograph for the journal and notes tile of an Islamic app. A closed burgundy cloth journal with a plain unlettered cover and a slim brass fountain pen across it, a modest jade-bead bookmark beside it, placed on a pale blue-grey marble ledge. Sunlight filtered by a geometric Islamic window makes soft shadows in the background. Journal and pen centered and fully visible at small thumbnail size and in wide crops. Clean quiet image, natural material detail, burgundy, charcoal, cool stone and restrained brass. No pages, writing, letters, people, hands, logos, borders, collage or watermark. Real photograph, not icon or UI.",
+      "source": "exec-2ac58777-5377-459c-a9b2-eee308a60a19.png"
+    },
+    {
+      "file": "calendar.jpg",
+      "prompt": "Use case: photorealistic-natural. One square premium architectural night photograph for an Islamic calendar tile in an app. A slender clearly visible natural crescent moon hangs above a pale stone mosque dome and minaret, framed from a broad graceful arch. Indigo dusk sky, a few warm lit windows, tranquil courtyard. The crescent and dome should lie near the central band so both remain visible in a wide crop. Spacious legible composition, real travel-photography materials and lighting. No people, dates, text, logos, clocks, books, frames, collage, decorative floating dots or watermark. Realistic photograph, not UI.",
+      "source": "exec-d646d0c0-3960-4cbb-8a3f-903ef85f6744.png"
+    },
+    {
+      "file": "bookmarks.jpg",
+      "prompt": "Use case: photorealistic-natural. Asset type: full-bleed portrait card background for a premium Islamic mobile app, inspired by refined pilgrimage travel editorial photography. Generate a single square photograph, not a UI mockup. Distinct tactile materials and subtle fine film grain, understated real depth, subject sharply legible at small size. Place the main subject in the lower two thirds, leaving quiet uncluttered color in the top third for a short title added by the app. Keep the subject near the center so a 3:4 portrait crop works. No people, hands, text, letters, calligraphy, logos, watermark, border, panel, cartoon or icon graphics. A single exquisite slim antique brass arabesque bookmark with a burgundy silk ribbon resting on smooth deep peacock-teal woven fabric. The bookmark is the unmistakable main subject, diagonal near the lower center. Close macro photography, soft sidelight, large quiet teal background above. No book or pages.",
+      "source": "exec-f45c2813-0a0f-48fa-8cb7-1d26f480dd3f.png"
+    },
+    {
+      "file": "today-reading-goal.jpg",
+      "prompt": "Create one square premium editorial still-life photograph for the Today's Reading Goal tile of an Islamic app. Main subject a single closed Quran-inspired emerald teal clothbound volume with a delicate purely geometric gold central medallion and geometric border, resting respectfully on a small elegant carved walnut reading stand. No writing or calligraphy anywhere on the cover. A single burgundy ribbon bookmark is visible at the lower edge. Compose the book and compact reading stand centered, filling the central 70 percent of the square, easy to recognize in a very small 72px square thumbnail. Airy cool blue-grey plaster niche in the background, soft clear morning window light, realistic tactile materials, calm refined contemporary editorial photography. Completely different from a clock or hourglass: communicate daily reading through the book alone. Rich emerald book, walnut wood, burgundy ribbon, cool stone, crisp natural lighting and subtle fine film grain. No hourglass, no clock, no calendar, no stacks of books, no people, no hands, no loose pages, no open pages, no scripture, no letters, no added text, no UI, no icon, no frame, no border outside the book, no watermark.",
+      "source": "exec-a6907316-4aea-4362-b214-a10796054d0b.png"
+    },
+    {
+      "file": "memorization.jpg",
+      "prompt": "Use case: photorealistic-natural. Asset type: full-bleed portrait card background for a premium Islamic mobile app, inspired by refined pilgrimage travel editorial photography. Generate a single square photograph, not a UI mockup. Distinct tactile materials and subtle fine film grain, understated real depth, subject sharply legible at small size. Place the main subject in the lower two thirds, leaving quiet uncluttered color in the top third for a short title added by the app. Keep the subject near the center so a 3:4 portrait crop works. No people, hands, text, letters, calligraphy, logos, watermark, border, panel, cartoon or icon graphics. One beautiful closed terracotta-cloth Quran-sized volume with several colored silk page-marker ribbons visible at its lower edge, sitting on a low dark carved walnut reading stand. Cover is plain with subtle geometric tooling and absolutely no lettering. Intimate study alcove, pale sage plaster wall behind. Subject in lower center, tactile ribbons visible, gentle natural light.",
+      "source": "exec-a7404e37-3e5d-4bf9-a5f1-33b0b6ec9709.png"
+    },
+    {
+      "file": "downloads.jpg",
+      "prompt": "Use case: photorealistic-natural. Asset type: full-bleed portrait card background for a premium Islamic mobile app, inspired by refined pilgrimage travel editorial photography. Generate a single square photograph, not a UI mockup. Distinct tactile materials and subtle fine film grain, understated real depth, subject sharply legible at small size. Place the main subject in the lower two thirds, leaving quiet uncluttered color in the top third for a short title added by the app. Keep the subject near the center so a 3:4 portrait crop works. No people, hands, text, letters, calligraphy, logos, watermark, border, panel, cartoon or icon graphics. A beautiful archival library cabinet with small walnut drawers and aged brass pulls, one drawer slightly open showing orderly plain unlettered clothbound volumes safely stored inside. Three-quarter editorial close-up with forest-green wall above, tactile wood and brass, compact central composition. No labels or written titles, no screens.",
+      "source": "exec-cfc5e8a5-0d8d-408e-bd15-12c22fa44978.png"
+    },
+    {
+      "file": "translations.jpg",
+      "prompt": "Use case: photorealistic-natural. Asset type: full-bleed portrait card background for a premium Islamic mobile app, inspired by refined pilgrimage travel editorial photography. Generate a single square photograph, not a UI mockup. Distinct tactile materials and subtle fine film grain, understated real depth, subject sharply legible at small size. Place the main subject in the lower two thirds, leaving quiet uncluttered color in the top third for a short title added by the app. Keep the subject near the center so a 3:4 portrait crop works. No people, hands, text, letters, calligraphy, logos, watermark, border, panel, cartoon or icon graphics. Three elegant closed clothbound volumes in cobalt, ivory and coral, fanned upright on a low brushed stone shelf, a small clear glass globe beside them symbolizing languages across the world. Covers have subtle geometric embossing but no writing. Pale sky-blue wall, crisp soft daylight. The books and globe occupy the lower central portion, quiet cool upper background.",
+      "source": "exec-a81b194d-6810-4e84-921f-74edc97997a4.png"
+    },
+    {
+      "file": "duas.jpg",
+      "prompt": "Use case: photorealistic-natural. Asset type: full-bleed portrait card background for a premium Islamic mobile app, inspired by refined pilgrimage travel editorial photography. Generate a single square photograph, not a UI mockup. Distinct tactile materials and subtle fine film grain, understated real depth, subject sharply legible at small size. Place the main subject in the lower two thirds, leaving quiet uncluttered color in the top third for a short title added by the app. Keep the subject near the center so a 3:4 portrait crop works. No people, hands, text, letters, calligraphy, logos, watermark, border, panel, cartoon or icon graphics. A single finely pierced bronze lantern casting a delicate geometric pattern on an unoccupied folded ivory prayer rug in a peaceful rose-colored mosque niche. Lantern and folded textile are the clear central subjects in lower half. Gentle daylight, luminous but no floating particles, rich warm rose wall with quiet empty space above. No prayer beads or books.",
+      "source": "exec-d5ec3bdb-d5b5-4e62-970c-89aae9272f71.png"
+    },
+    {
+      "file": "divine-names.jpg",
+      "prompt": "Use case: photorealistic-natural. Asset type: full-bleed portrait card background for a premium Islamic mobile app, inspired by refined pilgrimage travel editorial photography. Generate a single square photograph, not a UI mockup. Distinct tactile materials and subtle fine film grain, understated real depth, subject sharply legible at small size. Place the main subject in the lower two thirds, leaving quiet uncluttered color in the top third for a short title added by the app. Keep the subject near the center so a 3:4 portrait crop works. No people, hands, text, letters, calligraphy, logos, watermark, border, panel, cartoon or icon graphics. An upward architectural photograph of an exquisite Islamic geometric star ceiling with carved plaster and fine gold detailing, a small honeycomb muqarnas arch framing its lower edge. Dusty turquoise, ivory and restrained gold, no calligraphy at all. Make the geometric rosette unmistakable and centered lower in the composition, with a quiet turquoise upper band. Real ornate architecture rather than an illustration.",
+      "source": "exec-11ab26d4-3853-42a7-abdb-e42e904a5a6e.png"
+    },
+    {
+      "file": "notes.jpg",
+      "prompt": "Use case: photorealistic-natural. Asset type: full-bleed portrait card background for a premium Islamic mobile app, inspired by refined pilgrimage travel editorial photography. Generate a single square photograph, not a UI mockup. Distinct tactile materials and subtle fine film grain, understated real depth, subject sharply legible at small size. Place the main subject in the lower two thirds, leaving quiet uncluttered color in the top third for a short title added by the app. Keep the subject near the center so a 3:4 portrait crop works. No people, hands, text, letters, calligraphy, logos, watermark, border, panel, cartoon or icon graphics. An open ivory notebook with completely blank unlined pages on a warm grey stone ledge, a graceful dark green fountain pen diagonally resting beside it and one small pressed olive sprig. Quiet personal reflection setting, soft yellow-green plaster wall, top third uncluttered. Main blank notebook and pen fully readable at thumbnail size. No book cover, writing or decorative script.",
+      "source": "exec-8dfb0387-e9ac-45f2-817a-850ac97b5a7f.png"
+    },
+    {
+      "file": "mosques.jpg",
+      "prompt": "Use case: photorealistic-natural. Asset type: full-bleed portrait card background for a premium Islamic mobile app, inspired by refined pilgrimage travel editorial photography. Generate a single square photograph, not a UI mockup. Distinct tactile materials and subtle fine film grain, understated real depth, subject sharply legible at small size. Place the main subject in the lower two thirds, leaving quiet uncluttered color in the top third for a short title added by the app. Keep the subject near the center so a 3:4 portrait crop works. No people, hands, text, letters, calligraphy, logos, watermark, border, panel, cartoon or icon graphics. A crisp architectural photograph of a graceful white mosque dome and slender minaret beside turquoise coastal water, seen through a terracotta arch. The mosque is real-looking anonymous architecture, no claims of a named landmark. Bright clear daylight, white stone and sea-blue, subject in lower two thirds, quiet clear blue sky above. No people, signs, calligraphy or boats.",
+      "source": "exec-3b908314-3929-4471-8677-1b0137ee62a2.png"
+    }
+  ]
+}

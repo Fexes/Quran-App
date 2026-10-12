@@ -29,6 +29,7 @@ class HadithLibraryState extends Equatable {
     this.hadeethEncDownloadProgress,
     this.hadeethEncErrorMessage,
     this.hasMoreHadiths = false,
+    this.loadingMoreHadiths = false,
     this.errorMessage,
   });
 
@@ -51,6 +52,7 @@ class HadithLibraryState extends Equatable {
       hadeethEncDownloadProgress = null,
       hadeethEncErrorMessage = null,
       hasMoreHadiths = false,
+      loadingMoreHadiths = false,
       errorMessage = null;
 
   final HadithLibraryStatus status;
@@ -71,6 +73,7 @@ class HadithLibraryState extends Equatable {
   final HadeethEncDownloadProgress? hadeethEncDownloadProgress;
   final String? hadeethEncErrorMessage;
   final bool hasMoreHadiths;
+  final bool loadingMoreHadiths;
   final String? errorMessage;
 
   HadithBook? get selectedBook {
@@ -105,6 +108,7 @@ class HadithLibraryState extends Equatable {
     Object? hadeethEncDownloadProgress = _sentinel,
     String? hadeethEncErrorMessage,
     bool? hasMoreHadiths,
+    bool? loadingMoreHadiths,
     String? errorMessage,
   }) {
     return HadithLibraryState(
@@ -141,6 +145,7 @@ class HadithLibraryState extends Equatable {
           : hadeethEncDownloadProgress as HadeethEncDownloadProgress?,
       hadeethEncErrorMessage: hadeethEncErrorMessage,
       hasMoreHadiths: hasMoreHadiths ?? this.hasMoreHadiths,
+      loadingMoreHadiths: loadingMoreHadiths ?? this.loadingMoreHadiths,
       errorMessage: errorMessage,
     );
   }
@@ -165,6 +170,7 @@ class HadithLibraryState extends Equatable {
     hadeethEncDownloadProgress,
     hadeethEncErrorMessage,
     hasMoreHadiths,
+    loadingMoreHadiths,
     errorMessage,
   ];
 }

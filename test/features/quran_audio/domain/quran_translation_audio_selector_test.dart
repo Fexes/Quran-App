@@ -18,6 +18,17 @@ void main() {
       );
 
       expect(reciters.map((reciter) => reciter.id), ['alqurancloud:ur.khan']);
+      expect(
+        preferredQuranTranslationVoice(reciters)?.id,
+        'alqurancloud:ur.khan',
+      );
+      expect(
+        preferredQuranTranslationVoice(
+          reciters,
+          preferredId: 'alqurancloud:en.walk',
+        )?.id,
+        'alqurancloud:ur.khan',
+      );
     });
 
     test('returns no voices when no translation language is selected', () {
@@ -27,6 +38,7 @@ void main() {
       );
 
       expect(reciters, isEmpty);
+      expect(preferredQuranTranslationVoice(reciters), isNull);
       expect(
         quranTranslationAudioLanguageLabel(null),
         'Select translation language',
@@ -80,6 +92,19 @@ void main() {
           'alqurancloud:ru.kuliev-audio',
           'alqurancloud:ru.kuliev-audio-2',
         ]);
+        expect(
+          preferredQuranTranslationVoice(
+            russian,
+            preferredId: russian.last.id,
+          )?.id,
+          russian.last.id,
+        );
+        final reordered = quranTranslationAudioRecitersFor(
+          reciters: russian.reversed.toList(),
+          selectedTranslation: null,
+          preferredLanguageCode: 'ru',
+        );
+        expect(reordered.first.id, 'alqurancloud:ru.kuliev-audio');
       },
     );
 

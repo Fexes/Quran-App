@@ -634,6 +634,54 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settingsTitle;
 
+  /// No description provided for @readingPreferencesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading & language'**
+  String get readingPreferencesTitle;
+
+  /// No description provided for @downloadsDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads & data'**
+  String get downloadsDataTitle;
+
+  /// No description provided for @arabicScriptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Arabic script'**
+  String get arabicScriptTitle;
+
+  /// No description provided for @offlineDownloadsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline downloads'**
+  String get offlineDownloadsTitle;
+
+  /// No description provided for @offlineDownloadsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recitations, translations & tafsir'**
+  String get offlineDownloadsSubtitle;
+
+  /// No description provided for @contentSourcesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Content sources'**
+  String get contentSourcesTitle;
+
+  /// No description provided for @readingLanguagesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quran, tafsir, Hadith & Azkar'**
+  String get readingLanguagesSubtitle;
+
+  /// No description provided for @textAppearanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Text appearance'**
+  String get textAppearanceTitle;
+
   /// No description provided for @settingsSubtitle.
   ///
   /// In en, this message translates to:
@@ -652,12 +700,6 @@ abstract class AppLocalizations {
   /// **'Theme'**
   String get themeTitle;
 
-  /// No description provided for @themeWhite.
-  ///
-  /// In en, this message translates to:
-  /// **'White'**
-  String get themeWhite;
-
   /// No description provided for @themeLight.
   ///
   /// In en, this message translates to:
@@ -669,12 +711,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dark'**
   String get themeDark;
-
-  /// No description provided for @themeBlack.
-  ///
-  /// In en, this message translates to:
-  /// **'Black'**
-  String get themeBlack;
 
   /// No description provided for @languageTitle.
   ///
@@ -801,6 +837,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Prayer & fasting journal'**
   String get prayerJournalTitle;
+
+  /// No description provided for @fastingJournalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fasting journal'**
+  String get fastingJournalTitle;
 
   /// No description provided for @worshipToolsTitle.
   ///

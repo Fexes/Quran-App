@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/animated_expansion.dart';
+import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -12,9 +14,12 @@ import '../../../../core/theme/quran_theme_state.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/app_sheet.dart';
+import '../../../../core/widgets/note_editor_sheet.dart';
 import '../../../library/data/stores/library_user_data_store.dart';
 import '../../../library/domain/library_translation_language_mapper.dart';
 import '../../../library/presentation/widgets/library_reader_widgets.dart';
+import '../../../library/presentation/widgets/library_share_sheet.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
 import '../../domain/entities/azkar_category.dart';
@@ -176,7 +181,7 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
               IconButton(
                 tooltip: 'Reader settings',
                 onPressed: _showSettings,
-                icon: const Icon(Icons.tune_rounded),
+                icon: const AppIcon(Icons.tune_rounded),
               ),
             ],
           ),
@@ -205,7 +210,14 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
                     interactive: true,
                     child: ListView(
                       controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 132),
+                      padding: EdgeInsets.fromLTRB(
+                        18,
+                        10,
+                        18,
+                        _selectedItem(state) == null
+                            ? 24
+                            : LibraryReaderActionBar.bottomClearance(context),
+                      ),
                       children: [
                         if (category != null)
                           _CategorySummary(category: category),
@@ -256,9 +268,14 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
                             _toggleBookmark(_selectedItem(state)!),
                         onNote: () => _editNote(_selectedItem(state)!),
                         onCopy: () => _copyDhikr(_selectedItem(state)!),
-                        onShare: () => _copyDhikr(
+                        onShare: () => showDhikrShareSheet(
+                          context,
                           _selectedItem(state)!,
-                          shareIntent: true,
+                          languageCode: _language.azkarCode,
+                          translationResource: _selectedTranslation,
+                          includeTranslation: _showTranslation,
+                          includeTransliteration: _showTransliteration,
+                          translationAvailable: _translationAvailable,
                         ),
                         onSource: () => _showSourceSheet(_selectedItem(state)!),
                         onDetails: () =>
@@ -339,94 +356,104 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
           child: Align(
             alignment: Alignment.topCenter,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(26, 62, 26, 0),
-              child: Material(
-                color: Colors.transparent,
-                child: PremiumSurface(
-                  padding: const EdgeInsets.all(14),
-                  radius: 24,
-                  prominent: true,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 360),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _selectedCategory(state)?.englishName ??
-                                    'Azkar',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w900),
+              padding: EdgeInsets.fromLTRB(
+                18,
+                62,
+                18,
+                MediaQuery.viewInsetsOf(dialogContext).bottom + 12,
+              ),
+              child: SingleChildScrollView(
+                child: Material(
+                  color: Colors.transparent,
+                  child: PremiumSurface(
+                    padding: const EdgeInsets.all(14),
+                    radius: 24,
+                    prominent: true,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _selectedCategory(state)?.englishName ??
+                                      'Azkar',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
                               ),
-                            ),
-                            IconButton(
-                              onPressed: () =>
-                                  Navigator.of(dialogContext).pop(),
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _jumpController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Jump to item',
-                            prefixIcon: Icon(Icons.tag_rounded),
+                              IconButton(
+                                tooltip: 'Close',
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(),
+                                icon: const AppIcon(Icons.close_rounded),
+                              ),
+                            ],
                           ),
-                          onSubmitted: (value) {
-                            Navigator.of(dialogContext).pop();
-                            _jumpToItem(value, state.dhikr);
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                onPressed: () {
-                                  Navigator.of(dialogContext).pop();
-                                  _jumpToItem(
-                                    _jumpController.text,
-                                    state.dhikr,
-                                  );
-                                },
-                                icon: const Icon(Icons.arrow_forward_rounded),
-                                label: const Text('Go'),
-                              ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _jumpController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Jump to item',
+                              prefixIcon: AppIcon(Icons.tag_rounded),
                             ),
-                          ],
-                        ),
-                        if (state.categories.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 44,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemBuilder: (context, index) {
-                                final category = state.categories[index];
-                                return ChoiceChip(
-                                  label: Text(category.englishName),
-                                  selected: category.id == widget.categoryId,
-                                  onSelected: (_) {
+                            onSubmitted: (value) {
+                              Navigator.of(dialogContext).pop();
+                              _jumpToItem(value, state.dhikr);
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () {
                                     Navigator.of(dialogContext).pop();
-                                    context.go(
-                                      AppRoutes.azkarCategoryPath(category.id),
+                                    _jumpToItem(
+                                      _jumpController.text,
+                                      state.dhikr,
                                     );
                                   },
+                                  icon: const AppIcon(
+                                    Icons.arrow_forward_rounded,
+                                  ),
+                                  label: const Text('Go'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (state.categories.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              initialValue: widget.categoryId,
+                              isExpanded: true,
+                              itemHeight: null,
+                              decoration: const InputDecoration(
+                                labelText: 'Category',
+                              ),
+                              items: [
+                                for (final category in state.categories)
+                                  DropdownMenuItem(
+                                    value: category.id,
+                                    child: Text(category.englishName),
+                                  ),
+                              ],
+                              onChanged: (categoryId) {
+                                if (categoryId == null) return;
+                                Navigator.of(dialogContext).pop();
+                                context.go(
+                                  AppRoutes.azkarCategoryPath(categoryId),
                                 );
                               },
-                              separatorBuilder: (context, index) =>
-                                  const SizedBox(width: 8),
-                              itemCount: state.categories.length,
                             ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -498,23 +525,19 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
       context: context,
       useSafeArea: true,
       builder: (context) {
-        return SafeArea(
+        return AppSheet(
+          title: 'Select translation language',
+          scrollableChild: true,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
             children: [
-              Text(
-                'Select translation language',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 12),
               for (final language in languages)
                 ListTile(
                   title: Text(libraryLanguageLabel(language)),
                   subtitle: Text(language.toUpperCase()),
                   selected: _language.azkarCode == language,
-                  trailing: const Icon(Icons.chevron_right_rounded),
+                  trailing: const AppIcon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.of(context).pop(language),
                 ),
             ],
@@ -539,42 +562,60 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
     AzkarRepository repository,
     String languageCode,
   ) {
+    final download = repository.downloadTranslation(languageCode);
+    var closing = false;
     return showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       isDismissible: false,
       enableDrag: false,
-      builder: (context) {
-        return StreamBuilder(
-          stream: repository.downloadTranslation(languageCode),
-          builder: (context, snapshot) {
-            final progress = snapshot.data;
-            if (progress?.isComplete == true) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop(true);
-                }
-              });
-            }
-            return Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Downloading ${libraryLanguageLabel(languageCode)}'),
+      backgroundColor: Colors.transparent,
+      builder: (context) => StreamBuilder(
+        stream: download,
+        builder: (context, snapshot) {
+          final progress = snapshot.data;
+          if (progress?.isComplete == true && !closing) {
+            closing = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted &&
+                  ModalRoute.of(context)?.isCurrent == true) {
+                Navigator.of(context).pop(true);
+              }
+            });
+          }
+          return AppSheet(
+            title: 'Downloading ${libraryLanguageLabel(languageCode)} Azkar',
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 12),
+                LinearProgressIndicator(value: progress?.percent),
+                const SizedBox(height: 8),
+                Text(
+                  progress == null || progress.totalItems <= 1
+                      ? 'Preparing download'
+                      : '${progress.completedItems} of ${progress.totalItems}',
+                ),
+                if (snapshot.hasError || progress?.hasFailed == true) ...[
                   const SizedBox(height: 12),
-                  LinearProgressIndicator(value: progress?.percent),
-                  const SizedBox(height: 8),
                   Text(
-                    progress == null
-                        ? 'Preparing download'
-                        : '${progress.completedItems} of ${progress.totalItems}',
+                    'Azkar translation download failed.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Close'),
                   ),
                 ],
-              ),
-            );
-          },
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -594,66 +635,43 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
   }
 
   Future<void> _editNote(DhikrItem item) async {
-    final controller = TextEditingController(
-      text: _userDataStore.noteFor(_itemKey(item)),
-    );
-    final note = await showDialog<String>(
+    final note = await showModalBottomSheet<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(item.title.isEmpty ? 'Dhikr note' : item.title),
-        content: TextField(
-          controller: controller,
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(hintText: 'Write a note'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('Save'),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => NoteEditorSheet(
+        title: item.title.isEmpty ? 'Dhikr note' : item.title,
+        initialText: _userDataStore.noteFor(_itemKey(item)),
+        allowEmpty: true,
       ),
     );
-    controller.dispose();
     if (note != null) {
       await _userDataStore.saveNote(_itemKey(item), note);
     }
   }
 
-  Future<void> _copyDhikr(DhikrItem item, {bool shareIntent = false}) async {
+  Future<void> _copyDhikr(DhikrItem item) async {
     await Clipboard.setData(ClipboardData(text: _plainText(item)));
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(shareIntent ? 'Copied to share' : 'Copied')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Copied')));
   }
 
   void _showSourceSheet(DhikrItem item) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(18),
+      backgroundColor: Colors.transparent,
+      builder: (context) => AppSheet(
+        title: 'Source',
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Source',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 12),
-            Text(item.reference),
-          ],
+          children: [Text(item.reference)],
         ),
       ),
     );
@@ -664,25 +682,25 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.68,
-        maxChildSize: 0.92,
-        builder: (context, controller) => ListView(
-          controller: controller,
-          padding: const EdgeInsets.all(18),
+      backgroundColor: Colors.transparent,
+      builder: (context) => AppSheet(
+        title: item.title.isEmpty ? item.reference : item.title,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              item.title.isEmpty ? item.reference : item.title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            LibraryArabicText(
+              text: item.arabic,
+              themeState: context.read<QuranThemeCubit>().state,
+              selected: true,
             ),
-            const SizedBox(height: 12),
-            Text(item.arabic, textDirection: TextDirection.rtl),
             if (item.translation.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(item.translation),
+              LibraryTranslationBody(
+                text: item.translation,
+                themeState: context.read<QuranThemeCubit>().state,
+                resource: _selectedTranslation,
+              ),
             ],
             if (item.benefit.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -723,8 +741,8 @@ class _CategorySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PremiumSurface(
-      padding: const EdgeInsets.all(14),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -733,7 +751,7 @@ class _CategorySummary extends StatelessWidget {
             textDirection: TextDirection.rtl,
             textAlign: TextAlign.right,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w500,
               height: 1.4,
             ),
           ),
@@ -742,7 +760,7 @@ class _CategorySummary extends StatelessWidget {
             category.englishName,
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
           Text(
@@ -819,38 +837,56 @@ class _DhikrReaderCard extends StatelessWidget {
             themeState: themeState,
             selected: selected,
           ),
-          if (showTransliteration &&
-              item.transliteration.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              item.transliteration,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: QuranTheme.subText(context, 0.72),
-                fontStyle: FontStyle.italic,
-              ),
+          AnimatedExpansion(
+            expanded:
+                showTransliteration && item.transliteration.trim().isNotEmpty,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                Text(
+                  item.transliteration,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: QuranTheme.subText(context, 0.72),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
             ),
-          ],
-          if (showTranslation) ...[
-            const SizedBox(height: 8),
-            if (translationAvailable && item.translation.trim().isNotEmpty)
-              LibraryTranslationBody(
-                text: item.translation,
-                themeState: themeState,
-                resource: translationResource,
-              )
-            else
-              LibraryTranslationUnavailable(languageLabel: languageLabel),
-          ],
-          if (selected) ...[
-            const SizedBox(height: 8),
-            Text(
-              item.reference,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: QuranTheme.subText(context, 0.68),
-                fontWeight: FontWeight.w800,
-              ),
+          ),
+          AnimatedExpansion(
+            expanded: showTranslation,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 8),
+                if (translationAvailable && item.translation.trim().isNotEmpty)
+                  LibraryTranslationBody(
+                    text: item.translation,
+                    themeState: themeState,
+                    resource: translationResource,
+                  )
+                else
+                  LibraryTranslationUnavailable(languageLabel: languageLabel),
+              ],
             ),
-          ],
+          ),
+          AnimatedExpansion(
+            expanded: selected,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 8),
+                Text(
+                  item.reference,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: QuranTheme.subText(context, 0.68),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -911,7 +947,7 @@ class _ProgressPill extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: Theme.of(context).colorScheme.onPrimary,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -928,7 +964,7 @@ class _AzkarEmptyState extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          Icon(
+          AppIcon(
             Icons.favorite_border_rounded,
             color: Theme.of(context).colorScheme.primary,
           ),
