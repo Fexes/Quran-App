@@ -132,6 +132,7 @@ class SearchTextNormalizer {
         (rune >= 0x61 && rune <= 0x7A) ||
         (rune >= 0x00C0 && rune <= 0x024F) ||
         (rune >= 0x1E00 && rune <= 0x1EFF) ||
+        (rune >= 0x0400 && rune <= 0x052F) ||
         (rune >= 0x0600 && rune <= 0x06FF) ||
         (rune >= 0x0750 && rune <= 0x077F) ||
         (rune >= 0x08A0 && rune <= 0x08FF);
@@ -147,6 +148,11 @@ class SearchTextNormalizer {
 
   static String _latinFold(int rune) {
     switch (rune) {
+      // Match the decomposed Cyrillic text in bundled search indexes.
+      case 0x0451:
+        return '\u0435';
+      case 0x0439:
+        return '\u0438';
       case 0x00E0:
       case 0x00E1:
       case 0x00E2:

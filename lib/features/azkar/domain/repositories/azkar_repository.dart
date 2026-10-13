@@ -30,6 +30,18 @@ abstract interface class AzkarRepository {
   Future<List<DhikrItem>> search(String query, {int limit = 30});
 }
 
+extension AzkarTranslationAvailability on AzkarRepository {
+  Future<bool> hasInstalledTranslation(String languageCode) async {
+    final code = languageCode.trim().toLowerCase().replaceAll('_', '-');
+    if (await hasFullTranslation(code)) return true;
+    if (!(await availableTranslationLanguages()).contains(code)) {
+      return false;
+    }
+    final items = await getDhikr(languageCode: code, limit: 10000);
+    return items.any((item) => item.translation.trim().isNotEmpty);
+  }
+}
+
 class AzkarTranslationDownloadProgress {
   const AzkarTranslationDownloadProgress({
     required this.languageCode,

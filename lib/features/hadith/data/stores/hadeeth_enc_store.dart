@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/search/local_search_revision.dart';
 
 import '../../../../core/search/search_text_normalizer.dart';
 import '../../domain/entities/hadeeth_enc_item.dart';
@@ -40,7 +41,12 @@ class HadeethEncStore {
 
   bool hasFullLanguage(String languageCode) {
     final raw = _read(_metaKey(languageCode));
-    return raw is Map && raw['complete'] == true;
+    final items = _read(_itemsKey(languageCode));
+    return raw is Map &&
+        raw['complete'] == true &&
+        items is List &&
+        items.isNotEmpty &&
+        raw['itemCount'] == items.length;
   }
 
   List<String> downloadedLanguageCodes() {
@@ -67,7 +73,7 @@ class HadeethEncStore {
     await _write(_metaKey(languageCode), {
       'languageCode': languageCode,
       'version': version,
-      'complete': true,
+      'complete': items.isNotEmpty,
       'itemCount': items.length,
       'completedAt': DateTime.now().toIso8601String(),
     });
@@ -142,9 +148,10 @@ class HadeethEncStore {
     final box = _box;
     if (box != null) {
       await box.put(key, value);
-      return;
+    } else {
+      _memory?[key] = value;
     }
-    _memory?[key] = value;
+    LocalSearchRevision.changed();
   }
 
   static String _itemsKey(String languageCode) =>

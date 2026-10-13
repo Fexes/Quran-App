@@ -35,11 +35,17 @@ class AzkarRepositoryImpl implements AzkarRepository {
   Stream<AzkarTranslationDownloadProgress> downloadTranslation(
     String languageCode,
   ) async* {
-    final available = await hasFullTranslation(languageCode);
+    final available = await hasInstalledTranslation(languageCode);
+    final items = available
+        ? await getDhikr(languageCode: languageCode, limit: 10000)
+        : const <DhikrItem>[];
+    final count = items
+        .where((item) => item.translation.trim().isNotEmpty)
+        .length;
     yield AzkarTranslationDownloadProgress(
       languageCode: languageCode,
-      completedItems: available ? 1 : 0,
-      totalItems: 1,
+      completedItems: available ? count : 0,
+      totalItems: count,
       isComplete: available,
       hasFailed: !available,
     );

@@ -30,6 +30,8 @@ class QuranAudioDownloadItem extends Equatable {
     this.bytesDownloaded,
     this.bytesTotal,
     this.errorMessage,
+    this.isBulkDownload = false,
+    this.requestedSurahNumber,
   });
 
   factory QuranAudioDownloadItem.fromJson(Map<dynamic, dynamic> json) {
@@ -49,6 +51,8 @@ class QuranAudioDownloadItem extends Equatable {
       bytesTotal: _nullableInt(json['bytesTotal']),
       status: _status(json['status']),
       errorMessage: _nullableString(json['errorMessage']),
+      isBulkDownload: json['isBulkDownload'] == true,
+      requestedSurahNumber: _nullableInt(json['requestedSurahNumber']),
       updatedAt:
           DateTime.tryParse(_string(json['updatedAt'])) ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
@@ -71,6 +75,16 @@ class QuranAudioDownloadItem extends Equatable {
   final QuranAudioDownloadStatus status;
   final String? errorMessage;
   final DateTime updatedAt;
+  final bool isBulkDownload;
+  final int? requestedSurahNumber;
+
+  // Shared audio keeps its verse identity but belongs to the requesting job.
+  int get downloadSurahNumber {
+    final requested = requestedSurahNumber;
+    return requested != null && requested >= 1 && requested <= 114
+        ? requested
+        : surahNumber;
+  }
 
   bool get isDownloaded => status == QuranAudioDownloadStatus.downloaded;
   bool get isActive =>
@@ -104,6 +118,8 @@ class QuranAudioDownloadItem extends Equatable {
       'status': status.name,
       'errorMessage': errorMessage,
       'updatedAt': updatedAt.toIso8601String(),
+      'isBulkDownload': isBulkDownload,
+      'requestedSurahNumber': requestedSurahNumber,
     };
   }
 
@@ -124,6 +140,8 @@ class QuranAudioDownloadItem extends Equatable {
     QuranAudioDownloadStatus? status,
     String? errorMessage,
     DateTime? updatedAt,
+    bool? isBulkDownload,
+    int? requestedSurahNumber,
     bool clearLocalUri = false,
     bool clearBytes = false,
     bool clearError = false,
@@ -147,6 +165,8 @@ class QuranAudioDownloadItem extends Equatable {
       status: status ?? this.status,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       updatedAt: updatedAt ?? this.updatedAt,
+      isBulkDownload: isBulkDownload ?? this.isBulkDownload,
+      requestedSurahNumber: requestedSurahNumber ?? this.requestedSurahNumber,
     );
   }
 
@@ -221,6 +241,8 @@ class QuranAudioDownloadItem extends Equatable {
     status,
     errorMessage,
     updatedAt,
+    isBulkDownload,
+    requestedSurahNumber,
   ];
 }
 

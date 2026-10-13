@@ -221,6 +221,21 @@ void main() {
 }
 
 class _FakeHadithRepository implements HadithRepository {
+  @override
+  Future<List<String>> availableTranslationLanguagesForBook(
+    String bookId,
+  ) async => const ['en'];
+
+  @override
+  Future<bool> hasFullTranslation(String bookId, String languageCode) async =>
+      languageCode == 'en';
+
+  @override
+  Stream<HadithTranslationDownloadProgress> downloadBookTranslation(
+    String bookId,
+    String languageCode,
+  ) => Stream.error(UnsupportedError('This fixture only uses bundled English'));
+
   bool _hadeethEncDownloaded = false;
 
   static const _source = ContentSource(
@@ -277,6 +292,7 @@ class _FakeHadithRepository implements HadithRepository {
   Future<List<HadithItem>> getHadiths({
     String? bookId,
     String? chapterId,
+    String? languageCode,
     int offset = 0,
     int limit = 50,
   }) async {
@@ -284,7 +300,7 @@ class _FakeHadithRepository implements HadithRepository {
   }
 
   @override
-  Future<HadithItem?> getHadithById(String id) async {
+  Future<HadithItem?> getHadithById(String id, {String? languageCode}) async {
     return id == _hadith.id ? _hadith : null;
   }
 

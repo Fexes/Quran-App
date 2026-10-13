@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/widgets/app_icon.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../app/di/injection.dart';
+import '../../../../app/router/app_routes.dart';
+import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/architectural_backdrop.dart';
@@ -11,6 +15,10 @@ import '../../domain/entities/quran_surah.dart';
 import '../../domain/entities/quran_translation.dart';
 import '../../domain/repositories/quran_repository.dart';
 import '../../domain/repositories/quran_translation_repository.dart';
+import '../../../quran_audio/domain/services/quran_translation_audio_selector.dart';
+import '../../../quran_audio/presentation/cubit/quran_audio_cubit.dart';
+import '../widgets/quran_reading_preferences.dart';
+import '../widgets/quran_translation_download_sheet.dart';
 
 class QuranTranslationManagerPage extends StatefulWidget {
   const QuranTranslationManagerPage({super.key});
@@ -22,6 +30,342 @@ class QuranTranslationManagerPage extends StatefulWidget {
 
 class _QuranTranslationManagerPageState
     extends State<QuranTranslationManagerPage> {
+  late Future<void> _future;
+  QuranTranslationResource? _translation;
+  String? _reciterId;
+  String? _voiceId;
+  int? _savedTranslationId;
+  String? _savedReciterId;
+  String? _savedVoiceId;
+  bool _saving = false;
+  bool _confirmingExit = false;
+  bool _discarding = false;
+
+  bool get _dirty =>
+      _translation?.id != _savedTranslationId ||
+      _reciterId != _savedReciterId ||
+      _voiceId != _savedVoiceId;
+
+  void _rememberSavedChoices() {
+    _savedTranslationId = _translation?.id;
+    _savedReciterId = _reciterId;
+    _savedVoiceId = _voiceId;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<void> _load() async {
+    final repository = getIt<QuranRepository>();
+    final translation = await getIt<QuranTranslationRepository>()
+        .selectedTranslation();
+    final reciters = await repository.getAudioReciters();
+    final savedReciter = await repository.getSelectedAudioReciterId();
+    final arabic = reciters.where((item) => !item.isTranslation).toList();
+    final voices = quranCompatibleTranslationAudioReciters(
+      reciters: reciters,
+      selectedTranslation: translation,
+    );
+    final store = getIt<SettingsStore>();
+    final voice = preferredQuranTranslationVoice(
+      voices,
+      preferredId: translation == null
+          ? null
+          : store.translationVoiceForLanguage(translation.resolvedLanguageCode),
+      legacyId: store.audioTranslationReciterId,
+    );
+    if (!mounted) return;
+    _translation = translation;
+    _reciterId =
+        arabic.where((item) => item.id == savedReciter).firstOrNull?.id ??
+        arabic.firstOrNull?.id;
+    _voiceId = voice?.id;
+    _rememberSavedChoices();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _future,
+      builder: (context, snapshot) {
+        final ready =
+            snapshot.connectionState == ConnectionState.done &&
+            !snapshot.hasError;
+        return PopScope(
+          canPop: !_saving && (!_dirty || _discarding),
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop && !_saving) _confirmExit();
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Reading & listening'),
+              flexibleSpace: const ArchitecturalBackdrop(),
+              actions: [
+                IconButton(
+                  tooltip: 'Translation library',
+                  onPressed: ready && !_saving ? _openLibrary : null,
+                  icon: const AppIcon(Icons.library_books_outlined),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+            body: snapshot.hasError
+                ? AppErrorView(
+                    title: 'Reading preferences unavailable',
+                    message: 'Your choices could not be loaded.',
+                    onRetry: () => setState(() => _future = _load()),
+                  )
+                : !ready
+                ? const Center(child: CircularProgressIndicator())
+                : Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 680),
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                        children: [
+                          QuranReadingPreferences(
+                            translation: _translation,
+                            reciterId: _reciterId,
+                            translationVoiceId: _voiceId,
+                            enabled: !_saving,
+                            onTranslationChanged: (value) =>
+                                setState(() => _translation = value),
+                            onReciterChanged: (value) =>
+                                setState(() => _reciterId = value.id),
+                            onTranslationVoiceChanged: (value) =>
+                                setState(() => _voiceId = value?.id),
+                          ),
+                          const Divider(height: 32),
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                QuranTheme.radiusControl,
+                              ),
+                            ),
+                            leading: const SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Center(
+                                child: AppIcon(
+                                  Icons.download_for_offline_outlined,
+                                ),
+                              ),
+                            ),
+                            title: const Text('Offline downloads'),
+                            subtitle: const Text('Manage saved text and audio'),
+                            trailing: const AppIcon(
+                              Icons.chevron_right_rounded,
+                            ),
+                            onTap: _saving ? null : _openDownloads,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+            bottomNavigationBar: ready ? _buildSaveBar(context) : null,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSaveBar(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: QuranTheme.surface(context),
+        border: Border(top: BorderSide(color: QuranTheme.outline(context))),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+          child: Center(
+            heightFactor: 1,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _dirty && !_saving ? _save : null,
+                  icon: _saving
+                      ? SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: QuranTheme.subText(context),
+                          ),
+                        )
+                      : const AppIcon(Icons.check_rounded, size: 20),
+                  label: Text(_saving ? 'Saving...' : 'Save changes'),
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmExit() async {
+    if (_confirmingExit || !_dirty) return;
+    _confirmingExit = true;
+    try {
+      final save = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Save your changes?'),
+          content: const Text(
+            'Your reading and listening choices have not been saved.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Keep editing'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Discard'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+      if (save == null || !mounted) return;
+      if (save && !await _save()) return;
+      if (!mounted) return;
+      setState(() => _discarding = true);
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted) Navigator.of(context).pop();
+    } finally {
+      _confirmingExit = false;
+    }
+  }
+
+  Future<bool> _save() async {
+    if (_saving) return false;
+    setState(() => _saving = true);
+    final translationRepository = getIt<QuranTranslationRepository>();
+    try {
+      final previous = await translationRepository.selectedTranslation();
+      final translation = _translation;
+      if (translation != null &&
+          !await translationRepository.hasReadyReadingLanguage(
+            translation.id,
+          )) {
+        if (!mounted) return false;
+        final prepared = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          isDismissible: false,
+          enableDrag: false,
+          backgroundColor: Colors.transparent,
+          builder: (_) => QuranTranslationDownloadSheet(
+            repository: translationRepository,
+            resource: translation,
+            activateOnComplete: false,
+          ),
+        );
+        if (prepared != true || !mounted) return false;
+      }
+      if (!mounted) return false;
+      final audio = context.read<QuranAudioCubit>();
+      if (previous?.id != translation?.id) {
+        await translationRepository.setSelectedTranslation(translation?.id);
+        if ((await translationRepository.selectedTranslation())?.id !=
+            translation?.id) {
+          throw StateError('Could not save this translation.');
+        }
+      }
+      final store = getIt<SettingsStore>();
+      await store.setAudioTranslationReciterId(
+        _voiceId ?? '',
+        languageCode: translation?.resolvedLanguageCode,
+      );
+      final reciterId = _reciterId;
+      final quranRepository = getIt<QuranRepository>();
+      final reciterChanged =
+          reciterId != null &&
+          (reciterId != await quranRepository.getSelectedAudioReciterId() ||
+              audio.activeReciter?.id != reciterId);
+      if (reciterChanged) {
+        await quranRepository.saveSelectedAudioReciterId(reciterId);
+      }
+      if (!mounted) return false;
+      setState(_rememberSavedChoices);
+      var playbackUpdated = true;
+      try {
+        await audio.synchronizeTranslationSelection();
+        if (reciterChanged) await audio.changeReciter(reciterId);
+      } catch (_) {
+        playbackUpdated = false;
+      }
+      if (!mounted) return true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            playbackUpdated
+                ? 'Reading preferences saved.'
+                : 'Preferences saved. Restart playback to use them.',
+          ),
+        ),
+      );
+      return true;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save your preferences. Please try again.'),
+          ),
+        );
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _openDownloads() async {
+    if (_dirty && !await _save()) return;
+    if (!mounted) return;
+    await context.push(AppRoutes.quranDownloadsPath());
+    if (mounted) setState(() => _future = _load());
+  }
+
+  Future<void> _openLibrary() async {
+    if (_dirty && !await _save()) return;
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const _QuranTranslationLibraryPage(),
+      ),
+    );
+    if (mounted) setState(() => _future = _load());
+  }
+}
+
+class _QuranTranslationLibraryPage extends StatefulWidget {
+  const _QuranTranslationLibraryPage();
+
+  @override
+  State<_QuranTranslationLibraryPage> createState() =>
+      _QuranTranslationLibraryPageState();
+}
+
+class _QuranTranslationLibraryPageState
+    extends State<_QuranTranslationLibraryPage> {
   late final QuranTranslationRepository _repository;
   late final QuranMultiTranslationRepository _multiRepository;
   late Future<_ManagerData> _future;
@@ -195,14 +539,23 @@ class _QuranTranslationManagerPageState
                     ),
                     if (_downloadingResourceId != null) ...[
                       const SizedBox(height: 12),
-                      LinearProgressIndicator(value: _progress?.percent),
+                      LinearProgressIndicator(
+                        value:
+                            _progress?.contentLabel != null &&
+                                _progress?.contentProgress == null
+                            ? null
+                            : _progress?.percent,
+                      ),
                       const SizedBox(height: 5),
                       Text(
-                        _progress == null
-                            ? 'Starting download'
-                            : '${_progress!.completedChapters} of '
-                                  '${_progress!.totalChapters} Surah packs',
+                        _progress?.contentLabel ??
+                            (_progress == null
+                                ? 'Starting download'
+                                : '${_progress!.completedChapters} of '
+                                      '${_progress!.totalChapters} Surah packs'),
                       ),
+                      if (_progress?.contentDetail case final detail?)
+                        Text(detail),
                     ],
                     const SizedBox(height: 14),
                     if (visible.isEmpty)
@@ -284,23 +637,63 @@ class _QuranTranslationManagerPageState
         _message('You can compare up to three translations.');
         return;
       }
+      if (!await _prepareTranslation(resource)) return;
       next.add(resource.id);
     }
-    await _multiRepository.setSelectedTranslations(next);
-    _reload();
+    try {
+      await _multiRepository.setSelectedTranslations(next);
+      _reload();
+    } catch (_) {
+      _message('Could not update your translations. Please try again.');
+    }
   }
 
   Future<void> _makePrimary(
     List<QuranTranslationResource> selected,
     QuranTranslationResource resource,
   ) async {
-    await _multiRepository.setSelectedTranslations([
-      resource.id,
-      ...selected
-          .where((item) => item.id != resource.id)
-          .map((item) => item.id),
-    ]);
-    _reload();
+    if (!await _prepareTranslation(resource)) return;
+    try {
+      await _multiRepository.setSelectedTranslations([
+        resource.id,
+        ...selected
+            .where((item) => item.id != resource.id)
+            .map((item) => item.id),
+      ]);
+      _reload();
+    } catch (_) {
+      _message('Could not update your translations. Please try again.');
+    }
+  }
+
+  Future<bool> _prepareTranslation(QuranTranslationResource resource) async {
+    if (_downloadingResourceId != null) return false;
+    setState(() => _downloadingResourceId = resource.id);
+    try {
+      if (await _repository.hasReadyReadingLanguage(resource.id)) {
+        return mounted;
+      }
+      if (!mounted) return false;
+      final downloaded = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        isDismissible: false,
+        enableDrag: false,
+        backgroundColor: Colors.transparent,
+        builder: (_) => QuranTranslationDownloadSheet(
+          repository: _repository,
+          resource: resource,
+          activateOnComplete: false,
+        ),
+      );
+      return downloaded == true && mounted;
+    } catch (_) {
+      _message('Could not prepare this translation. Please try again.');
+      return false;
+    } finally {
+      if (mounted) setState(() => _downloadingResourceId = null);
+    }
   }
 
   Future<void> _downloadSurah(QuranTranslationResource resource) async {
@@ -347,6 +740,8 @@ class _QuranTranslationManagerPageState
       _message(
         _progress?.isComplete == true
             ? '${resource.displayEndonym} full pack downloaded.'
+            : _progress?.failedContent == true
+            ? 'Quran saved. Retry to finish the Hadith and dua translations.'
             : 'Download paused with ${_progress?.failedChapters ?? 0} failed packs. Retry resumes completed Surahs.',
       );
     } catch (_) {

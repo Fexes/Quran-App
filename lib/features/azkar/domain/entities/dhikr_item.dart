@@ -31,6 +31,28 @@ class DhikrItem extends Equatable {
   final int categorySortOrder;
   final int itemSortOrder;
 
+  DhikrItem withTranslation({
+    required String translation,
+    String? title,
+    String? reference,
+  }) {
+    return DhikrItem(
+      id: id,
+      categoryId: categoryId,
+      arabic: arabic,
+      translation: translation,
+      transliteration: transliteration,
+      reference: reference?.isNotEmpty == true ? reference! : this.reference,
+      repeatCount: repeatCount,
+      sourceId: sourceId,
+      title: title?.isNotEmpty == true ? title! : this.title,
+      notes: notes,
+      benefit: benefit,
+      categorySortOrder: categorySortOrder,
+      itemSortOrder: itemSortOrder,
+    );
+  }
+
   factory DhikrItem.fromMap(Map<String, dynamic> map) {
     return DhikrItem(
       id: map['id'] as String? ?? '',

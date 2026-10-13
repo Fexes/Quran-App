@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_10y.dart' as timezone_data;
@@ -11,13 +13,15 @@ import '../../../prayer_times/domain/repositories/prayer_times_repository.dart';
 import '../../../prayer_tracking/data/stores/prayer_tracking_store.dart';
 import '../../../prayer_tracking/domain/entities/prayer_tracking_models.dart';
 import '../../domain/entities/prayer_alert_settings.dart';
+import 'prayer_alert_background_service.dart';
 
-class PrayerAlertNotificationService {
+class PrayerAlertNotificationService with WidgetsBindingObserver {
   PrayerAlertNotificationService({
     required SettingsStore settingsStore,
     required PrayerTimesRepository prayerTimesRepository,
     PrayerTrackingStore? prayerTrackingStore,
     FlutterLocalNotificationsPlugin? notifications,
+    this.managesBackgroundRenewal = true,
   }) : _settingsStore = settingsStore,
        _prayerTimesRepository = prayerTimesRepository,
        _prayerTrackingStore = prayerTrackingStore,
@@ -27,13 +31,17 @@ class PrayerAlertNotificationService {
   final PrayerTimesRepository _prayerTimesRepository;
   final PrayerTrackingStore? _prayerTrackingStore;
   final FlutterLocalNotificationsPlugin _notifications;
+  final bool managesBackgroundRenewal;
 
   static const _channelId = 'prayer_alerts';
   static const _channelName = 'Prayer alerts';
   static const _channelDescription = 'Prayer time and reminder alerts';
   static const _androidNotificationIcon = 'ic_stat_prayer';
   static const _baseNotificationId = 910000;
-  static const _scheduledDays = 5;
+  static const _scheduledDays = 60;
+  static const _maximumPendingAlerts = 60;
+  int _scheduledCount = 0;
+  int _scheduleRevision = 0;
   static var _timeZonesInitialized = false;
 
   var _initialized = false;
@@ -70,7 +78,24 @@ class PrayerAlertNotificationService {
       return false;
     }
     _initialized = true;
+    if (managesBackgroundRenewal) {
+      WidgetsBinding.instance.addObserver(this);
+      _settingsStore.prayerLocationChanges.addListener(_refreshSafely);
+    }
     return true;
+  }
+
+  void _refreshSafely() {
+    unawaited(
+      syncUpcomingAlerts().catchError((Object error) {
+        debugPrint('Prayer alert refresh failed: $error');
+      }),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshSafely();
   }
 
   PrayerAlertSettings loadSettings() {
@@ -138,18 +163,57 @@ class PrayerAlertNotificationService {
   }
 
   Future<void> syncUpcomingAlerts({PrayerAlertSettings? settings}) async {
+    final revision = ++_scheduleRevision;
+    if (managesBackgroundRenewal && supportsPrayerAlertRenewal) {
+      await withPrayerAlertSnapshot((file) async {
+        if (revision != _scheduleRevision) return;
+        final next = settings ?? loadSettings();
+        if (next.schedulesAnything) {
+          await file.writeAsString(
+            jsonEncode({
+              'settings': {
+                for (final entry in _settingsStore.exportSnapshot().entries)
+                  if (entry.key.startsWith('prayer_')) entry.key: entry.value,
+              },
+              'tracking': {
+                'pause_ranges':
+                    _prayerTrackingStore?.exportSnapshot()['pause_ranges'] ??
+                    [],
+              },
+            }),
+            flush: true,
+          );
+          await _reschedule(next);
+          await ensurePrayerAlertRenewal();
+        } else {
+          if (await file.exists()) await file.delete();
+          await cancelPrayerAlertRenewal();
+          await _cancelNotifications();
+        }
+      });
+      return;
+    }
+    await _reschedule(settings ?? loadSettings());
+  }
+
+  Future<void> _reschedule(PrayerAlertSettings nextSettings) async {
     if (!await initialize()) {
       return;
     }
-    final nextSettings = settings ?? loadSettings();
-    await cancelScheduledAlerts();
+    await _cancelNotifications();
+    _scheduledCount = 0;
     if (!nextSettings.schedulesAnything) {
       return;
     }
-    final now = DateTime.now();
-    for (var dayOffset = 0; dayOffset < _scheduledDays; dayOffset++) {
+    final zone = _timeZone(_settingsStore.prayerTimeZone);
+    final now = tz.TZDateTime.now(zone);
+    for (
+      var dayOffset = 0;
+      dayOffset < _scheduledDays && _scheduledCount < _maximumPendingAlerts;
+      dayOffset++
+    ) {
       final dailyTimes = await _prayerTimesRepository.getDailyPrayerTimes(
-        date: now.add(Duration(days: dayOffset)),
+        date: tz.TZDateTime(zone, now.year, now.month, now.day + dayOffset),
       );
       await _scheduleDailyAlerts(
         dailyTimes: dailyTimes,
@@ -160,16 +224,26 @@ class PrayerAlertNotificationService {
   }
 
   Future<void> cancelScheduledAlerts() async {
+    _scheduleRevision++;
+    if (managesBackgroundRenewal && supportsPrayerAlertRenewal) {
+      await withPrayerAlertSnapshot((file) async {
+        if (await file.exists()) await file.delete();
+        await cancelPrayerAlertRenewal();
+        await _cancelNotifications();
+      });
+      return;
+    }
+    await _cancelNotifications();
+  }
+
+  Future<void> _cancelNotifications() async {
     if (!await initialize()) {
       return;
     }
-    for (var dayOffset = 0; dayOffset < _scheduledDays; dayOffset++) {
-      for (final name in PrayerTimeName.values) {
-        for (var type = 0; type < 2; type++) {
-          await _notifications.cancel(
-            id: _notificationId(dayOffset, name, type),
-          );
-        }
+    for (final request in await _notifications.pendingNotificationRequests()) {
+      if (request.id >= _baseNotificationId &&
+          request.id < _baseNotificationId + _scheduledDays * 100) {
+        await _notifications.cancel(id: request.id);
       }
     }
   }
@@ -190,16 +264,6 @@ class PrayerAlertNotificationService {
       if (!settings.isEnabledFor(entry.name)) {
         continue;
       }
-      if (settings.notifyAtPrayerTime) {
-        await _scheduleEntryAlert(
-          id: _notificationId(dayOffset, entry.name, 0),
-          entry: entry,
-          dailyTimes: dailyTimes,
-          timeZone: timeZone,
-          scheduledAt: entry.time,
-          beforeMinutes: null,
-        );
-      }
       if (settings.notifyBeforePrayer) {
         await _scheduleEntryAlert(
           id: _notificationId(dayOffset, entry.name, 1),
@@ -210,6 +274,16 @@ class PrayerAlertNotificationService {
             Duration(minutes: settings.beforeMinutes),
           ),
           beforeMinutes: settings.beforeMinutes,
+        );
+      }
+      if (settings.notifyAtPrayerTime) {
+        await _scheduleEntryAlert(
+          id: _notificationId(dayOffset, entry.name, 0),
+          entry: entry,
+          dailyTimes: dailyTimes,
+          timeZone: timeZone,
+          scheduledAt: entry.time,
+          beforeMinutes: null,
         );
       }
     }
@@ -224,7 +298,8 @@ class PrayerAlertNotificationService {
     required int? beforeMinutes,
   }) async {
     final scheduledDate = tz.TZDateTime.from(scheduledAt, timeZone);
-    if (!scheduledDate.isAfter(tz.TZDateTime.now(timeZone))) {
+    if (_scheduledCount >= _maximumPendingAlerts ||
+        !scheduledDate.isAfter(tz.TZDateTime.now(timeZone))) {
       return;
     }
     final isSunrise = entry.name == PrayerTimeName.sunrise;
@@ -250,6 +325,7 @@ class PrayerAlertNotificationService {
       payload: 'prayer:${entry.name}',
       scheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
+    _scheduledCount++;
   }
 
   Future<void> _zonedSchedule({

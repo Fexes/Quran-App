@@ -14,6 +14,17 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
   static const _pageSize = 50;
   var _searchRequestId = 0;
 
+  @override
+  void emit(HadithLibraryState state) {
+    if (!isClosed) super.emit(state);
+  }
+
+  @override
+  Future<void> close() {
+    _searchRequestId++;
+    return super.close();
+  }
+
   Future<void> load() async {
     final requestId = ++_searchRequestId;
     emit(
@@ -128,6 +139,7 @@ class HadithLibraryCubit extends Cubit<HadithLibraryState> {
     await for (final progress in _repository.downloadHadeethEncLanguage(
       languageCode,
     )) {
+      if (isClosed) return;
       emit(
         state.copyWith(
           hadeethEncDownloadProgress: progress,

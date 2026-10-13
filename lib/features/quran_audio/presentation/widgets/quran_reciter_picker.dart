@@ -4,6 +4,7 @@ import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_sheet.dart';
 import '../../../quran/domain/entities/quran_audio_reciter.dart';
+import '../../../quran/domain/services/quran_translation_audio_pairings.dart';
 
 Future<QuranAudioReciter?> showQuranReciterPickerSheet(
   BuildContext context, {
@@ -136,6 +137,7 @@ class _QuranReciterPickerSheetState extends State<QuranReciterPickerSheet> {
       reciter.arabicName ?? '',
       reciter.qualityLabel ?? '',
       reciter.provider.name,
+      quranTranslationPairForVoice(reciter.id)?.resource.name ?? '',
     ].join(' ').toLowerCase();
     return fields.contains(query);
   }
@@ -195,6 +197,17 @@ class QuranReciterPickerTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         textDirection: TextDirection.rtl,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: QuranTheme.subText(context),
+                        ),
+                      ),
+                    ],
+                    if (reciter.isTranslation) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        quranTranslationPairForVoice(reciter.id) == null
+                            ? 'Translation edition not verified'
+                            : 'Translation: ${quranTranslationPairForVoice(reciter.id)!.resource.name}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: QuranTheme.subText(context),
                         ),
                       ),

@@ -48,7 +48,11 @@ LibraryLanguageSelection libraryLanguageFromQuranTranslation(
         ? resource.languageName
         : resource.displayLanguage,
     hadithCode: map(_hadithLanguageCodes),
-    azkarCode: map(_azkarLanguageCodes),
+    azkarCode: tokens.contains('badini')
+        ? 'ckb-badini'
+        : tokens.contains('kurmanji')
+        ? null
+        : map(_azkarLanguageCodes),
     resource: resource,
   );
 }
@@ -57,7 +61,7 @@ LibraryLanguageSelection libraryLanguageFromCode(
   String languageCode, {
   QuranTranslationResource? resource,
 }) {
-  final normalized = languageCode.trim().toLowerCase();
+  final normalized = languageCode.trim().toLowerCase().replaceAll('_', '-');
   return LibraryLanguageSelection(
     label: libraryLanguageLabel(normalized),
     hadithCode: _hadithLanguageCodes.containsValue(normalized)
@@ -71,7 +75,10 @@ LibraryLanguageSelection libraryLanguageFromCode(
 }
 
 String libraryLanguageLabel(String languageCode) {
-  return _languageLabels[languageCode.trim().toLowerCase()] ??
+  return _languageLabels[languageCode.trim().toLowerCase().replaceAll(
+        '_',
+        '-',
+      )] ??
       languageCode.trim().toUpperCase();
 }
 
@@ -87,12 +94,24 @@ const _hadithLanguageCodes = {
   'urdu': 'ur',
 };
 
-const _azkarLanguageCodes = {'english': 'en'};
+const _azkarLanguageCodes = {
+  'arabic': 'ar',
+  'english': 'en',
+  'persian': 'fa',
+  'farsi': 'fa',
+  'russian': 'ru',
+  'urdu': 'ur',
+  'kurdish': 'ckb',
+  'sorani': 'ckb',
+  'badini': 'ckb-badini',
+};
 
 const _languageLabels = {
   'ar': 'Arabic',
   'bn': 'Bengali',
   'bs': 'Bosnian',
+  'ckb': 'Kurdish (Sorani)',
+  'ckb-badini': 'Kurdish (Badini)',
   'en': 'English',
   'fa': 'Persian',
   'fr': 'French',

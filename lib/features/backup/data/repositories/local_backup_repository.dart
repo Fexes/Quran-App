@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:pointycastle/export.dart';
 
@@ -9,6 +9,7 @@ import '../../../../core/storage/settings_store.dart';
 import '../../../hifz/data/stores/hifz_store.dart';
 import '../../../library/data/stores/library_user_data_store.dart';
 import '../../../quran/data/stores/quran_user_data_store.dart';
+import '../../../quran/data/stores/quran_translation_store.dart';
 import '../../../prayer_tracking/data/stores/prayer_tracking_store.dart';
 import '../../../reading_goals/data/stores/reading_progress_store.dart';
 import '../../domain/entities/backup_models.dart';
@@ -22,12 +23,18 @@ class LocalBackupRepository implements BackupRepository {
     required HifzStore hifzStore,
     required PrayerTrackingStore prayerTrackingStore,
     required LibraryUserDataStore libraryUserDataStore,
+    QuranTranslationStore? translationStore,
+    Future<void> Function()? cancelPrayerAlerts,
+    Future<void> Function()? refreshPrayerAlerts,
   }) : _settingsStore = settingsStore,
        _quranUserDataStore = quranUserDataStore,
        _readingProgressStore = readingProgressStore,
        _hifzStore = hifzStore,
        _prayerTrackingStore = prayerTrackingStore,
-       _libraryUserDataStore = libraryUserDataStore;
+       _libraryUserDataStore = libraryUserDataStore,
+       _translationStore = translationStore,
+       _cancelPrayerAlerts = cancelPrayerAlerts,
+       _refreshPrayerAlerts = refreshPrayerAlerts;
 
   static const schemaVersion = 1;
   static const _format = 'quran-local-backup';
@@ -39,6 +46,9 @@ class LocalBackupRepository implements BackupRepository {
   final HifzStore _hifzStore;
   final PrayerTrackingStore _prayerTrackingStore;
   final LibraryUserDataStore _libraryUserDataStore;
+  final QuranTranslationStore? _translationStore;
+  final Future<void> Function()? _cancelPrayerAlerts;
+  final Future<void> Function()? _refreshPrayerAlerts;
 
   @override
   Future<Uint8List> createEncryptedBackup(String password) async {
@@ -46,6 +56,9 @@ class LocalBackupRepository implements BackupRepository {
     final payload = <String, Object?>{
       'schemaVersion': schemaVersion,
       'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'translationPreferences': _jsonSafe(
+        _translationStore?.exportPreferences(),
+      ),
       'categories': {
         'settings': _jsonSafe(_settingsStore.exportSnapshot()),
         'quranUserData': _jsonSafe(_quranUserDataStore.exportSnapshot()),
@@ -55,10 +68,18 @@ class LocalBackupRepository implements BackupRepository {
         'library': _jsonSafe(_libraryUserDataStore.exportSnapshot()),
       },
     };
-    final plaintext = Uint8List.fromList(utf8.encode(jsonEncode(payload)));
+    return compute(_encryptPayload, (payload: payload, password: password));
+  }
+
+  static Uint8List _encryptPayload(
+    ({Map<String, Object?> payload, String password}) request,
+  ) {
+    final plaintext = Uint8List.fromList(
+      utf8.encode(jsonEncode(request.payload)),
+    );
     final salt = _randomBytes(16);
     final iv = _randomBytes(12);
-    final key = _deriveKey(password, salt);
+    final key = _deriveKey(request.password, salt);
     final encrypter = encrypt.Encrypter(
       encrypt.AES(encrypt.Key(key), mode: encrypt.AESMode.gcm),
     );
@@ -83,7 +104,10 @@ class LocalBackupRepository implements BackupRepository {
     Uint8List bytes,
     String password,
   ) async {
-    final payload = _decrypt(bytes, password);
+    final payload = await compute(_decryptPayload, (
+      bytes: bytes,
+      password: password,
+    ));
     final categories = _categories(payload);
     return BackupPreview(
       schemaVersion: _int(payload['schemaVersion']),
@@ -103,10 +127,22 @@ class LocalBackupRepository implements BackupRepository {
     required String password,
     required BackupRestoreMode mode,
   }) async {
-    final payload = _decrypt(bytes, password);
+    final payload = await compute(_decryptPayload, (
+      bytes: bytes,
+      password: password,
+    ));
     final categories = _categories(payload);
     final replace = mode == BackupRestoreMode.replace;
     final restored = <BackupDataCategory>[];
+    await _settingsStore.prepareForPersonalDataErase();
+    await _cancelPrayerAlerts?.call();
+    final preferences = _stringMap(payload['translationPreferences']);
+    if (preferences != null || replace) {
+      await _translationStore?.restorePreferences(
+        preferences ?? {},
+        replace: replace,
+      );
+    }
 
     final settings = _stringMap(categories['settings']);
     if (settings != null) {
@@ -153,7 +189,10 @@ class LocalBackupRepository implements BackupRepository {
       await _libraryUserDataStore.restoreSnapshot(
         replace
             ? library
-            : {..._libraryUserDataStore.exportSnapshot(), ...library},
+            : LibraryUserDataStore.mergeSnapshots(
+                _libraryUserDataStore.exportSnapshot(),
+                library,
+              ),
         replace: replace,
       );
       restored.add(BackupDataCategory.library);
@@ -169,12 +208,18 @@ class LocalBackupRepository implements BackupRepository {
       );
       restored.add(BackupDataCategory.worship);
     }
+    await _refreshPrayerAlerts?.call();
     return BackupRestoreResult(mode: mode, restoredCategories: restored);
   }
 
   @override
-  Future<void> eraseCategory(BackupDataCategory category) {
-    return switch (category) {
+  Future<void> eraseCategory(BackupDataCategory category) async {
+    await _settingsStore.prepareForPersonalDataErase();
+    if (category == BackupDataCategory.settings) {
+      await _cancelPrayerAlerts?.call();
+      await _translationStore?.restorePreferences({});
+    }
+    await switch (category) {
       BackupDataCategory.settings => _settingsStore.clearAll(),
       BackupDataCategory.quranUserData => _quranUserDataStore.clearAll(),
       BackupDataCategory.reading => _readingProgressStore.clearAll(),
@@ -186,6 +231,9 @@ class LocalBackupRepository implements BackupRepository {
 
   @override
   Future<void> eraseAllUserData() async {
+    await _settingsStore.prepareForPersonalDataErase();
+    await _cancelPrayerAlerts?.call();
+    await _translationStore?.restorePreferences({});
     await _quranUserDataStore.clearAll();
     await _readingProgressStore.clearAll();
     await _hifzStore.clearAll();
@@ -195,7 +243,11 @@ class LocalBackupRepository implements BackupRepository {
     await _settingsStore.setOnboardingStep(0);
   }
 
-  Map<String, Object?> _decrypt(Uint8List bytes, String password) {
+  static Map<String, Object?> _decryptPayload(
+    ({Uint8List bytes, String password}) request,
+  ) {
+    final bytes = request.bytes;
+    final password = request.password;
     _validatePassword(password);
     final envelopeRaw = jsonDecode(utf8.decode(bytes));
     if (envelopeRaw is! Map || envelopeRaw['format'] != _format) {
@@ -429,20 +481,20 @@ class LocalBackupRepository implements BackupRepository {
         : incoming;
   }
 
-  Uint8List _deriveKey(String password, Uint8List salt) {
+  static Uint8List _deriveKey(String password, Uint8List salt) {
     final derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
       ..init(Pbkdf2Parameters(salt, _iterations, 32));
     return derivator.process(Uint8List.fromList(utf8.encode(password)));
   }
 
-  Uint8List _randomBytes(int length) {
+  static Uint8List _randomBytes(int length) {
     final random = Random.secure();
     return Uint8List.fromList(
       List<int>.generate(length, (_) => random.nextInt(256)),
     );
   }
 
-  void _validatePassword(String password) {
+  static void _validatePassword(String password) {
     if (password.length < 8) {
       throw const FormatException('Backup password must have 8 characters.');
     }
@@ -461,7 +513,7 @@ class LocalBackupRepository implements BackupRepository {
     return value;
   }
 
-  Map<String, Object?>? _stringMap(Object? value) {
+  static Map<String, Object?>? _stringMap(Object? value) {
     if (value is! Map) {
       return null;
     }
@@ -501,7 +553,7 @@ class LocalBackupRepository implements BackupRepository {
     return value == null ? 0 : 1;
   }
 
-  int _int(Object? value) {
+  static int _int(Object? value) {
     return value is num
         ? value.round()
         : int.tryParse(value?.toString() ?? '') ?? 0;

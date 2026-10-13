@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../quran/data/services/surah_cover_cache.dart';
 import '../../../quran/domain/entities/surah_image_catalog.dart';
@@ -11,7 +12,7 @@ import 'quran_audio_playback_port.dart';
 
 class QuranAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler
-    implements QuranAudioPlaybackPort {
+    implements QuranAudioPlaybackPort, QuranAudioFiniteRepeatPort {
   QuranAudioHandler() {
     _player.playbackEventStream.listen(
       _broadcastPlaybackState,
@@ -21,9 +22,22 @@ class QuranAudioHandler extends BaseAudioHandler
       _broadcastPlaybackError(error, StackTrace.current);
     });
     _player.currentIndexStream.listen((index) {
+      if (index != _repeatItemIndex) {
+        _repeatItemIndex = index;
+        _ayahRepeatIteration = 1;
+        unawaited(_syncAyahLoopMode().catchError(_broadcastPlaybackError));
+      }
       final items = queue.value;
       if (index != null && index >= 0 && index < items.length) {
         mediaItem.add(items[index]);
+      }
+    });
+    _player.positionDiscontinuityStream.listen((event) {
+      if (_repeatMode == QuranAudioRepeatMode.ayah &&
+          event.reason == PositionDiscontinuityReason.autoAdvance &&
+          event.previousEvent.currentIndex == event.event.currentIndex) {
+        _ayahRepeatIteration++;
+        unawaited(_syncAyahLoopMode().catchError(_broadcastPlaybackError));
       }
     });
   }
@@ -33,6 +47,10 @@ class QuranAudioHandler extends BaseAudioHandler
   final Map<int, String?> _artworkUriBySurah = {};
   int _loadRevision = 0;
   int _transportRevision = 0;
+  QuranAudioRepeatMode _repeatMode = QuranAudioRepeatMode.off;
+  int _ayahRepeatCount = 1;
+  int _ayahRepeatIteration = 1;
+  int? _repeatItemIndex;
 
   @override
   Stream<Duration> get positionStream => _player.positionStream;
@@ -68,12 +86,19 @@ class QuranAudioHandler extends BaseAudioHandler
     final loadRevision = ++_loadRevision;
     final transportRevision = _transportRevision;
     if (!autoPlay) await _player.pause();
-    final prepared = await _withSurahArtwork(items);
-    if (loadRevision != _loadRevision) return;
-    _items = List.unmodifiable(prepared);
+    _items = List.unmodifiable(items);
+    _repeatItemIndex = startIndex.clamp(0, items.length - 1);
+    _ayahRepeatIteration = 1;
     final mediaItems = _items.map((item) => item.toMediaItem()).toList();
     queue.add(mediaItems);
     mediaItem.add(mediaItems[startIndex.clamp(0, mediaItems.length - 1)]);
+    unawaited(
+      _refreshSurahArtwork(loadRevision).catchError((Object error) {
+        debugPrint('Could not refresh audio artwork: $error');
+      }),
+    );
+    await _syncAyahLoopMode();
+    if (loadRevision != _loadRevision) return;
 
     final sources = [
       for (final item in _items)
@@ -96,16 +121,26 @@ class QuranAudioHandler extends BaseAudioHandler
     }
   }
 
-  Future<List<QuranAudioQueueItem>> _withSurahArtwork(
-    List<QuranAudioQueueItem> items,
-  ) async {
-    final prepared = <QuranAudioQueueItem>[];
-    for (final item in items) {
-      prepared.add(
-        item.copyWithArtwork(surahArtworkUri: await _localArtworkUriFor(item)),
-      );
+  Future<void> _refreshSurahArtwork(int revision) async {
+    final surahs = <int>{};
+    for (final item in _items) {
+      if (!surahs.add(item.surahNumber)) continue;
+      final uri = await _localArtworkUriFor(item);
+      if (revision != _loadRevision) return;
+      if (uri == null) continue;
+      _items = List.unmodifiable([
+        for (final queued in _items)
+          if (queued.surahNumber == item.surahNumber)
+            queued.copyWithArtwork(surahArtworkUri: uri)
+          else
+            queued,
+      ]);
+      queue.add(_items.map((entry) => entry.toMediaItem()).toList());
+      final index = _player.currentIndex;
+      if (index != null && index >= 0 && index < _items.length) {
+        mediaItem.add(_items[index].toMediaItem());
+      }
     }
-    return prepared;
   }
 
   Future<String?> _localArtworkUriFor(QuranAudioQueueItem item) async {
@@ -128,8 +163,31 @@ class QuranAudioHandler extends BaseAudioHandler
   }
 
   @override
-  Future<void> setQuranRepeatMode(QuranAudioRepeatMode _) async {
-    await _player.setLoopMode(LoopMode.off);
+  Future<void> setQuranRepeatMode(QuranAudioRepeatMode mode) async {
+    _repeatMode = mode;
+    _ayahRepeatIteration = 1;
+    await _syncAyahLoopMode();
+  }
+
+  @override
+  Future<void> setAyahRepeatCount(int count) async {
+    _ayahRepeatCount = count.clamp(1, 10);
+    _ayahRepeatIteration = 1;
+    await _syncAyahLoopMode();
+  }
+
+  Future<void> _syncAyahLoopMode() {
+    final index = _repeatItemIndex;
+    final item = index != null && index >= 0 && index < _items.length
+        ? _items[index]
+        : null;
+    // The native loop finishes the entire segment before repeating it.
+    final repeat =
+        _repeatMode == QuranAudioRepeatMode.ayah &&
+        _ayahRepeatIteration < _ayahRepeatCount &&
+        item != null &&
+        !item.isBismillah;
+    return _player.setLoopMode(repeat ? LoopMode.one : LoopMode.off);
   }
 
   @override

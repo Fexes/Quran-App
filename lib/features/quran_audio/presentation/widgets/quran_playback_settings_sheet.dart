@@ -3,16 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/app_routes.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/animated_expansion.dart';
 import '../../../../core/widgets/app_sheet.dart';
 import '../../../quran/domain/entities/quran_audio_reciter.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
+import '../../../quran/domain/services/quran_translation_audio_pairings.dart';
 import '../../domain/entities/quran_audio_state.dart';
 import '../../domain/services/quran_translation_audio_selector.dart';
 import '../cubit/quran_audio_cubit.dart';
 import 'quran_reciter_picker.dart';
+import 'quran_translation_voice_change.dart';
 
 Future<void> showQuranPlaybackSettingsSheet({
   required BuildContext context,
@@ -23,21 +27,21 @@ Future<void> showQuranPlaybackSettingsSheet({
   QuranTranslationResource? selectedTranslation,
   String? audioMeaningLanguageCode,
   String? currentRangeLabel,
-}) {
+}) async {
   final callerContext = context;
   final arabicReciters = reciters
       .where((reciter) => !reciter.isTranslation)
       .toList(growable: false);
-  final translationReciters = quranTranslationAudioRecitersFor(
+  final sheetTranslation = selectedTranslation;
+  final translationLanguageLabel = selectedTranslation == null
+      ? 'English'
+      : quranTranslationAudioLanguageLabel(selectedTranslation);
+  final hasTranslationAudio = quranCompatibleTranslationAudioReciters(
     reciters: reciters,
-    selectedTranslation: selectedTranslation,
-    preferredLanguageCode: audioMeaningLanguageCode,
-  );
-  final translationLanguageLabel = quranTranslationAudioLanguageLabel(
-    selectedTranslation,
-    preferredLanguageCode: audioMeaningLanguageCode,
-  );
-  final hasTranslationAudio = translationReciters.isNotEmpty;
+    selectedTranslation: sheetTranslation,
+  ).isNotEmpty;
+  var changingTranslation = false;
+  var openSetupRequested = false;
 
   QuranAudioReciter? arabicReciterById(String? id) {
     if (id == null) {
@@ -66,8 +70,11 @@ Future<void> showQuranPlaybackSettingsSheet({
   var sheetPlayTranslationAudio =
       audioState.playTranslationAudio && hasTranslationAudio;
   final audioCubit = callerContext.read<QuranAudioCubit>();
-  var sheetTranslationReciter = audioCubit.preferredTranslationReciter(
-    translationReciters,
+  final sheetTranslationReciter = audioCubit.preferredTranslationReciter(
+    quranCompatibleTranslationAudioReciters(
+      reciters: reciters,
+      selectedTranslation: sheetTranslation,
+    ),
   );
   var sheetSpeed = audioState.speed.clamp(0.75, 2.0).toDouble();
   var sheetRepeatMode = audioState.repeatMode;
@@ -97,23 +104,26 @@ Future<void> showQuranPlaybackSettingsSheet({
           ? 'No active range'
           : audioState.scopeLabel);
 
-  return showModalBottomSheet<void>(
+  await showModalBottomSheet<void>(
     context: context,
     showDragHandle: false,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.16),
     builder: (sheetContext) {
-      Future<void> applyChange(Future<void> change) async {
+      Future<bool> applyChange(Future<void> change) async {
         try {
           await change;
+          return true;
         } catch (_) {
-          if (!sheetContext.mounted) return;
-          ScaffoldMessenger.of(sheetContext).showSnackBar(
-            const SnackBar(
-              content: Text('Could not update playback settings. Try again.'),
-            ),
-          );
+          if (sheetContext.mounted) {
+            ScaffoldMessenger.of(sheetContext).showSnackBar(
+              const SnackBar(
+                content: Text('Could not update playback settings. Try again.'),
+              ),
+            );
+          }
+          return false;
         }
       }
 
@@ -130,64 +140,60 @@ Future<void> showQuranPlaybackSettingsSheet({
         if (!sheetContext.mounted) {
           return;
         }
+        final previousReciter = sheetReciter;
+        final previousName = sheetReciterName;
+        final previousId = sheetReciterId;
         setSheetState(() {
           sheetReciter = selected;
           sheetReciterName = selected.name;
           sheetReciterId = selected.id;
         });
-        await applyChange(onReciterSelected(selected));
+        if (!await applyChange(onReciterSelected(selected)) &&
+            sheetContext.mounted) {
+          setSheetState(() {
+            sheetReciter = previousReciter;
+            sheetReciterName = previousName;
+            sheetReciterId = previousId;
+          });
+        }
       }
 
-      Future<QuranAudioReciter?> chooseTranslationReciter(
-        StateSetter setSheetState,
-      ) async {
-        final selected = await showQuranReciterPickerSheet(
-          sheetContext,
-          reciters: translationReciters,
-          selectedReciterId: sheetTranslationReciter?.id,
-          title: 'Choose translation voice',
-        );
-        if (selected == null || !callerContext.mounted) {
-          return null;
-        }
-        if (!sheetContext.mounted) {
-          return selected;
-        }
-        setSheetState(() {
-          sheetTranslationReciter = selected;
-        });
-        await applyChange(audioCubit.changeTranslationReciter(selected.id));
-        return selected;
+      void openReadingSetup() {
+        openSetupRequested = true;
+        Navigator.of(sheetContext).pop();
       }
 
       Future<void> toggleTranslationAudio(
         StateSetter setSheetState,
         bool enabled,
       ) async {
-        if (!enabled) {
-          if (sheetContext.mounted) {
-            setSheetState(() {
-              sheetPlayTranslationAudio = false;
-            });
-          }
-          await applyChange(audioCubit.setPlayTranslationAudio(false));
+        if (changingTranslation) return;
+        final voice = sheetTranslationReciter;
+        final repository = audioCubit.translationRepository;
+        if (enabled && (voice == null || repository == null)) {
+          openReadingSetup();
           return;
         }
-
-        var selected = sheetTranslationReciter;
-        if (selected == null) {
-          selected = await chooseTranslationReciter(setSheetState);
-          if (selected == null) {
+        setSheetState(() => changingTranslation = true);
+        try {
+          if (enabled &&
+              !await prepareQuranTranslationVoiceChange(
+                context: sheetContext,
+                repository: repository!,
+                voice: voice!,
+              )) {
             return;
           }
+          if (!sheetContext.mounted) return;
+          await applyChange(audioCubit.setPlayTranslationAudio(enabled));
+        } finally {
+          if (sheetContext.mounted) {
+            setSheetState(() {
+              changingTranslation = false;
+              sheetPlayTranslationAudio = audioCubit.state.playTranslationAudio;
+            });
+          }
         }
-        if (sheetContext.mounted) {
-          setSheetState(() {
-            sheetPlayTranslationAudio = true;
-            sheetTranslationReciter = selected;
-          });
-        }
-        await applyChange(audioCubit.setPlayTranslationAudio(true));
       }
 
       return StatefulBuilder(
@@ -210,17 +216,27 @@ Future<void> showQuranPlaybackSettingsSheet({
                   subtitle: sheetReciterName,
                   onTap: () => unawaited(chooseReciter(setSheetState)),
                 ),
+                _PlaybackOptionTile(
+                  icon: Icons.translate_rounded,
+                  title: 'Translation language',
+                  subtitle:
+                      sheetTranslation?.displayLanguage ?? 'English (bundled)',
+                  onTap: openReadingSetup,
+                ),
                 const Divider(height: 20),
                 PlaybackTranslationAudioTile(
                   enabled: sheetPlayTranslationAudio && hasTranslationAudio,
                   translationRecitersAvailable: hasTranslationAudio,
                   languageLabel: translationLanguageLabel,
                   selectedReciter: sheetTranslationReciter,
+                  selectedTranslation: sheetTranslation,
+                  showVoiceDetails: false,
+                  busy: changingTranslation,
                   onEnabledChanged: (enabled) =>
                       unawaited(toggleTranslationAudio(setSheetState, enabled)),
-                  onVoiceTap: () =>
-                      unawaited(chooseTranslationReciter(setSheetState)),
+                  onVoiceTap: openReadingSetup,
                 ),
+                const Divider(height: 20),
                 _PlaybackSpeedTile(
                   speed: sheetSpeed,
                   onChanged: (value) {
@@ -290,6 +306,24 @@ Future<void> showQuranPlaybackSettingsSheet({
       );
     },
   );
+  if (openSetupRequested && callerContext.mounted) {
+    await callerContext.push(AppRoutes.quranTranslationsPath());
+    if (callerContext.mounted && !audioCubit.isClosed) {
+      try {
+        await audioCubit.synchronizeTranslationSelection();
+      } catch (_) {
+        if (callerContext.mounted) {
+          ScaffoldMessenger.of(callerContext).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Could not update translation playback. Try again.',
+              ),
+            ),
+          );
+        }
+      }
+    }
+  }
 }
 
 _RepeatRangeBounds _repeatRangeBounds(
@@ -420,6 +454,10 @@ class PlaybackTranslationAudioTile extends StatelessWidget {
     required this.selectedReciter,
     required this.onEnabledChanged,
     required this.onVoiceTap,
+    this.selectedTranslation,
+    this.canChooseCompatibleEdition = false,
+    this.busy = false,
+    this.showVoiceDetails = true,
   });
 
   final bool enabled;
@@ -428,6 +466,10 @@ class PlaybackTranslationAudioTile extends StatelessWidget {
   final QuranAudioReciter? selectedReciter;
   final ValueChanged<bool> onEnabledChanged;
   final VoidCallback onVoiceTap;
+  final QuranTranslationResource? selectedTranslation;
+  final bool canChooseCompatibleEdition;
+  final bool busy;
+  final bool showVoiceDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -443,13 +485,17 @@ class PlaybackTranslationAudioTile extends StatelessWidget {
           subtitle: Text(
             translationRecitersAvailable
                 ? 'Arabic, then $languageLabel'
-                : 'No $languageLabel translation voice available.',
+                : selectedTranslation == null
+                ? 'Bundled English text. Choose a translation with audio to listen.'
+                : 'Translation audio is unavailable in $languageLabel.',
           ),
           value: isEnabled,
-          onChanged: translationRecitersAvailable ? onEnabledChanged : null,
+          onChanged: translationRecitersAvailable && !busy
+              ? onEnabledChanged
+              : null,
         ),
         AnimatedExpansion(
-          expanded: isEnabled,
+          expanded: isEnabled && showVoiceDetails,
           child: ListTile(
             key: const ValueKey('translation-voice'),
             contentPadding: EdgeInsets.zero,
@@ -459,11 +505,35 @@ class PlaybackTranslationAudioTile extends StatelessWidget {
               size: 36,
             ),
             title: const Text('Translation voice'),
-            subtitle: Text(selectedName),
-            trailing: const AppIcon(Icons.chevron_right_rounded),
-            onTap: onVoiceTap,
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(selectedName),
+                Text(
+                  'Translation: ${quranTranslationPairForVoice(selectedReciter?.id ?? '')?.resource.name ?? 'Edition not verified'}',
+                ),
+              ],
+            ),
+            trailing: busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const AppIcon(Icons.chevron_right_rounded),
+            onTap: busy ? null : onVoiceTap,
           ),
         ),
+        if (showVoiceDetails && !isEnabled && canChooseCompatibleEdition)
+          TextButton.icon(
+            onPressed: busy ? null : onVoiceTap,
+            icon: const AppIcon(Icons.record_voice_over_outlined, size: 18),
+            label: Text(
+              busy
+                  ? 'Preparing translation...'
+                  : 'Choose an audio-supported translation',
+            ),
+          ),
       ],
     );
   }

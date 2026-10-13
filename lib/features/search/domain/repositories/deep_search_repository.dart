@@ -8,3 +8,7 @@ abstract interface class DeepSearchRepository {
     int limitPerCategory = 20,
   });
 }
+
+abstract interface class DisposableDeepSearchRepository {
+  Future<void> dispose();
+}

@@ -31,8 +31,8 @@ class QuranSurahPullNavigation extends StatefulWidget {
 
 class _QuranSurahPullNavigationState extends State<QuranSurahPullNavigation>
     with SingleTickerProviderStateMixin {
-  static const _pullDistance = 360.0;
-  static const _holdDuration = Duration(milliseconds: 1600);
+  static const _pullDistance = 220.0;
+  static const _holdDuration = Duration(milliseconds: 1400);
   static const _returnDuration = Duration(milliseconds: 1000);
 
   late final _progress = AnimationController(
@@ -270,25 +270,42 @@ class SurahNavigationCapsule extends StatelessWidget {
   final bool previous;
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: QuranTheme.surface(context),
-        borderRadius: BorderRadius.circular(QuranTheme.radiusPill),
+  Widget build(BuildContext context) {
+    final divider = SizedBox(
+      width: 72,
+      child: Divider(
+        height: 20,
+        thickness: 0.5,
+        color: QuranTheme.subText(context, 0.12),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Text(
-          previous
-              ? 'Swipe down to go to previous surah'
-              : 'Swipe up to go to next surah',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            fontSize: 12,
-            color: QuranTheme.subText(context, 0.8),
+    );
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!previous) divider,
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: QuranTheme.surface(context),
+              borderRadius: BorderRadius.circular(QuranTheme.radiusPill),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Text(
+                previous
+                    ? 'Swipe down to go to previous surah'
+                    : 'Swipe up to go to next surah',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontSize: 12,
+                  color: QuranTheme.subText(context, 0.8),
+                ),
+              ),
+            ),
           ),
-        ),
+          if (previous) divider,
+        ],
       ),
-    ),
-  );
+    );
+  }
 }

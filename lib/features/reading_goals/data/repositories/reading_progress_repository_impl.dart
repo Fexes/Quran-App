@@ -148,7 +148,7 @@ class ReadingProgressRepositoryImpl implements ReadingProgressRepository {
     if (khatma != null &&
         !khatma.paused &&
         !khatma.completed &&
-        page > khatma.currentPage) {
+        (page > khatma.currentPage || page == 604)) {
       await _store.saveKhatma(
         khatma.copyWith(
           currentPage: page,
@@ -165,7 +165,7 @@ class ReadingProgressRepositoryImpl implements ReadingProgressRepository {
           !plan.completed &&
           page >= plan.startPage &&
           page <= plan.endPage &&
-          page > plan.currentPage) {
+          (page > plan.currentPage || page == plan.endPage)) {
         changed = true;
         next.add(
           plan.copyWith(

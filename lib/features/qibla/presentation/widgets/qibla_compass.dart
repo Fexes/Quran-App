@@ -15,6 +15,7 @@ class QiblaCompass extends StatelessWidget {
     required this.reliable,
     required this.aligned,
     required this.settling,
+    this.recovering = false,
   }) : assert(!aligned || (hasHeading && reliable));
 
   final Animation<double> heading;
@@ -24,13 +25,14 @@ class QiblaCompass extends StatelessWidget {
   final bool reliable;
   final bool aligned;
   final bool settling;
+  final bool recovering;
 
   @override
   Widget build(BuildContext context) {
     final text = QuranTheme.text(context);
     final accent = aligned
         ? QuranTheme.semantic(context).success
-        : reliable || !hasHeading
+        : reliable || !hasHeading || recovering
         ? text
         : QuranTheme.semantic(context).warning;
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
@@ -97,7 +99,7 @@ class QiblaCompass extends StatelessWidget {
                                         ? Icons.check_rounded
                                         : unavailable
                                         ? Icons.explore_off_outlined
-                                        : !hasHeading
+                                        : !hasHeading || recovering
                                         ? Icons.explore_outlined
                                         : !reliable
                                         ? Icons.warning_amber_rounded
@@ -138,6 +140,8 @@ class QiblaCompass extends StatelessWidget {
                                         ? 'Unavailable'
                                         : !hasHeading
                                         ? 'Finding north'
+                                        : recovering
+                                        ? 'Settling'
                                         : reliable
                                         ? 'to Qibla'
                                         : 'Approximate',

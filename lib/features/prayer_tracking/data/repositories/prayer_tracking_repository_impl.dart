@@ -39,14 +39,23 @@ class PrayerTrackingRepositoryImpl implements PrayerTrackingRepository {
     final plan = _store.qadaPlan;
     final laterRecords = records.where(
       (record) =>
-          record.updatedAt.isAfter(plan.baselineAt) &&
+          record.statusChangedAt.isAfter(plan.baselineAt) &&
           !_isExemptDate(record.dateKey, ranges),
     );
     final missed = laterRecords
-        .where((record) => record.status == PrayerCompletion.missed)
+        .where(
+          (record) =>
+              record.status == PrayerCompletion.missed &&
+              record.debtCreatedAt!.isAfter(plan.baselineAt),
+        )
         .length;
     final qada = laterRecords
-        .where((record) => record.status == PrayerCompletion.qada)
+        .where(
+          (record) =>
+              record.status == PrayerCompletion.qada &&
+              (record.debtCreatedAt == null ||
+                  !record.debtCreatedAt!.isAfter(plan.baselineAt)),
+        )
         .length;
     final fasts = _store.fastingRecords;
     FastingRecord? selectedFast;
@@ -109,8 +118,16 @@ class PrayerTrackingRepositoryImpl implements PrayerTrackingRepository {
   }) async {
     final dateKey = worshipDateKey(date);
     final id = '$dateKey:${prayer.name}';
+    final records = _store.prayerRecords;
+    final previous = records.where((item) => item.id == id).firstOrNull;
+    final now = DateTime.now();
+    final debtCreatedAt =
+        previous?.status == PrayerCompletion.missed ||
+            previous?.status == PrayerCompletion.qada
+        ? previous?.debtCreatedAt
+        : null;
     final next = [
-      for (final item in _store.prayerRecords)
+      for (final item in records)
         if (item.id != id) item,
       if (status != PrayerCompletion.unrecorded)
         PrayerTrackingRecord(
@@ -121,7 +138,11 @@ class PrayerTrackingRepositoryImpl implements PrayerTrackingRepository {
               congregation &&
               status != PrayerCompletion.missed &&
               status != PrayerCompletion.exempt,
-          updatedAt: DateTime.now(),
+          updatedAt: now,
+          statusChangedAt: previous?.status == status
+              ? previous!.statusChangedAt
+              : now,
+          debtCreatedAt: debtCreatedAt,
         ),
     ];
     await _store.savePrayerRecords(next);

@@ -233,7 +233,7 @@ void main() {
         slug: 'ur',
       );
       const french = QuranTranslationResource(
-        id: 31,
+        id: 1000003,
         languageName: 'french',
         name: 'French edition',
         authorName: 'French author',

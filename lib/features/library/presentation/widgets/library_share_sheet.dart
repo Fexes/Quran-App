@@ -56,7 +56,10 @@ Future<void> showHadithShareSheet(
             languages: () =>
                 repository.availableTranslationLanguagesForBook(item.bookId),
             loadTranslation: (code, onProgress) async {
-              if (!await repository.hasFullTranslation(item.bookId, code)) {
+              if (!await repository.hasDownloadedTranslation(
+                item.bookId,
+                code,
+              )) {
                 await for (final progress in repository.downloadBookTranslation(
                   item.bookId,
                   code,
@@ -113,7 +116,7 @@ Future<void> showDhikrShareSheet(
                 onChanged: (code, text) => onChanged(null, text, code),
                 languages: repository.availableTranslationLanguages,
                 loadTranslation: (code, onProgress) async {
-                  if (!await repository.hasFullTranslation(code)) {
+                  if (!await repository.hasInstalledTranslation(code)) {
                     await for (final progress in repository.downloadTranslation(
                       code,
                     )) {

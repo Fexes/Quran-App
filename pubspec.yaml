@@ -57,6 +57,7 @@ dependencies:
   flutter_local_notifications: ^21.0.0
   scrollable_positioned_list: ^0.3.8
   background_downloader: ^9.5.4
+  workmanager: ^0.10.10
   connectivity_plus: ^7.1.1
   flutter_pretext: ^1.0.2
   archive: ^4.0.9
@@ -109,6 +110,7 @@ flutter:
     - assets/data/hadith/books/
     - assets/data/azkar/
     - assets/data/azkar/categories/
+    - assets/data/azkar/translations/
     - assets/data/worship/
 
   # An image asset can refer to one or more resolution-specific "variants", see

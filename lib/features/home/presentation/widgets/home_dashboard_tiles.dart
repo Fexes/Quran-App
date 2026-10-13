@@ -110,6 +110,7 @@ class _HomeDashboardTilesState extends State<HomeDashboardTiles> {
         onRetry: widget.onRefreshTimes,
       ),
       HomeTile.dailyAyah => HomeDailyAyahTile(
+        settingsStore: widget.settingsStore,
         dailyAyah: widget.dailyAyah,
         loading: widget.loading,
         errorMessage: widget.dailyAyahErrorMessage,
@@ -256,7 +257,7 @@ extension _TilePresentation on HomeTile {
     HomeTile.mosques => 'Nearby mosques',
     HomeTile.islamicCalendar => 'Islamic calendar',
     HomeTile.todayReadingGoal => "Today's reading goal",
-    HomeTile.dailyAyah => 'Verse of the Day',
+    HomeTile.dailyAyah => 'Daily inspiration',
   };
 }
 
@@ -448,7 +449,7 @@ class _FastingTile extends StatelessWidget {
                               Icons.nightlight_outlined,
                               size: 18,
                             ),
-                            label: const Text('Ramadan plan'),
+                            label: const Text('Fasting Plan'),
                           ),
                         ),
                       ],

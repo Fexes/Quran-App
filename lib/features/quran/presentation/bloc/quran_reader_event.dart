@@ -42,6 +42,10 @@ class QuranReaderTranslationToggled extends QuranReaderEvent {
   const QuranReaderTranslationToggled();
 }
 
+class QuranReaderTranslationPreferenceChanged extends QuranReaderEvent {
+  const QuranReaderTranslationPreferenceChanged();
+}
+
 class QuranReaderTranslationSelected extends QuranReaderEvent {
   const QuranReaderTranslationSelected(this.resourceId);
 

@@ -19,11 +19,16 @@ class QuranSearchBloc extends Bloc<QuranSearchEvent, QuranSearchState> {
 
   final DeepSearchRepository _repository;
   Timer? _debounce;
+  int _requestRevision = 0;
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
+    _requestRevision++;
     _debounce?.cancel();
-    return super.close();
+    if (_repository case final DisposableDeepSearchRepository disposable) {
+      await disposable.dispose();
+    }
+    await super.close();
   }
 
   void _onQueryChanged(
@@ -31,6 +36,7 @@ class QuranSearchBloc extends Bloc<QuranSearchEvent, QuranSearchState> {
     Emitter<QuranSearchState> emit,
   ) {
     _debounce?.cancel();
+    _requestRevision++;
     final query = event.query.trim();
     if (query.isEmpty) {
       emit(const QuranSearchState.initial());
@@ -63,6 +69,8 @@ class QuranSearchBloc extends Bloc<QuranSearchEvent, QuranSearchState> {
     QuranSearchSubmitted event,
     Emitter<QuranSearchState> emit,
   ) async {
+    _debounce?.cancel();
+    final revision = ++_requestRevision;
     final query = event.query.trim();
     if (query.isEmpty) {
       emit(const QuranSearchState.initial());
@@ -80,6 +88,7 @@ class QuranSearchBloc extends Bloc<QuranSearchEvent, QuranSearchState> {
 
     try {
       final sections = await _repository.search(query, limitPerCategory: 20);
+      if (emit.isDone || revision != _requestRevision) return;
       emit(
         QuranSearchState(
           status: sections.isEmpty
@@ -90,6 +99,7 @@ class QuranSearchBloc extends Bloc<QuranSearchEvent, QuranSearchState> {
         ),
       );
     } catch (error) {
+      if (emit.isDone || revision != _requestRevision) return;
       emit(
         state.copyWith(
           status: QuranSearchStatus.failure,
@@ -112,6 +122,7 @@ class QuranSearchBloc extends Bloc<QuranSearchEvent, QuranSearchState> {
   }
 
   void _onCleared(QuranSearchCleared event, Emitter<QuranSearchState> emit) {
+    _requestRevision++;
     _debounce?.cancel();
     emit(const QuranSearchState.initial());
   }

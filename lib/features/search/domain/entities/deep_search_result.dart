@@ -20,6 +20,7 @@ class DeepSearchTarget extends Equatable {
     this.noteId,
     this.itemId,
     this.translationResourceId,
+    this.languageCode,
   });
 
   final DeepSearchTargetType type;
@@ -28,6 +29,7 @@ class DeepSearchTarget extends Equatable {
   final String? noteId;
   final String? itemId;
   final int? translationResourceId;
+  final String? languageCode;
 
   String? get verseKey {
     final surah = surahNumber;
@@ -46,6 +48,7 @@ class DeepSearchTarget extends Equatable {
     noteId,
     itemId,
     translationResourceId,
+    languageCode,
   ];
 }
 

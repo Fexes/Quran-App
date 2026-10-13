@@ -137,8 +137,12 @@ void main() {
 
       expect(languages, hasLength(2));
       expect(languages.first.languageName, 'english');
-      expect(languages.first.defaultResource.id, 85);
-      expect(languages.first.resourceCount, 2);
+      expect(languages.first.defaultResource.id, 20);
+      expect(languages.first.resourceCount, 3);
+      expect(
+        languages.first.resources.map((resource) => resource.id),
+        containsAll([85, 19, 20]),
+      );
       expect(languages.last.languageName, 'urdu');
       expect(languages.last.defaultResource.id, 234);
       await repository.setSelectedTranslation(
@@ -147,6 +151,9 @@ void main() {
       expect(settings.audioMeaningLanguageCodeOrNull, 'ur');
       await settings.setAudioTranslationReciterId('alqurancloud:ur.khan');
       await repository.setSelectedTranslation(97);
+      expect((await repository.selectedTranslation())?.id, 97);
+      expect(settings.audioTranslationReciterId, isEmpty);
+      expect(settings.audioPlayTranslationEnabled, isFalse);
       await repository.setSelectedTranslation(85);
       expect(settings.audioMeaningLanguageCodeOrNull, 'en');
       expect(settings.audioTranslationReciterId, isEmpty);
@@ -155,11 +162,13 @@ void main() {
         97,
       );
       await repository.setSelectedTranslation(97);
+      expect(settings.audioTranslationReciterId, isEmpty);
+      await repository.setSelectedTranslation(234);
       expect(settings.audioTranslationReciterId, 'alqurancloud:ur.khan');
       await repository.setSelectedTranslation(null);
       expect(settings.audioMeaningLanguageCodeOrNull, isNull);
       expect(settings.audioTranslationReciterId, isEmpty);
-      expect(store.preferredResourceId('urdu'), 97);
+      expect(store.preferredResourceId('urdu'), 234);
     });
 
     test(
@@ -194,7 +203,7 @@ void main() {
         }
         expect(
           languages.map((language) => language.defaultResource.id),
-          containsAll([85, 234]),
+          containsAll([20, 234]),
         );
       },
     );

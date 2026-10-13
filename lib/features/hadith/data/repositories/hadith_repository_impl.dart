@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import '../../../../core/content/content_source.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../core/search/deep_search_index_record.dart';
 import '../../../../core/search/search_text_normalizer.dart';
 import '../../domain/entities/hadeeth_enc_item.dart';
 import '../../domain/entities/hadith_book.dart';
 import '../../domain/entities/hadith_chapter.dart';
 import '../../domain/entities/hadith_item.dart';
+import '../../domain/services/hadith_authenticity_policy.dart';
 import '../../domain/repositories/hadith_repository.dart';
 import '../datasources/fawaz_hadith_translation_data_source.dart';
 import '../datasources/hadeeth_enc_data_source.dart';
@@ -13,7 +17,10 @@ import '../stores/hadeeth_enc_store.dart';
 import '../stores/hadith_translation_store.dart';
 
 class HadithRepositoryImpl
-    implements HadithRepository, HadithScopedSearchRepository {
+    implements
+        HadithRepository,
+        HadithScopedSearchRepository,
+        HadithTranslationPackRepository {
   const HadithRepositoryImpl({
     required LocalHadithDataSource localDataSource,
     required HadeethEncDataSource hadeethEncDataSource,
@@ -77,12 +84,67 @@ class HadithRepositoryImpl
     if (normalized == 'en') {
       return _localDataSource.hasFullTranslation(bookId, normalized);
     }
+    if (!_translationStore.hasFullBook(
+      bookId: bookId,
+      languageCode: normalized,
+    )) {
+      return false;
+    }
     if (!await _bookSupportsLanguage(bookId, normalized)) {
       return false;
     }
     return _translationStore.hasFullBook(
       bookId: bookId,
       languageCode: normalized,
+      requiredNumbers: await _requiredNumbers(bookId),
+    );
+  }
+
+  @override
+  Future<HadithTranslationPackStatus> translationPackStatus(
+    String bookId,
+    String languageCode,
+  ) async {
+    final code = languageCode.trim().toLowerCase();
+    if (code == 'en') {
+      final items = await _localDataSource.getHadiths(
+        bookId: bookId,
+        limit: 100000,
+      );
+      return HadithTranslationPackStatus(
+        isDownloaded: items.isNotEmpty,
+        totalHadiths: items.length,
+        translatedHadiths: items
+            .where((item) => item.translation.trim().isNotEmpty)
+            .length,
+      );
+    }
+    final downloaded = _translationStore.hasDownloadedBook(
+      bookId: bookId,
+      languageCode: code,
+    );
+    if (!downloaded &&
+        !_translationStore.hasFullBook(bookId: bookId, languageCode: code)) {
+      return HadithTranslationPackStatus(
+        isDownloaded: false,
+        totalHadiths:
+            (await _localDataSource.getBook(bookId))?.hadithCount ?? 0,
+        translatedHadiths: 0,
+      );
+    }
+    final numbers = await _requiredNumbers(bookId);
+    final translations = _translationStore.translationsForBook(
+      bookId: bookId,
+      languageCode: code,
+    );
+    final translated = numbers
+        .where((number) => translations[number]?.trim().isNotEmpty == true)
+        .length;
+    return HadithTranslationPackStatus(
+      isDownloaded:
+          downloaded || (numbers.isNotEmpty && translated == numbers.length),
+      totalHadiths: numbers.length,
+      translatedHadiths: translated,
     );
   }
 
@@ -92,14 +154,16 @@ class HadithRepositoryImpl
     String languageCode,
   ) async* {
     final normalized = languageCode.toLowerCase();
-    final available = await hasFullTranslation(bookId, normalized);
+    final status = await translationPackStatus(bookId, normalized);
+    final available = status.isDownloaded;
     yield HadithTranslationDownloadProgress(
       bookId: bookId,
       languageCode: normalized,
-      completedItems: available ? 1 : 0,
-      totalItems: 1,
+      completedItems: available ? status.totalHadiths : 0,
+      totalItems: status.totalHadiths,
       isComplete: available,
       hasFailed: false,
+      unavailableTranslations: available ? status.unavailableTranslations : 0,
     );
     if (available) {
       return;
@@ -115,34 +179,84 @@ class HadithRepositoryImpl
       return;
     }
 
-    try {
-      final result = await _translationDataSource.downloadBookTranslation(
-        bookId: bookId,
-        languageCode: normalized,
-      );
-      await _translationStore.saveBookTranslations(
-        bookId: bookId,
-        languageCode: normalized,
-        editionName: result.editionName,
-        translations: result.translations,
-      );
-      yield HadithTranslationDownloadProgress(
-        bookId: bookId,
-        languageCode: normalized,
-        completedItems: result.translations.length,
-        totalItems: result.translations.length,
-        isComplete: result.translations.isNotEmpty,
-        hasFailed: result.translations.isEmpty,
-      );
-    } catch (_) {
-      yield HadithTranslationDownloadProgress(
-        bookId: bookId,
-        languageCode: normalized,
-        completedItems: 0,
-        totalItems: 1,
-        hasFailed: true,
+    final requiredNumbers = await _requiredNumbers(bookId);
+    var cancelled = false;
+    final updates = StreamController<HadithTranslationDownloadProgress>(
+      onCancel: () => cancelled = true,
+    );
+    void report(double progress, String stage) {
+      if (cancelled || updates.isClosed) return;
+      updates.add(
+        HadithTranslationDownloadProgress(
+          bookId: bookId,
+          languageCode: normalized,
+          completedItems: 0,
+          totalItems: requiredNumbers.length,
+          downloadProgress: progress,
+          stage: stage,
+        ),
       );
     }
+
+    Future<void> download() async {
+      try {
+        final result = await _translationDataSource.downloadBookTranslation(
+          bookId: bookId,
+          languageCode: normalized,
+          isCancelled: () => cancelled,
+          onProgress: (value) => report(value * 0.85, 'Downloading'),
+        );
+        if (cancelled) return;
+        report(0.9, 'Saving');
+        await _translationStore.saveBookTranslations(
+          bookId: bookId,
+          languageCode: normalized,
+          editionName: result.editionName,
+          translations: result.translations,
+          requiredNumbers: requiredNumbers,
+          sourceDownloadComplete: true,
+        );
+        await _translationDataSource.finishBookDownload(bookId, normalized);
+        final translated = requiredNumbers
+            .where(
+              (number) =>
+                  result.translations[number]?.trim().isNotEmpty == true,
+            )
+            .length;
+        if (cancelled) return;
+        updates.add(
+          HadithTranslationDownloadProgress(
+            bookId: bookId,
+            languageCode: normalized,
+            completedItems: requiredNumbers.length,
+            totalItems: requiredNumbers.length,
+            isComplete: _translationStore.hasDownloadedBook(
+              bookId: bookId,
+              languageCode: normalized,
+            ),
+            unavailableTranslations: requiredNumbers.length - translated,
+          ),
+        );
+      } catch (error) {
+        if (!cancelled) {
+          updates.add(
+            HadithTranslationDownloadProgress(
+              bookId: bookId,
+              languageCode: normalized,
+              completedItems: 0,
+              totalItems: 1,
+              hasFailed: true,
+              errorMessage: error.toString(),
+            ),
+          );
+        }
+      } finally {
+        if (!updates.isClosed) await updates.close();
+      }
+    }
+
+    unawaited(download());
+    yield* updates.stream;
   }
 
   @override
@@ -167,7 +281,8 @@ class HadithRepositoryImpl
   Future<HadithItem?> getHadithById(String id, {String? languageCode}) async {
     final hadeethEncItem = _hadeethEncItemFromId(id);
     if (hadeethEncItem != null) {
-      return hadeethEncItem.toHadithItem();
+      final item = hadeethEncItem.toHadithItem();
+      return HadithAuthenticityPolicy.shouldShow(item) ? item : null;
     }
     final item = await _localDataSource.getHadithById(
       id,
@@ -184,28 +299,33 @@ class HadithRepositoryImpl
     final records = await _localDataSource.getSearchIndexRecords();
     return [
       ...records,
-      for (final languageCode in _hadeethEncStore.downloadedLanguageCodes())
-        for (final item in _hadeethEncStore.itemsForLanguage(languageCode))
-          _hadeethEncIndexRecord(item),
+      ...await compute(_translatedIndexRecords, {
+        'records': records,
+        'packs': _translationStore.cachedPacks(),
+      }),
+      ...await compute(_hadeethEncIndexRecords, [
+        for (final languageCode in _hadeethEncStore.downloadedLanguageCodes())
+          ..._hadeethEncStore.itemsForLanguage(languageCode),
+      ]),
     ];
   }
 
   @override
   Future<List<HadithItem>> search(String query, {int limit = 30}) async {
-    final local = await _localDataSource.search(query, limit: limit);
-    final translated = <HadithItem>[];
-    for (final languageCode in _hadeethEncStore.downloadedLanguageCodes()) {
-      final remaining = limit - local.length - translated.length;
-      if (remaining <= 0) {
-        break;
-      }
-      translated.addAll(
-        _hadeethEncStore
-            .search(languageCode: languageCode, query: query, limit: remaining)
-            .map((item) => item.toHadithItem()),
+    final matches = await compute(_searchContentRecords, {
+      'records': await getSearchIndexRecords(),
+      'query': SearchTextNormalizer.normalize(query),
+      'limit': limit,
+    });
+    final results = <HadithItem>[];
+    for (final record in matches) {
+      final item = await getHadithById(
+        record.targetId,
+        languageCode: record.languageCode,
       );
+      if (item != null) results.add(item);
     }
-    return [...local, ...translated].take(limit).toList(growable: false);
+    return results;
   }
 
   @override
@@ -215,13 +335,22 @@ class HadithRepositoryImpl
     String? languageCode,
     int limit = 50,
   }) async {
-    final items = await _localDataSource.searchInBook(
-      bookId,
-      query,
-      limit: limit,
+    final items = await _localDataSource.getHadiths(
+      bookId: bookId,
+      limit: 100000,
     );
-    return _applyCachedTranslation(items, languageCode);
+    return compute(searchHadithBook, {
+      'hadiths': _applyCachedTranslation(items, languageCode),
+      'query': SearchTextNormalizer.normalize(query),
+      'limit': limit,
+    });
   }
+
+  Future<List<String>> _requiredNumbers(String bookId) async =>
+      (await _localDataSource.getHadiths(
+        bookId: bookId,
+        limit: 100000,
+      )).map((item) => item.hadithNumber).toList();
 
   @override
   Future<List<HadeethEncLanguage>> getHadeethEncLanguages() async {
@@ -236,7 +365,15 @@ class HadithRepositoryImpl
 
   @override
   Future<bool> hasHadeethEncLanguage(String languageCode) async {
-    return _hadeethEncStore.hasFullLanguage(languageCode);
+    return _hadeethEncStore.hasFullLanguage(languageCode) &&
+        _hadeethEncStore
+            .itemsForLanguage(languageCode)
+            .any(
+              (item) =>
+                  item.hadithTextArabic.trim().isNotEmpty &&
+                  item.hadithText.trim().isNotEmpty &&
+                  HadithAuthenticityPolicy.shouldShow(item.toHadithItem()),
+            );
   }
 
   @override
@@ -248,27 +385,85 @@ class HadithRepositoryImpl
       completedItems: 0,
       totalItems: 0,
     );
-    try {
-      final result = await _hadeethEncDataSource.downloadLanguage(languageCode);
-      await _hadeethEncStore.saveLanguageItems(
-        languageCode: languageCode,
-        version: result.version,
-        items: result.items,
-      );
+    if (await hasHadeethEncLanguage(languageCode)) {
+      final items = _hadeethEncStore.itemsForLanguage(languageCode);
       yield HadeethEncDownloadProgress(
         languageCode: languageCode,
-        completedItems: result.items.length,
-        totalItems: result.items.length,
+        completedItems: items.length,
+        totalItems: items.length,
         isComplete: true,
       );
-    } catch (_) {
-      yield HadeethEncDownloadProgress(
-        languageCode: languageCode,
-        completedItems: 0,
-        totalItems: 0,
-        hasFailed: true,
+      return;
+    }
+    var cancelled = false;
+    final updates = StreamController<HadeethEncDownloadProgress>(
+      onCancel: () => cancelled = true,
+    );
+    void report(double progress, String stage) {
+      if (cancelled || updates.isClosed) return;
+      updates.add(
+        HadeethEncDownloadProgress(
+          languageCode: languageCode,
+          completedItems: 0,
+          totalItems: 0,
+          downloadProgress: progress,
+          stage: stage,
+        ),
       );
     }
+
+    Future<void> download() async {
+      try {
+        final result = await _hadeethEncDataSource.downloadLanguage(
+          languageCode,
+          isCancelled: () => cancelled,
+          onProgress: (value) => report(value * 0.85, 'Downloading'),
+        );
+        if (cancelled) return;
+        if (!result.items.any(
+          (item) =>
+              item.hadithTextArabic.trim().isNotEmpty &&
+              item.hadithText.trim().isNotEmpty &&
+              HadithAuthenticityPolicy.shouldShow(item.toHadithItem()),
+        )) {
+          throw const FormatException(
+            'No translated authentic hadiths were found',
+          );
+        }
+        report(0.9, 'Saving');
+        await _hadeethEncStore.saveLanguageItems(
+          languageCode: languageCode,
+          version: result.version,
+          items: result.items,
+        );
+        await _hadeethEncDataSource.finishLanguageDownload(languageCode);
+        if (cancelled) return;
+        updates.add(
+          HadeethEncDownloadProgress(
+            languageCode: languageCode,
+            completedItems: result.items.length,
+            totalItems: result.items.length,
+            isComplete: true,
+          ),
+        );
+      } catch (_) {
+        if (!cancelled) {
+          updates.add(
+            HadeethEncDownloadProgress(
+              languageCode: languageCode,
+              completedItems: 0,
+              totalItems: 0,
+              hasFailed: true,
+            ),
+          );
+        }
+      } finally {
+        if (!updates.isClosed) await updates.close();
+      }
+    }
+
+    unawaited(download());
+    yield* updates.stream;
   }
 
   @override
@@ -277,11 +472,14 @@ class HadithRepositoryImpl
     int offset = 0,
     int limit = 50,
   }) async {
-    return _hadeethEncStore.pageForLanguage(
-      languageCode: languageCode,
-      offset: offset,
-      limit: limit,
-    );
+    return _hadeethEncStore
+        .itemsForLanguage(languageCode)
+        .where(
+          (item) => HadithAuthenticityPolicy.shouldShow(item.toHadithItem()),
+        )
+        .skip(offset)
+        .take(limit)
+        .toList();
   }
 
   @override
@@ -290,11 +488,17 @@ class HadithRepositoryImpl
     required String query,
     int limit = 30,
   }) async {
-    return _hadeethEncStore.search(
+    final matches = _hadeethEncStore.search(
       languageCode: languageCode,
       query: query,
-      limit: limit,
+      limit: 100000,
     );
+    return matches
+        .where(
+          (item) => HadithAuthenticityPolicy.shouldShow(item.toHadithItem()),
+        )
+        .take(limit)
+        .toList();
   }
 
   HadeethEncItem? _hadeethEncItemFromId(String id) {
@@ -310,7 +514,15 @@ class HadithRepositoryImpl
     return _hadeethEncStore.itemById(languageCode: languageCode, id: itemId);
   }
 
-  DeepSearchIndexRecord _hadeethEncIndexRecord(HadeethEncItem item) {
+  static List<DeepSearchIndexRecord> _hadeethEncIndexRecords(
+    List<HadeethEncItem> items,
+  ) => [
+    for (final item in items)
+      if (HadithAuthenticityPolicy.shouldShow(item.toHadithItem()))
+        _hadeethEncIndexRecord(item),
+  ];
+
+  static DeepSearchIndexRecord _hadeethEncIndexRecord(HadeethEncItem item) {
     final hadith = item.toHadithItem();
     final title = item.title.trim().isEmpty
         ? 'HadeethEnc ${item.id}'
@@ -390,4 +602,51 @@ class HadithRepositoryImpl
 
 extension _FirstOrNull<T> on List<T> {
   T? get firstOrNull => isEmpty ? null : first;
+}
+
+List<DeepSearchIndexRecord> _searchContentRecords(Map<String, Object> args) {
+  final query = args['query'] as String;
+  if (query.isEmpty) return const [];
+  final records = args['records'] as List<DeepSearchIndexRecord>;
+  return records
+      .where((record) => record.normalizedText.contains(query))
+      .take(args['limit'] as int)
+      .toList();
+}
+
+List<DeepSearchIndexRecord> _translatedIndexRecords(Map<String, Object> args) {
+  final records = args['records'] as List<DeepSearchIndexRecord>;
+  final byId = {for (final record in records) record.targetId: record};
+  final packs =
+      args['packs']
+          as List<
+            ({
+              String bookId,
+              String languageCode,
+              Map<String, String> translations,
+            })
+          >;
+  return [
+    for (final pack in packs)
+      for (final entry in pack.translations.entries)
+        if (entry.value.trim().isNotEmpty)
+          if (byId['hadith:${pack.bookId}:${entry.key}'] case final record?)
+            DeepSearchIndexRecord(
+              id: '${record.id}:translation:${pack.languageCode}',
+              category: 'hadith',
+              title: record.title,
+              subtitle: pack.languageCode,
+              primaryPreview: record.primaryPreview,
+              secondaryPreview: SearchTextNormalizer.cleanVisibleText(
+                entry.value,
+              ),
+              normalizedText: SearchTextNormalizer.normalize(
+                '${record.title} ${entry.value}',
+              ),
+              targetType: 'hadith',
+              targetId: record.targetId,
+              bookId: record.bookId,
+              languageCode: pack.languageCode,
+            ),
+  ];
 }

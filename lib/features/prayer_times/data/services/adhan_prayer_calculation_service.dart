@@ -57,12 +57,27 @@ class AdhanPrayerCalculationService {
         time: tz.TZDateTime.from(prayerTimes.isha, timeZone),
       ),
     ];
+    final tomorrow = adhan.PrayerTimes(
+      date: tz.TZDateTime(
+        timeZone,
+        locationDate.year,
+        locationDate.month,
+        locationDate.day + 1,
+      ),
+      coordinates: adhan.Coordinates(location.latitude, location.longitude),
+      calculationParameters: parameters,
+    );
+    final nextDayFajr = PrayerTimeEntry(
+      name: PrayerTimeName.fajr,
+      time: tz.TZDateTime.from(tomorrow.fajr, timeZone),
+    );
     return DailyPrayerTimes(
       date: date,
       location: location,
       settings: settings,
       entries: entries,
-      nextPrayer: _nextPrayer(entries, now ?? DateTime.now()),
+      nextPrayer: _nextPrayer(entries, now ?? DateTime.now(), nextDayFajr),
+      nextDayFajr: nextDayFajr,
     );
   }
 
@@ -82,7 +97,11 @@ class AdhanPrayerCalculationService {
     return parameters;
   }
 
-  PrayerTimeEntry _nextPrayer(List<PrayerTimeEntry> entries, DateTime now) {
+  PrayerTimeEntry _nextPrayer(
+    List<PrayerTimeEntry> entries,
+    DateTime now,
+    PrayerTimeEntry nextDayFajr,
+  ) {
     for (final entry in entries) {
       if (entry.name == PrayerTimeName.sunrise) {
         continue;
@@ -91,7 +110,7 @@ class AdhanPrayerCalculationService {
         return entry;
       }
     }
-    return entries.firstWhere((entry) => entry.name == PrayerTimeName.fajr);
+    return nextDayFajr;
   }
 
   tz.Location _timeZone(String timeZone) {

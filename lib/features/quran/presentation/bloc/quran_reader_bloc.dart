@@ -1,4 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
 
 import '../../../../core/storage/settings_store.dart';
 import '../../../reading_goals/domain/repositories/reading_progress_repository.dart';
@@ -11,6 +13,7 @@ import '../../domain/entities/quran_word.dart';
 import '../../domain/repositories/quran_interlinear_repository.dart';
 import '../../domain/repositories/quran_repository.dart';
 import '../../domain/repositories/quran_translation_repository.dart';
+import '../../domain/services/quran_translation_audio_pairings.dart';
 import 'quran_reader_event.dart';
 import 'quran_reader_state.dart';
 
@@ -33,6 +36,9 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     on<QuranReaderSurahChanged>(_onSurahChanged);
     on<QuranReaderTranslationToggled>(_onTranslationToggled);
     on<QuranReaderTranslationSelected>(_onTranslationSelected);
+    on<QuranReaderTranslationPreferenceChanged>(
+      (event, emit) => _refreshTranslation(emit),
+    );
     on<QuranReaderInterlinearCacheCompleted>(_onInterlinearCacheCompleted);
     on<QuranReaderAudioReciterSelected>(_onAudioReciterSelected);
     on<QuranReaderAyahTextLayoutChanged>(_onAyahTextLayoutChanged);
@@ -42,6 +48,19 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     on<QuranReaderFollowAudioChanged>(_onFollowAudioChanged);
     on<QuranReaderBookmarkToggled>(_onBookmarkToggled);
     on<QuranReaderLastReadSaved>(_onLastReadSaved);
+    if (translationRepository is QuranTranslationSelectionObservable) {
+      _translationChanges =
+          (translationRepository as QuranTranslationSelectionObservable)
+              .selectionChanges;
+      _translationChanges!.addListener(_onTranslationPreferenceChanged);
+    }
+  }
+
+  Listenable? _translationChanges;
+  int _translationLoadRevision = 0;
+
+  void _onTranslationPreferenceChanged() {
+    if (!isClosed) add(const QuranReaderTranslationPreferenceChanged());
   }
 
   final QuranRepository _repository;
@@ -51,6 +70,55 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
   final SettingsStore? _settingsStore;
   final DateTime Function() _now;
   DateTime? _readingSessionStartedAt;
+  bool _readingActive = true;
+  bool _hasReadingProgress = false;
+  int _readingSeconds = 0;
+  int _recordedMinutes = 0;
+  Future<void> _readingWrites = Future.value();
+  Future<void> _lastReadWrite = Future.value();
+  int _navigationRevision = 0;
+
+  void setReadingActivity(bool active) {
+    if (isClosed || active == _readingActive) return;
+    _accumulateReadingTime();
+    _readingActive = active;
+    if (active && _hasReadingProgress) _readingSessionStartedAt = _now();
+    if (!active) unawaited(_flushReadingMinutes());
+  }
+
+  void _accumulateReadingTime() {
+    final started = _readingSessionStartedAt;
+    _readingSessionStartedAt = null;
+    if (started != null) {
+      _readingSeconds += _now().difference(started).inSeconds.clamp(0, 7200);
+    }
+  }
+
+  Future<void> _flushReadingMinutes({bool round = false}) {
+    final repository = _readingProgressRepository;
+    final minutes = ((_readingSeconds + (round ? 30 : 0)) ~/ 60).clamp(
+      0,
+      120 - _recordedMinutes,
+    );
+    if (repository == null || minutes == 0) return _readingWrites;
+    _readingSeconds = (_readingSeconds - minutes * 60).clamp(0, 7200);
+    _recordedMinutes += minutes;
+    final at = _now();
+    return _readingWrites = _readingWrites
+        .then((_) => repository.recordMinutes(minutes, at: at))
+        .catchError((Object error) {
+          debugPrint('Could not save reading minutes: $error');
+        });
+  }
+
+  Future<void> _saveNavigationLastRead(int surah, int ayah, int revision) {
+    return _lastReadWrite = _lastReadWrite.catchError((Object _) {}).then((
+      _,
+    ) async {
+      if (isClosed || revision != _navigationRevision) return;
+      await _repository.saveLastRead(surahNumber: surah, ayahNumber: ayah);
+    });
+  }
 
   Future<_LoadedSurahReaderData> _loadSurahReaderData({
     required int surahNumber,
@@ -77,12 +145,6 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
             languageCode: interlinearLanguageCode,
           )
         : existingWords;
-    if (startingAyah != null) {
-      await _repository.saveLastRead(
-        surahNumber: startingAyah.surahNumber,
-        ayahNumber: startingAyah.number,
-      );
-    }
     return _LoadedSurahReaderData(
       surah: surah,
       ayahs: ayahs,
@@ -95,6 +157,7 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     QuranReaderStarted event,
     Emitter<QuranReaderState> emit,
   ) async {
+    final revision = ++_navigationRevision;
     emit(state.copyWith(status: QuranReaderStatus.loading));
     try {
       final bookmarks = await _repository.getBookmarks();
@@ -149,6 +212,11 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
       final translationsByVerse = selectedTranslation == null
           ? const <String, String>{}
           : translationsByResource[selectedTranslation.id] ?? const {};
+      if (emit.isDone || revision != _navigationRevision) return;
+      if (loaded.startingAyah case final ayah?) {
+        await _saveNavigationLastRead(ayah.surahNumber, ayah.number, revision);
+      }
+      if (emit.isDone || revision != _navigationRevision) return;
       emit(
         state.copyWith(
           status: QuranReaderStatus.success,
@@ -176,6 +244,7 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
         ),
       );
     } catch (error) {
+      if (emit.isDone || revision != _navigationRevision) return;
       emit(
         state.copyWith(
           status: QuranReaderStatus.failure,
@@ -189,7 +258,8 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     QuranReaderSurahChanged event,
     Emitter<QuranReaderState> emit,
   ) async {
-    if (state.errorMessage != null) emit(state.copyWith());
+    final revision = ++_navigationRevision;
+    emit(state.copyWith(followAudio: false));
     try {
       final loaded = await _loadSurahReaderData(
         surahNumber: event.surahNumber.clamp(1, 114).toInt(),
@@ -207,6 +277,11 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
       final translationsByVerse = state.selectedTranslation == null
           ? const <String, String>{}
           : translationsByResource[state.selectedTranslation!.id] ?? const {};
+      if (emit.isDone || revision != _navigationRevision) return;
+      if (loaded.startingAyah case final ayah?) {
+        await _saveNavigationLastRead(ayah.surahNumber, ayah.number, revision);
+      }
+      if (emit.isDone || revision != _navigationRevision) return;
       emit(
         state.copyWith(
           surah: loaded.surah,
@@ -223,6 +298,7 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
         ),
       );
     } catch (_) {
+      if (emit.isDone || revision != _navigationRevision) return;
       // Keep the current reader visible and allow a failed pull to be retried.
       emit(
         state.copyWith(errorMessage: 'Could not open surah. Please try again.'),
@@ -270,17 +346,30 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     if (repository == null || surah == null) {
       return;
     }
+    final resourceId = event.resourceId;
     final cachedForSurah = await repository.cachedTranslationsForSurah(
-      event.resourceId,
+      resourceId,
       surah.number,
     );
     if (cachedForSurah.isEmpty &&
-        !await repository.hasFullTranslation(event.resourceId)) {
+        !await repository.hasFullTranslation(resourceId)) {
       return;
     }
-    await repository.setSelectedTranslation(event.resourceId);
+    await repository.setSelectedTranslation(resourceId);
     await _settingsStore?.setQuranTranslationVisible(true);
+    await _refreshTranslation(emit, enable: true);
+  }
+
+  Future<void> _refreshTranslation(
+    Emitter<QuranReaderState> emit, {
+    bool enable = false,
+  }) async {
+    final repository = _translationRepository;
+    final surah = state.surah;
+    if (repository == null || surah == null) return;
+    final revision = ++_translationLoadRevision;
     final selected = await repository.selectedTranslation();
+    final visible = enable || state.showTranslation;
     final selectedTranslations = await _selectedTranslationResources(selected);
     final interlinearLanguageCode = _interlinearLanguageCode(selected);
     final interlinearCacheComplete = await _hasFullInterlinearCache(
@@ -301,7 +390,7 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     final pageWords =
         _shouldLoadWords(
           ayahTextLayout: state.ayahTextLayout,
-          showTranslation: selected != null,
+          showTranslation: visible,
           interlinearCacheComplete: interlinearCacheComplete,
           interlinearLanguageCode: interlinearLanguageCode,
         )
@@ -311,10 +400,16 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
             languageCode: interlinearLanguageCode,
           )
         : existingWords;
+    if (emit.isDone ||
+        revision != _translationLoadRevision ||
+        state.surah?.number != surah.number) {
+      return;
+    }
     emit(
       state.copyWith(
-        showTranslation: selected != null,
+        showTranslation: visible,
         selectedTranslation: selected,
+        clearSelectedTranslation: selected == null,
         selectedTranslations: selectedTranslations,
         translationsByResource: translationsByResource,
         translationsByVerse: translationsByVerse,
@@ -429,10 +524,15 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     if (selected == null) {
       return;
     }
-    await _repository.saveLastRead(
-      surahNumber: selected.surahNumber,
-      ayahNumber: selected.ayahNumber,
+    final revision = state.followAudio
+        ? ++_navigationRevision
+        : _navigationRevision;
+    await _saveNavigationLastRead(
+      selected.surahNumber,
+      selected.ayahNumber,
+      revision,
     );
+    if (emit.isDone || revision != _navigationRevision) return;
     if (state.followAudio && selected.surahNumber != state.surah?.number) {
       final loaded = await _loadSurahReaderData(
         surahNumber: selected.surahNumber,
@@ -450,6 +550,7 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
       final translationsByVerse = state.selectedTranslation == null
           ? const <String, String>{}
           : translationsByResource[state.selectedTranslation!.id] ?? const {};
+      if (emit.isDone || revision != _navigationRevision) return;
       emit(
         state.copyWith(
           surah: loaded.surah,
@@ -513,11 +614,20 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     QuranReaderLastReadSaved event,
     Emitter<QuranReaderState> emit,
   ) async {
-    await _repository.saveLastRead(
-      surahNumber: event.surahNumber,
-      ayahNumber: event.ayahNumber,
+    if (state.surah?.number != event.surahNumber) return;
+    final revision = _navigationRevision;
+    await _saveNavigationLastRead(
+      event.surahNumber,
+      event.ayahNumber,
+      revision,
     );
+    if (emit.isDone ||
+        revision != _navigationRevision ||
+        state.surah?.number != event.surahNumber) {
+      return;
+    }
     await _recordReadingProgress(event.surahNumber, event.ayahNumber);
+    if (emit.isDone || revision != _navigationRevision) return;
     emit(
       state.copyWith(
         currentVerseKey: '${event.surahNumber}:${event.ayahNumber}',
@@ -533,12 +643,11 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
     required int ayahNumber,
     required Emitter<QuranReaderState> emit,
   }) async {
+    final revision = ++_navigationRevision;
     final verseKey = '$surahNumber:$ayahNumber';
-    await _repository.saveLastRead(
-      surahNumber: surahNumber,
-      ayahNumber: ayahNumber,
-    );
+    await _saveNavigationLastRead(surahNumber, ayahNumber, revision);
     await _recordReadingProgress(surahNumber, ayahNumber);
+    if (emit.isDone || revision != _navigationRevision) return;
     if (surahNumber != state.surah?.number) {
       final loaded = await _loadSurahReaderData(
         surahNumber: surahNumber,
@@ -556,6 +665,7 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
       final translationsByVerse = state.selectedTranslation == null
           ? const <String, String>{}
           : translationsByResource[state.selectedTranslation!.id] ?? const {};
+      if (emit.isDone || revision != _navigationRevision) return;
       emit(
         state.copyWith(
           surah: loaded.surah,
@@ -588,7 +698,8 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
         break;
       }
     }
-    _readingSessionStartedAt ??= _now();
+    _hasReadingProgress = true;
+    if (_readingActive) _readingSessionStartedAt ??= _now();
     await repository.recordVerse(
       verseKey: '$surahNumber:$ayahNumber',
       page: page,
@@ -598,17 +709,12 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
 
   @override
   Future<void> close() async {
-    final startedAt = _readingSessionStartedAt;
-    final repository = _readingProgressRepository;
-    if (startedAt != null && repository != null) {
-      final seconds = _now().difference(startedAt).inSeconds;
-      if (seconds >= 30) {
-        await repository.recordMinutes(
-          ((seconds + 30) ~/ 60).clamp(1, 120),
-          at: _now(),
-        );
-      }
-    }
+    _navigationRevision++;
+    _translationChanges?.removeListener(_onTranslationPreferenceChanged);
+    _readingActive = false;
+    _accumulateReadingTime();
+    await _flushReadingMinutes(round: true);
+    await _lastReadWrite.catchError((Object _) {});
     return super.close();
   }
 
@@ -649,7 +755,7 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
   }
 
   String? _interlinearLanguageCode(QuranTranslationResource? resource) {
-    return resource?.wordTranslationLanguageCode;
+    return quranEditionWordLanguage(resource);
   }
 
   Future<bool> _hasFullInterlinearCache(String? languageCode) async {
@@ -663,6 +769,11 @@ class QuranReaderBloc extends Bloc<QuranReaderEvent, QuranReaderState> {
   Future<List<QuranTranslationResource>> _selectedTranslationResources(
     QuranTranslationResource? primary,
   ) async {
+    if (primary != null &&
+        (primary.isUrdu ||
+            quranTranslationPairForResource(primary.id) != null)) {
+      return [primary];
+    }
     final repository = _translationRepository;
     if (repository is QuranMultiTranslationRepository) {
       final selected = await (repository as QuranMultiTranslationRepository)

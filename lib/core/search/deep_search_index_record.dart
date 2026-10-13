@@ -13,6 +13,7 @@ class DeepSearchIndexRecord extends Equatable {
     required this.targetId,
     this.bookId,
     this.categoryId,
+    this.languageCode,
   });
 
   factory DeepSearchIndexRecord.fromMap(Map<String, dynamic> map) {
@@ -28,6 +29,7 @@ class DeepSearchIndexRecord extends Equatable {
       targetId: map['targetId'] as String? ?? '',
       bookId: map['bookId'] as String?,
       categoryId: map['categoryId'] as String?,
+      languageCode: map['languageCode'] as String?,
     );
   }
 
@@ -42,6 +44,7 @@ class DeepSearchIndexRecord extends Equatable {
   final String targetId;
   final String? bookId;
   final String? categoryId;
+  final String? languageCode;
 
   @override
   List<Object?> get props => [
@@ -56,5 +59,6 @@ class DeepSearchIndexRecord extends Equatable {
     targetId,
     bookId,
     categoryId,
+    languageCode,
   ];
 }

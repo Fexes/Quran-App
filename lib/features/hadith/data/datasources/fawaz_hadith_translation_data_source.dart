@@ -1,12 +1,15 @@
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
+import '../../../../core/network/resumable_file_downloader.dart';
 
 class FawazHadithTranslationDataSource {
   const FawazHadithTranslationDataSource({
     Future<List<int>> Function(Uri uri)? fetcher,
-  }) : _fetcher = fetcher ?? _httpGet;
+  }) : _fetcher = fetcher;
 
-  final Future<List<int>> Function(Uri uri) _fetcher;
+  final Future<List<int>> Function(Uri uri)? _fetcher;
 
   static const _baseUrl =
       'https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions';
@@ -14,15 +17,66 @@ class FawazHadithTranslationDataSource {
   Future<FawazHadithBookTranslation> downloadBookTranslation({
     required String bookId,
     required String languageCode,
+    void Function(double progress)? onProgress,
+    bool Function()? isCancelled,
   }) async {
     final editionPrefix = editionPrefixFor(languageCode);
     if (editionPrefix == null) {
       throw UnsupportedError('Hadith language not supported: $languageCode');
     }
     final editionName = '$editionPrefix-$bookId';
-    final uri = Uri.parse('$_baseUrl/$editionName.min.json');
-    final bytes = await _fetcher(uri);
-    final decoded = jsonDecode(utf8.decode(bytes));
+    Object? lastError;
+    for (final suffix in ['min.json', 'json']) {
+      final uri = Uri.parse('$_baseUrl/$editionName.$suffix');
+      ResumableDownloadFile? completedFile;
+      try {
+        if (_fetcher == null) {
+          completedFile = await ResumableFileDownloader.instance.download(
+            uri,
+            onProgress: onProgress,
+            isCancelled: isCancelled,
+          );
+        }
+        final bytes = completedFile != null
+            ? await completedFile.readBytes()
+            : await _fetcher!(uri);
+        if (isCancelled?.call() == true) throw StateError('Download cancelled');
+        onProgress?.call(1);
+        return await compute(_parseBookTranslation, {
+          'bytes': bytes,
+          'editionName': editionName,
+        });
+      } catch (error) {
+        if (isCancelled?.call() == true) rethrow;
+        if (completedFile != null && error is FormatException) {
+          await ResumableFileDownloader.instance.discard(uri);
+        }
+        lastError = error;
+      }
+    }
+    throw lastError ??
+        const FormatException('Hadith translation download failed');
+  }
+
+  Future<void> finishBookDownload(String bookId, String languageCode) async {
+    if (_fetcher != null) return;
+    final prefix = editionPrefixFor(languageCode);
+    if (prefix == null) return;
+    try {
+      for (final suffix in ['min.json', 'json']) {
+        await ResumableFileDownloader.instance.discard(
+          Uri.parse('$_baseUrl/$prefix-$bookId.$suffix'),
+        );
+      }
+    } catch (_) {
+      // Installed data is authoritative; cleanup must not fail the download.
+    }
+  }
+
+  static FawazHadithBookTranslation _parseBookTranslation(
+    Map<String, Object> input,
+  ) {
+    final decoded = jsonDecode(utf8.decode(input['bytes'] as List<int>));
     if (decoded is! Map) {
       throw const FormatException('Invalid Hadith translation response');
     }
@@ -33,16 +87,21 @@ class FawazHadithTranslationDataSource {
     final translations = <String, String>{};
     for (final item in rawHadiths) {
       if (item is! Map) {
-        continue;
+        throw const FormatException('Invalid Hadith translation record');
       }
       final number = item['hadithnumber']?.toString() ?? '';
       final text = _cleanText(item['text']);
-      if (number.isNotEmpty && text.isNotEmpty) {
-        translations[number] = text;
+      if (number.isEmpty || translations.containsKey(number)) {
+        throw const FormatException('Invalid or duplicate Hadith number');
       }
+      // Empty source records are unavailable translations, not failed transfers.
+      translations[number] = text;
+    }
+    if (translations.isEmpty) {
+      throw const FormatException('Empty Hadith edition');
     }
     return FawazHadithBookTranslation(
-      editionName: editionName,
+      editionName: input['editionName'] as String,
       translations: translations,
     );
   }
@@ -61,28 +120,6 @@ class FawazHadithTranslationDataSource {
     'tr': 'tur',
     'ur': 'urd',
   };
-
-  static Future<List<int>> _httpGet(Uri uri) async {
-    final client = HttpClient();
-    client.userAgent = 'QuranApp/1.0';
-    try {
-      final request = await client.getUrl(uri);
-      final response = await request.close();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw HttpException(
-          'Hadith translation request failed with ${response.statusCode}',
-          uri: uri,
-        );
-      }
-      final chunks = <int>[];
-      await for (final chunk in response) {
-        chunks.addAll(chunk);
-      }
-      return chunks;
-    } finally {
-      client.close(force: true);
-    }
-  }
 
   static String _cleanText(Object? value) {
     if (value == null) {

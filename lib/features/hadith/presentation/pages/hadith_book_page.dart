@@ -154,7 +154,10 @@ class _HadithBookViewState extends State<_HadithBookView> {
     final supported = await repository.availableTranslationLanguagesForBook(
       widget.bookId,
     );
-    final available = await repository.hasFullTranslation(widget.bookId, code);
+    final available = await repository.hasDownloadedTranslation(
+      widget.bookId,
+      code,
+    );
     if (!mounted || request != _languageRequest) {
       return;
     }

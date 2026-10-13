@@ -13,6 +13,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../app/di/injection.dart';
 import '../../../../core/storage/settings_store.dart';
+import '../../../../core/navigation/app_route_observer.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/theme/quran_theme_cubit.dart';
 import '../../../../core/theme/quran_theme_state.dart';
@@ -32,6 +33,7 @@ import '../../domain/entities/quran_surah.dart';
 import '../../domain/entities/quran_tafsir.dart';
 import '../../domain/entities/quran_translation.dart';
 import '../../domain/entities/quran_word.dart';
+import '../../domain/services/quran_translation_audio_pairings.dart';
 import '../../data/stores/quran_user_data_store.dart';
 import '../../domain/repositories/quran_interlinear_repository.dart';
 import '../../domain/repositories/quran_repository.dart';
@@ -49,7 +51,6 @@ import '../widgets/quran_book_text.dart';
 import '../widgets/quran_surah_pull_navigation.dart';
 import '../widgets/quran_reader_floating_controls.dart';
 import '../widgets/quran_translation_text.dart';
-import '../widgets/quran_translation_picker.dart';
 import '../widgets/quran_translation_download_sheet.dart';
 import '../widgets/quran_share_translation_tile.dart';
 
@@ -111,7 +112,8 @@ class _QuranReaderView extends StatefulWidget {
   State<_QuranReaderView> createState() => _QuranReaderViewState();
 }
 
-class _QuranReaderViewState extends State<_QuranReaderView> {
+class _QuranReaderViewState extends State<_QuranReaderView>
+    with WidgetsBindingObserver, RouteAware {
   static const _ayahBookChunkSize = 20;
 
   var _itemScrollController = ItemScrollController();
@@ -139,16 +141,75 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
   String? _suppressedInitialAudioFocusVerseKey;
   var _programmaticScroll = false;
   bool _changingSurah = false;
+  int? _requestedUrduDownloadForSurah;
   int? _enterAtBottomSurah;
+  QuranReaderBloc? _readerBloc;
+  ModalRoute<dynamic>? _readerRoute;
+  bool _routeVisible = true;
+  bool _appActive = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _itemPositionsListener.itemPositions.addListener(_scheduleVisibleAyahSave);
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _readerBloc ??= context.read<QuranReaderBloc>();
+    final route = ModalRoute.of(context);
+    if (route != _readerRoute) {
+      appRouteObserver.unsubscribe(this);
+      _readerRoute = route;
+      if (route != null) appRouteObserver.subscribe(this, route);
+      _routeVisible = route?.isCurrent ?? true;
+    }
+    _appActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    _updateReadingActivity();
+  }
+
+  void _updateReadingActivity() =>
+      _readerBloc?.setReadingActivity(_routeVisible && _appActive);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appActive = state == AppLifecycleState.resumed;
+    _updateReadingActivity();
+  }
+
+  @override
+  void didPush() {
+    _routeVisible = true;
+    _updateReadingActivity();
+  }
+
+  @override
+  void didPopNext() {
+    _routeVisible = true;
+    _updateReadingActivity();
+  }
+
+  @override
+  void didPushNext() {
+    _routeVisible = false;
+    _updateReadingActivity();
+  }
+
+  @override
+  void didPop() {
+    _routeVisible = false;
+    _updateReadingActivity();
+  }
+
+  @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    _readerBloc?.setReadingActivity(false);
     _scrollSaveDebounce?.cancel();
     _followScrollRetry?.cancel();
     _jumpScrollRetry?.cancel();
@@ -809,20 +870,16 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
                       readerState: readerState,
                       layout: layout,
                     ),
-                    onTranslationTap: () => _showTranslationPicker(
+                    onTranslationTap: () => _showReadingPreferences(
                       readerBloc: readerBloc,
                       readerState: readerState,
                     ),
-                    onTranslationSwitchChanged: (enabled) {
-                      if (enabled && readerState.selectedTranslation == null) {
-                        _showTranslationPicker(
+                    onTranslationSwitchChanged: (enabled) =>
+                        _changeTranslationVisibility(
                           readerBloc: readerBloc,
                           readerState: readerState,
-                        );
-                      } else if (readerState.showTranslation != enabled) {
-                        readerBloc.add(const QuranReaderTranslationToggled());
-                      }
-                    },
+                          enabled: enabled,
+                        ),
                     onFollowAudioChanged: (enabled) => readerBloc.add(
                       QuranReaderFollowAudioChanged(
                         enabled,
@@ -843,30 +900,57 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
     );
   }
 
-  Future<void> _showTranslationPicker({
+  Future<void> _showReadingPreferences({
     required QuranReaderBloc readerBloc,
     required QuranReaderState readerState,
   }) async {
-    final repository = getIt<QuranTranslationRepository>();
-    final selected = await showModalBottomSheet<QuranTranslationResource>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => QuranTranslationPicker(
-        repository: repository,
-        currentResource: readerState.selectedTranslation,
-      ),
-    );
-    if (!mounted) {
-      return;
-    }
-    if (selected == null) {
-      return;
-    }
-    if (!await repository.hasFullTranslation(selected.id)) {
-      if (!mounted) {
-        return;
+    try {
+      await context.push(AppRoutes.quranTranslationsPath());
+      if (!mounted || readerBloc.isClosed) return;
+      final selected = await getIt<QuranTranslationRepository>()
+          .selectedTranslation();
+      final reciterId = await getIt<QuranRepository>()
+          .getSelectedAudioReciterId();
+      if (!mounted || readerBloc.isClosed) return;
+      if (reciterId != null &&
+          reciterId != readerBloc.state.selectedAudioReciter?.id) {
+        readerBloc.add(QuranReaderAudioReciterSelected(reciterId));
       }
+      if (selected != null &&
+          selected.id != readerState.selectedTranslation?.id) {
+        final prepared = await _ensureBookLineTranslationCache(
+          readerState: readerBloc.state,
+          resource: selected,
+        );
+        if (!mounted || readerBloc.isClosed) return;
+        final languageCode = quranEditionWordLanguage(selected);
+        if (prepared && languageCode != null) {
+          readerBloc.add(
+            QuranReaderInterlinearCacheCompleted(languageCode: languageCode),
+          );
+        }
+      }
+      if (!readerBloc.isClosed) {
+        readerBloc.add(const QuranReaderTranslationPreferenceChanged());
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not refresh reading preferences. Try again.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<bool> _ensureTranslationDownloaded(
+    QuranTranslationResource resource,
+  ) async {
+    final repository = getIt<QuranTranslationRepository>();
+    try {
+      if (await repository.hasReadyReadingLanguage(resource.id)) return mounted;
+      if (!mounted) return false;
       final downloaded = await showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
@@ -875,18 +959,65 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
         useSafeArea: true,
         builder: (context) => QuranTranslationDownloadSheet(
           repository: repository,
-          resource: selected,
+          resource: resource,
         ),
       );
-      if (!mounted || downloaded != true) {
-        return;
+      return mounted && downloaded == true;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not prepare translation. Try again.'),
+          ),
+        );
       }
+      return false;
     }
-    await _ensureBookLineTranslationCache(
-      readerState: readerState,
-      resource: selected,
-    );
-    readerBloc.add(QuranReaderTranslationSelected(selected.id));
+  }
+
+  Future<void> _changeTranslationVisibility({
+    required QuranReaderBloc readerBloc,
+    required QuranReaderState readerState,
+    required bool enabled,
+  }) async {
+    final resource = readerState.selectedTranslation;
+    if (enabled &&
+        resource != null &&
+        readerState.translationsByVerse.isEmpty) {
+      if (await _ensureTranslationDownloaded(resource) &&
+          !readerBloc.isClosed) {
+        readerBloc.add(QuranReaderTranslationSelected(resource.id));
+      }
+    } else if (readerBloc.state.showTranslation != enabled) {
+      readerBloc.add(const QuranReaderTranslationToggled());
+    }
+  }
+
+  void _scheduleUrduTranslationDownload(QuranReaderState state) {
+    if (state.status != QuranReaderStatus.success ||
+        !state.showTranslation ||
+        state.selectedTranslation?.isUrdu != true) {
+      if (!state.showTranslation) _requestedUrduDownloadForSurah = null;
+      return;
+    }
+    if (_requestedUrduDownloadForSurah == state.surah?.number) return;
+    if (state.translationsByVerse.keys.any(
+      (key) => key.startsWith('${state.surah?.number}:'),
+    )) {
+      return;
+    }
+    _requestedUrduDownloadForSurah = state.surah?.number;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      final readerBloc = context.read<QuranReaderBloc>();
+      final resource = state.selectedTranslation!;
+      if (await _ensureTranslationDownloaded(resource) &&
+          !readerBloc.isClosed) {
+        readerBloc.add(QuranReaderTranslationSelected(resource.id));
+      } else if (!readerBloc.isClosed && readerBloc.state.showTranslation) {
+        readerBloc.add(const QuranReaderTranslationToggled());
+      }
+    });
   }
 
   Future<void> _changeAyahLayout({
@@ -903,8 +1034,7 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
         targetLayout: layout,
       );
       if (downloaded && mounted && settingsContext.mounted) {
-        final code =
-            readerState.selectedTranslation!.wordTranslationLanguageCode;
+        final code = quranEditionWordLanguage(readerState.selectedTranslation);
         if (code != null) {
           settingsContext.read<QuranReaderBloc>().add(
             QuranReaderInterlinearCacheCompleted(languageCode: code),
@@ -929,7 +1059,7 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
     if (effectiveLayout != QuranAyahTextLayout.combined) {
       return false;
     }
-    final languageCode = resource.wordTranslationLanguageCode;
+    final languageCode = quranEditionWordLanguage(resource);
     if (languageCode == null) {
       return false;
     }
@@ -1202,8 +1332,8 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
                     currentSurah: currentSurah,
                     onSurahSelected: (surahNumber, {ayahNumber}) {
                       _enterAtBottomSurah = null;
+                      _scrollSaveDebounce?.cancel();
                       if (ayahNumber != null) {
-                        _scrollSaveDebounce?.cancel();
                         _markProgrammaticScroll();
                       }
                       readerContext.read<QuranReaderBloc>().add(
@@ -1314,10 +1444,10 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
                     _AyahCard(
                       ayah: ayah,
                       arabicScript: themeState.quranArabicScript,
-                      translation: selectedTranslation ?? ayah.translation,
-                      translationResource: selectedTranslation == null
-                          ? null
-                          : state.selectedTranslation,
+                      translation: state.selectedTranslation == null
+                          ? ayah.translation
+                          : selectedTranslation ?? '',
+                      translationResource: state.selectedTranslation,
                       additionalTranslations: [
                         for (final resource in state.selectedTranslations.skip(
                           1,
@@ -1562,38 +1692,31 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const ExcludeSemantics(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _GoldOrnament(compact: true),
-                SizedBox(width: 6),
-                AppIcon(
-                  Icons.auto_awesome_rounded,
-                  size: 8,
-                  color: Color(0xFFD6A657),
+          Row(
+            children: [
+              const _GoldOrnament(compact: true),
+              const SizedBox(width: 6),
+              Expanded(
+                child: QuranReaderArabicText(
+                  text:
+                      ayah?.textForScript(themeState.quranArabicScript) ??
+                      themeState.quranArabicScript.bismillah,
+                  arabicScript: themeState.quranArabicScript,
+                  arabicFontScale: themeState.quranArabicFontScale,
+                  textAlign: TextAlign.center,
+                  selected: numbered && state.selectedVerseKey == '1:1',
+                  highlighterActive: active,
+                  activeWordIndex: active
+                      ? ayah?.wordIndexForScript(
+                          themeState.quranArabicScript,
+                          audioState.activeWordIndex,
+                        )
+                      : null,
                 ),
-                SizedBox(width: 6),
-                _GoldOrnament(compact: true, flip: true),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          QuranReaderArabicText(
-            text:
-                ayah?.textForScript(themeState.quranArabicScript) ??
-                themeState.quranArabicScript.bismillah,
-            arabicScript: themeState.quranArabicScript,
-            arabicFontScale: themeState.quranArabicFontScale,
-            textAlign: TextAlign.center,
-            selected: numbered && state.selectedVerseKey == '1:1',
-            highlighterActive: active,
-            activeWordIndex: active
-                ? ayah?.wordIndexForScript(
-                    themeState.quranArabicScript,
-                    audioState.activeWordIndex,
-                  )
-                : null,
+              ),
+              const SizedBox(width: 6),
+              const _GoldOrnament(compact: true, flip: true),
+            ],
           ),
           if (state.showTranslation)
             for (final (text, resource) in translations) ...[
@@ -1835,6 +1958,7 @@ class _QuranReaderViewState extends State<_QuranReaderView> {
     return BlocBuilder<QuranReaderBloc, QuranReaderState>(
       builder: (context, state) {
         _latestState = state;
+        _scheduleUrduTranslationDownload(state);
         _handleRenderedSurahChange(state);
         final surah = state.surah;
         return Scaffold(
@@ -3094,7 +3218,7 @@ class _ReaderSettingsPageState extends State<_ReaderSettingsPage> {
             children: [
               SizedBox(
                 key: const ValueKey('reader-settings-preview'),
-                height: (constraints.maxHeight * 0.4).clamp(0, 320),
+                height: (constraints.maxHeight * 0.32).clamp(0, 256),
                 child: _preview(context),
               ),
               const Divider(height: 1),
@@ -3163,67 +3287,61 @@ class _ReaderSettingsPageState extends State<_ReaderSettingsPage> {
                           widget.onFontScaleChanged(value);
                         },
                       ),
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: TextButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _arabicScale = 1.0;
-                              _translationScale = 1.0;
-                            });
-                            context
-                                .read<QuranThemeCubit>()
-                                .resetReaderFontSizes();
-                          },
-                          icon: const AppIcon(
-                            Icons.restart_alt_rounded,
-                            size: 18,
+                      AnimatedExpansion(
+                        expanded:
+                            (_arabicScale - 1.0).abs() > 0.0001 ||
+                            (_translationScale - 1.0).abs() > 0.0001,
+                        child: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _arabicScale = 1.0;
+                                _translationScale = 1.0;
+                              });
+                              context
+                                  .read<QuranThemeCubit>()
+                                  .resetReaderFontSizes();
+                            },
+                            icon: const AppIcon(
+                              Icons.restart_alt_rounded,
+                              size: 18,
+                            ),
+                            label: const Text('Reset font sizes'),
                           ),
-                          label: const Text('Reset font sizes'),
                         ),
                       ),
                       const Divider(height: 24),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const AppIcon(Icons.translate_rounded),
+                        title: const Text('Reading & listening'),
+                        subtitle: Text(
+                          '${state.selectedTranslation?.displayLanguage ?? 'English'} · '
+                          '${state.selectedAudioReciter?.name ?? 'Default reciter'}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const AppIcon(Icons.chevron_right_rounded),
+                        onTap: widget.onTranslationTap,
+                      ),
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Translation'),
+                        title: const Text('Show translation'),
                         value: state.showTranslation,
                         onChanged: widget.onTranslationSwitchChanged,
                       ),
                       AnimatedExpansion(
                         expanded: state.showTranslation,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const AppIcon(Icons.translate_rounded),
-                              title: Text(
-                                state.selectedTranslation?.displayEndonym ??
-                                    'Select language',
-                              ),
-                              subtitle: state.selectedTranslation == null
-                                  ? null
-                                  : Text(
-                                      state.selectedTranslation!.name,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                              trailing: const AppIcon(
-                                Icons.chevron_right_rounded,
-                              ),
-                              onTap: widget.onTranslationTap,
-                            ),
-                            ReaderTextSizeControl(
-                              title: 'Translation size',
-                              value: _translationScale,
-                              onPreviewChanged: (value) =>
-                                  setState(() => _translationScale = value),
-                              onChanged: (value) {
-                                setState(() => _translationScale = value);
-                                widget.onTranslationFontScaleChanged(value);
-                              },
-                            ),
-                          ],
+                        child: ReaderTextSizeControl(
+                          title: 'Translation size',
+                          value: _translationScale,
+                          onPreviewChanged: (value) =>
+                              setState(() => _translationScale = value),
+                          onChanged: (value) {
+                            setState(() => _translationScale = value);
+                            widget.onTranslationFontScaleChanged(value);
+                          },
                         ),
                       ),
                       const Divider(height: 24),

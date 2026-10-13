@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../../core/content/content_cache_policy.dart';
@@ -14,6 +15,36 @@ class QuranTranslationStore {
 
   final Box<dynamic>? _box;
   final Map<String, Object?>? _memory;
+  final _selectionChanges = ValueNotifier(0);
+
+  Listenable get selectionChanges => _selectionChanges;
+
+  Map<String, Object?> exportPreferences() => {
+    for (final key in _keys())
+      if (_isPreferenceKey(key)) key: _read(key),
+  };
+
+  Future<void> restorePreferences(
+    Map<String, Object?> values, {
+    bool replace = true,
+  }) async {
+    if (replace) {
+      for (final key in _keys().where(_isPreferenceKey).toList()) {
+        await _delete(key);
+      }
+    }
+    for (final entry in values.entries) {
+      if (_isPreferenceKey(entry.key) && entry.value != null) {
+        await _write(entry.key, entry.value!);
+      }
+    }
+    _selectionChanges.value++;
+  }
+
+  static bool _isPreferenceKey(String key) =>
+      key == 'selected_translation_resource' ||
+      key == 'selected_translation_resources' ||
+      key.startsWith('preferred_translation:');
 
   static const boxName = 'quran_translations';
   static const _contentRevisionKey = 'translation_content_revision';
@@ -71,15 +102,17 @@ class QuranTranslationStore {
   }
 
   Future<void> saveSelectedResource(QuranTranslationResource? resource) async {
+    final changed = selectedResource()?.id != resource?.id;
     if (resource == null) {
       await _delete('selected_translation_resource');
-      return;
+    } else {
+      await _write('selected_translation_resource', resource.toJson());
+      await _write(
+        'preferred_translation:${resource.languageName.trim().toLowerCase()}',
+        resource.id,
+      );
     }
-    await _write('selected_translation_resource', resource.toJson());
-    await _write(
-      'preferred_translation:${resource.languageName.trim().toLowerCase()}',
-      resource.id,
-    );
+    if (changed) _selectionChanges.value++;
   }
 
   List<QuranTranslationResource> selectedResources() {
@@ -160,17 +193,27 @@ class QuranTranslationStore {
     ContentCachePolicy? cachePolicy,
   }) {
     final raw = _read(_chapterMetaId(resourceId, surahNumber));
-    return raw is Map &&
-        raw['complete'] == true &&
-        _isFresh(
+    if (raw is! Map ||
+        raw['complete'] != true ||
+        !_isFresh(
           fetchedAt: _date(raw['completedAt']),
           cachePolicy: cachePolicy,
-        ) &&
-        translationsForSurah(
-          resourceId: resourceId,
-          surahNumber: surahNumber,
-          cachePolicy: cachePolicy,
-        ).isNotEmpty;
+        )) {
+      return false;
+    }
+    final count = raw['verseCount'];
+    if (count is! int || count <= 0) return false;
+    for (var ayah = 1; ayah <= count; ayah++) {
+      if (translationForVerse(
+            resourceId: resourceId,
+            verseKey: '$surahNumber:$ayah',
+            cachePolicy: cachePolicy,
+          ) ==
+          null) {
+        return false;
+      }
+    }
+    return true;
   }
 
   Future<void> markSurahTranslationComplete({
@@ -342,13 +385,24 @@ class QuranTranslationStore {
     if (raw is! Map) {
       return false;
     }
-    return _isFresh(
+    final markedComplete =
+        _isFresh(
           fetchedAt: _date(raw['completedAt']),
           cachePolicy: cachePolicy,
         ) &&
         raw['version'] == version &&
         raw['complete'] == true &&
         raw['verseCount'] == verseCount;
+    if (!markedComplete) return false;
+    final prefix = 'translation:$resourceId:verse:';
+    var saved = 0;
+    for (final key in _keys()) {
+      if (key.startsWith(prefix) &&
+          _translationText(_read(key), cachePolicy: cachePolicy) != null) {
+        saved++;
+      }
+    }
+    return saved == verseCount;
   }
 
   DateTime? fullTranslationExpiresAt({

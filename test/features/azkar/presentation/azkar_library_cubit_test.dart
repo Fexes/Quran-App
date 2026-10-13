@@ -71,6 +71,18 @@ void main() {
 }
 
 class _FakeAzkarRepository implements AzkarRepository {
+  @override
+  Future<List<String>> availableTranslationLanguages() async => const ['en'];
+
+  @override
+  Future<bool> hasFullTranslation(String languageCode) async =>
+      languageCode == 'en';
+
+  @override
+  Stream<AzkarTranslationDownloadProgress> downloadTranslation(
+    String languageCode,
+  ) => Stream.error(UnsupportedError('This fixture only uses bundled English'));
+
   static const _source = ContentSource(
     id: 'test_azkar_source',
     name: 'Test Azkar Source',
@@ -105,6 +117,7 @@ class _FakeAzkarRepository implements AzkarRepository {
   @override
   Future<List<DhikrItem>> getDhikr({
     String? categoryId,
+    String? languageCode,
     int offset = 0,
     int limit = 100,
   }) async {

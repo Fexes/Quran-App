@@ -17,6 +17,7 @@ class HomeCubit extends Cubit<HomeState> {
     QuranTranslationRepository? translationRepository,
     ReadingProgressRepository? readingProgressRepository,
     Listenable? lastReadChanges,
+    Listenable? translationChanges,
     DailyAyahService dailyAyahService = const DailyAyahService(),
     DateTime Function()? now,
   }) : _quranRepository = quranRepository,
@@ -24,10 +25,15 @@ class HomeCubit extends Cubit<HomeState> {
        _translationRepository = translationRepository,
        _readingProgressRepository = readingProgressRepository,
        _lastReadChanges = lastReadChanges,
+       _translationChanges = translationChanges,
        _dailyAyahService = dailyAyahService,
        _now = now ?? DateTime.now,
        super(const HomeState.initial()) {
     _lastReadChanges?.addListener(refreshLastRead);
+    _translationChanges?.addListener(load);
+    if (_prayerTimesRepository case final PrayerLocationObservable observable) {
+      observable.locationChanges.addListener(load);
+    }
   }
 
   final QuranRepository _quranRepository;
@@ -35,9 +41,11 @@ class HomeCubit extends Cubit<HomeState> {
   final QuranTranslationRepository? _translationRepository;
   final ReadingProgressRepository? _readingProgressRepository;
   final Listenable? _lastReadChanges;
+  final Listenable? _translationChanges;
   final DailyAyahService _dailyAyahService;
   final DateTime Function() _now;
   int _lastReadRevision = 0;
+  int _loadRevision = 0;
 
   Future<void> refreshLastRead() async {
     if (isClosed) return;
@@ -75,12 +83,17 @@ class HomeCubit extends Cubit<HomeState> {
 
   @override
   Future<void> close() {
+    if (_prayerTimesRepository case final PrayerLocationObservable observable) {
+      observable.locationChanges.removeListener(load);
+    }
     _lastReadChanges?.removeListener(refreshLastRead);
+    _translationChanges?.removeListener(load);
     return super.close();
   }
 
   Future<void> load() async {
     if (isClosed) return;
+    final loadRevision = ++_loadRevision;
     final lastReadRevision = ++_lastReadRevision;
     final previous = state;
     emit(
@@ -156,7 +169,7 @@ class HomeCubit extends Cubit<HomeState> {
       }(),
     ]);
 
-    if (isClosed) {
+    if (isClosed || loadRevision != _loadRevision) {
       return;
     }
     // A live save wins over a dashboard refresh that started earlier.

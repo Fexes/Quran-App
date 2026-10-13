@@ -54,10 +54,14 @@ void main() {
         await cubit.setAudioType(QuranAudioDownloadAudioType.translation);
         await cubit.downloadSurah(1);
 
-        expect(cubit.state.selectedReciter?.id, 'translation:urdu');
+        expect(cubit.state.selectedReciter?.id, 'alqurancloud:ur.khan');
         expect(
           harness.downloadService.enqueuedItems.map((item) => item.reciterId),
-          ['translation:urdu', 'translation:urdu', 'translation:urdu'],
+          [
+            'alqurancloud:ur.khan',
+            'alqurancloud:ur.khan',
+            'alqurancloud:ur.khan',
+          ],
         );
 
         await cubit.close();
@@ -82,9 +86,9 @@ void main() {
             'arabic:alafasy',
             'arabic:alafasy',
             'arabic:alafasy',
-            'translation:urdu',
-            'translation:urdu',
-            'translation:urdu',
+            'alqurancloud:ur.khan',
+            'alqurancloud:ur.khan',
+            'alqurancloud:ur.khan',
           ],
         );
 
@@ -119,10 +123,16 @@ void main() {
 
       expect(
         harness.downloadService.cancelledItems.map((item) => item.reciterId),
-        ['translation:urdu', 'translation:urdu', 'translation:urdu'],
+        [
+          'alqurancloud:ur.khan',
+          'alqurancloud:ur.khan',
+          'alqurancloud:ur.khan',
+        ],
       );
       expect(
-        harness.downloadRepository.store.itemsForReciter('translation:urdu'),
+        harness.downloadRepository.store.itemsForReciter(
+          'alqurancloud:ur.khan',
+        ),
         isEmpty,
       );
       expect(
@@ -145,9 +155,9 @@ void main() {
       await cubit.selectTranslation(_urduTranslation.id);
 
       expect(cubit.state.selectedTranslation, _urduTranslation);
-      expect(cubit.state.selectedReciter?.id, 'translation:urdu');
+      expect(cubit.state.selectedReciter?.id, 'alqurancloud:ur.khan');
       expect(cubit.state.reciters.map((reciter) => reciter.id), [
-        'translation:urdu',
+        'alqurancloud:ur.khan',
       ]);
 
       await cubit.close();
@@ -157,7 +167,7 @@ void main() {
 }
 
 const _urduTranslation = QuranTranslationResource(
-  id: 22,
+  id: 234,
   languageName: 'Urdu',
   name: 'Urdu translation',
   authorName: 'Author',
@@ -200,7 +210,7 @@ class _DownloadsHarness {
       downloadRepository: downloadRepository,
       downloadService: downloadService,
       settingsStore: SettingsStore.memory({
-        'audio_translation_reciter_id': 'translation:urdu',
+        'audio_translation_reciter_id': 'alqurancloud:ur.khan',
       }),
     );
     return _DownloadsHarness(
@@ -267,7 +277,7 @@ class _FakeQuranRepository implements QuranRepository {
       identifier: 'Alafasy_128kbps',
     ),
     QuranAudioReciter(
-      id: 'translation:english',
+      id: 'alqurancloud:en.walk',
       name: 'English Voice',
       provider: QuranAudioProvider.alQuranCloud,
       identifier: 'en.walk',
@@ -275,7 +285,7 @@ class _FakeQuranRepository implements QuranRepository {
       isTranslation: true,
     ),
     QuranAudioReciter(
-      id: 'translation:urdu',
+      id: 'alqurancloud:ur.khan',
       name: 'Urdu Voice',
       provider: QuranAudioProvider.alQuranCloud,
       identifier: 'ur.khan',

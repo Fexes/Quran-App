@@ -1,9 +1,99 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quran/features/quran/domain/entities/quran_audio_reciter.dart';
 import 'package:quran/features/quran/domain/entities/quran_translation.dart';
+import 'package:quran/features/quran/domain/services/quran_translation_audio_pairings.dart';
 import 'package:quran/features/quran_audio/domain/services/quran_translation_audio_selector.dart';
 
 void main() {
+  group('quranCompatibleTranslationAudioReciters', () {
+    test(
+      'uses only the exact verified edition, not all voices in its language',
+      () {
+        final fooladvand = quranTranslationPairForVoice(
+          'alqurancloud:fa.hedayatfarfooladvand',
+        )!;
+        final voices = quranCompatibleTranslationAudioReciters(
+          reciters: _translationReciters,
+          selectedTranslation: fooladvand.resource,
+        );
+        expect(voices.map((voice) => voice.id), [
+          'alqurancloud:fa.hedayatfarfooladvand',
+        ]);
+        expect(
+          preferredQuranTranslationVoice(
+            voices,
+            preferredId: 'everyayah:translations/Makarem_Kabiri_16Kbps',
+          )?.id,
+          'alqurancloud:fa.hedayatfarfooladvand',
+        );
+      },
+    );
+
+    test('does not pair another Urdu edition or an unverified voice', () {
+      const unpairedUrdu = QuranTranslationResource(
+        id: 97,
+        languageName: 'urdu',
+        name: 'Maududi',
+        authorName: 'Maududi',
+        slug: 'ur-maududi',
+      );
+      expect(
+        quranCompatibleTranslationAudioReciters(
+          reciters: _translationReciters,
+          selectedTranslation: unpairedUrdu,
+        ),
+        isEmpty,
+      );
+      expect(
+        quranCompatibleTranslationAudioReciters(
+          reciters: const [
+            QuranAudioReciter(
+              id: 'unverified:urdu',
+              name: 'Unverified Urdu voice',
+              provider: QuranAudioProvider.alQuranCloud,
+              identifier: 'ur.unknown',
+              languageCode: 'ur',
+              isTranslation: true,
+            ),
+          ],
+          selectedTranslation: QuranTranslationResource.urduJalandhari,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('never falls back to English without a selected text edition', () {
+      expect(
+        quranCompatibleTranslationAudioReciters(
+          reciters: _translationReciters,
+          selectedTranslation: null,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('every catalog pair resolves back to the same text edition', () {
+      final ids = <String>{};
+      final resources = <int>{};
+      for (final pair in quranTranslationAudioPairs) {
+        expect(resources.add(pair.resource.id), isTrue);
+        expect(pair.evidenceUrl, startsWith('https://'));
+        expect(pair.voiceIds, isNotEmpty);
+        for (final voiceId in pair.voiceIds) {
+          expect(ids.add(voiceId), isTrue);
+          expect(
+            quranTranslationPairForVoice(voiceId)?.resource.id,
+            pair.resource.id,
+          );
+          expect(
+            quranTranslationPairForResource(pair.resource.id)?.voiceIds,
+            contains(voiceId),
+          );
+        }
+      }
+    });
+  });
+
   group('quranTranslationAudioRecitersFor', () {
     test('returns only voices matching the selected translation language', () {
       final reciters = quranTranslationAudioRecitersFor(

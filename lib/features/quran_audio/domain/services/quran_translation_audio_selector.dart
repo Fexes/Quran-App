@@ -1,5 +1,20 @@
 import '../../../quran/domain/entities/quran_audio_reciter.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
+import '../../../quran/domain/services/quran_translation_audio_pairings.dart';
+
+List<QuranAudioReciter> quranCompatibleTranslationAudioReciters({
+  required List<QuranAudioReciter> reciters,
+  required QuranTranslationResource? selectedTranslation,
+}) {
+  final pair = selectedTranslation == null
+      ? null
+      : quranTranslationPairForResource(selectedTranslation.id);
+  if (pair == null) return const [];
+  return quranTranslationAudioRecitersFor(
+    reciters: reciters,
+    selectedTranslation: selectedTranslation,
+  ).where((voice) => pair.voiceIds.contains(voice.id)).toList(growable: false);
+}
 
 List<QuranAudioReciter> quranTranslationAudioRecitersFor({
   required List<QuranAudioReciter> reciters,
@@ -46,7 +61,7 @@ const _defaultVoiceIds = {
   'ur': 'alqurancloud:ur.khan',
   'fa': 'alqurancloud:fa.hedayatfarfooladvand',
   'fr': 'alqurancloud:fr.leclerc',
-  'zh': 'alqurancloud:zh.chinese',
+  'zh': 'quranenc:chinese_suliman',
   'ru': 'alqurancloud:ru.kuliev-audio',
   'kk': 'alqurancloud:kk.khalifahaltai-audio',
   'bs': 'everyayah:translations/besim_korkut_ajet_po_ajet',

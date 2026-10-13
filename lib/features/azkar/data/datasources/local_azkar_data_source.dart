@@ -30,7 +30,10 @@ class LocalAzkarDataSource {
   final List<AzkarCategory>? _manualCategories;
   final List<DhikrItem>? _manualDhikr;
   final _categoryCache = <String, List<DhikrItem>>{};
+  final _translationCache =
+      <String, Future<Map<String, Map<String, dynamic>>>>{};
 
+  Future<Map<String, dynamic>>? _manifestFuture;
   Future<List<AzkarCategory>>? _categoriesFuture;
   Future<List<ContentSource>>? _sourcesFuture;
   Future<List<DeepSearchIndexRecord>>? _searchIndexFuture;
@@ -52,11 +55,28 @@ class LocalAzkarDataSource {
   }
 
   Future<List<String>> availableTranslationLanguages() async {
-    return const ['en'];
+    if (_manualDhikr != null) return const ['en'];
+    final manifest = await _loadManifest();
+    return List.unmodifiable(
+      (manifest['translationLanguages'] as List? ?? const ['en'])
+          .cast<String>(),
+    );
   }
 
   Future<bool> hasFullTranslation(String languageCode) async {
-    return languageCode.toLowerCase() == 'en';
+    final code = _languageCode(languageCode);
+    if (!(await availableTranslationLanguages()).contains(code)) return false;
+    if (code == 'en') return true;
+    try {
+      final categories = await getCategories();
+      final expected = categories.fold<int>(
+        0,
+        (sum, item) => sum + item.itemCount,
+      );
+      return (await _translationFor(code)).length == expected;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<List<DhikrItem>> getDhikr({
@@ -67,26 +87,29 @@ class LocalAzkarDataSource {
   }) async {
     final manual = _manualDhikr;
     if (manual != null) {
-      return _page(
-        manual
-            .where(
-              (item) => categoryId == null || item.categoryId == categoryId,
-            )
-            .toList(growable: false),
-        offset,
-        limit,
+      return _translate(
+        _page(
+          manual
+              .where(
+                (item) => categoryId == null || item.categoryId == categoryId,
+              )
+              .toList(growable: false),
+          offset,
+          limit,
+        ),
+        languageCode,
       );
     }
     if (categoryId != null) {
       final items = await _loadCategoryItems(categoryId);
-      return _page(items, offset, limit);
+      return _translate(_page(items, offset, limit), languageCode);
     }
     final categories = await getCategories();
     final all = <DhikrItem>[];
     for (final category in categories) {
       all.addAll(await _loadCategoryItems(category.id));
     }
-    return _page(all, offset, limit);
+    return _translate(_page(all, offset, limit), languageCode);
   }
 
   Future<DhikrItem?> getDhikrById(String id) async {
@@ -160,13 +183,112 @@ class LocalAzkarDataSource {
   }
 
   Future<List<AzkarCategory>> _loadCategories() async {
-    final raw = await _assetBundle.loadString(_manifestPath);
-    final map = _decodeJsonObject(raw);
+    final map = await _loadManifest();
     final categories = map['categories'] as List? ?? const [];
     return [
       for (final category in categories.cast<Map<String, dynamic>>())
         AzkarCategory.fromMap(category),
     ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  }
+
+  Future<Map<String, dynamic>> _loadManifest() {
+    return _manifestFuture ??= _assetBundle
+        .loadString(_manifestPath)
+        .then(_decodeJsonObject);
+  }
+
+  static String _languageCode(String? code) =>
+      (code ?? 'en').trim().toLowerCase().replaceAll('_', '-');
+
+  Future<Map<String, Map<String, dynamic>>> _translationFor(String code) async {
+    if (!(await availableTranslationLanguages()).contains(code)) {
+      return const {};
+    }
+    final cached = _translationCache.putIfAbsent(code, () async {
+      final raw = await _assetBundle.loadString(
+        'assets/data/azkar/translations/$code.json',
+      );
+      final pack = await compute(_decodeJsonObject, raw);
+      final items = (pack['items'] as Map).cast<String, Map<String, dynamic>>();
+      final categories = await getCategories();
+      final count = categories.fold<int>(
+        0,
+        (sum, item) => sum + item.itemCount,
+      );
+      final counts = <String, int>{};
+      final sourceIds = <int>{};
+      for (final entry in items.entries) {
+        final parts = entry.key.split(':');
+        final sourceId = parts.length == 3 ? int.tryParse(parts.last) : null;
+        if (parts.length != 3 ||
+            parts.first != 'azkar' ||
+            sourceId == null ||
+            !sourceIds.add(sourceId) ||
+            (entry.value['translation'] as String?)?.trim().isNotEmpty !=
+                true) {
+          throw const FormatException('Invalid Azkar translation item');
+        }
+        counts.update(parts[1], (count) => count + 1, ifAbsent: () => 1);
+      }
+      final partial = pack['coverage'] == 'partial';
+      final missing = (pack['missingItemIds'] as List? ?? const [])
+          .cast<String>()
+          .toSet();
+      final missingCounts = <String, int>{};
+      for (final id in missing) {
+        final parts = id.split(':');
+        final sourceId = parts.length == 3 ? int.tryParse(parts.last) : null;
+        if (parts.length != 3 ||
+            parts.first != 'azkar' ||
+            sourceId == null ||
+            !sourceIds.add(sourceId)) {
+          throw const FormatException('Invalid Azkar translation coverage');
+        }
+        missingCounts.update(parts[1], (count) => count + 1, ifAbsent: () => 1);
+      }
+      if (pack['version'] != 1 ||
+          pack['languageCode'] != code ||
+          pack['sourceId'] != 'muslim_data_android' ||
+          pack['itemCount'] != items.length ||
+          items.isEmpty ||
+          (!partial && (items.length != count || missing.isNotEmpty)) ||
+          (partial &&
+              (pack['corpusItemCount'] != count ||
+                  items.length + missing.length != count)) ||
+          {...counts.keys, ...missingCounts.keys}.length != categories.length ||
+          categories.any(
+            (category) =>
+                (counts[category.id] ?? 0) +
+                    (missingCounts[category.id] ?? 0) !=
+                category.itemCount,
+          )) {
+        throw const FormatException('Incomplete Azkar translation pack');
+      }
+      return Map.unmodifiable(items);
+    });
+    try {
+      return await cached;
+    } catch (_) {
+      _translationCache.remove(code);
+      rethrow;
+    }
+  }
+
+  Future<List<DhikrItem>> _translate(
+    List<DhikrItem> items,
+    String? languageCode,
+  ) async {
+    final code = _languageCode(languageCode);
+    if (code == 'en') return items;
+    final pack = await _translationFor(code);
+    return [
+      for (final item in items)
+        item.withTranslation(
+          translation: pack[item.id]?['translation'] as String? ?? '',
+          title: pack[item.id]?['title'] as String?,
+          reference: pack[item.id]?['reference'] as String?,
+        ),
+    ];
   }
 
   Future<List<DhikrItem>> _loadCategoryItems(String categoryId) async {

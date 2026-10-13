@@ -402,11 +402,18 @@ class _HadeethEncDownloadSheet extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               if (state.hadeethEncLoading) ...[
-                LinearProgressIndicator(value: progress?.percent),
+                LinearProgressIndicator(
+                  value:
+                      progress?.totalItems == 0 &&
+                          progress?.downloadProgress == null
+                      ? null
+                      : progress?.percent,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   progress == null || progress.totalItems == 0
-                      ? 'Downloading ${selectedLanguage.nativeName} hadith...'
+                      ? '${progress?.stage ?? 'Downloading'} ${selectedLanguage.nativeName} hadith'
+                            ' · ${((progress?.percent ?? 0) * 100).round()}%'
                       : 'Downloaded ${progress.completedItems} of ${progress.totalItems}',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: QuranTheme.subText(context, 0.72),

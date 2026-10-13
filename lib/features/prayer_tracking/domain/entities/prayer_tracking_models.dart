@@ -15,7 +15,12 @@ class PrayerTrackingRecord extends Equatable {
     required this.status,
     required this.congregation,
     required this.updatedAt,
-  });
+    DateTime? statusChangedAt,
+    DateTime? debtCreatedAt,
+  }) : statusChangedAt = statusChangedAt ?? updatedAt,
+       debtCreatedAt =
+           debtCreatedAt ??
+           (status == PrayerCompletion.missed ? updatedAt : null);
 
   factory PrayerTrackingRecord.fromJson(Map<dynamic, dynamic> json) {
     return PrayerTrackingRecord(
@@ -30,6 +35,9 @@ class PrayerTrackingRecord extends Equatable {
       ),
       congregation: json['congregation'] as bool? ?? false,
       updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
+      statusChangedAt:
+          _date(json['statusChangedAt']) ?? _date(json['updatedAt']),
+      debtCreatedAt: _date(json['debtCreatedAt']),
     );
   }
 
@@ -38,6 +46,8 @@ class PrayerTrackingRecord extends Equatable {
   final PrayerCompletion status;
   final bool congregation;
   final DateTime updatedAt;
+  final DateTime statusChangedAt;
+  final DateTime? debtCreatedAt;
 
   String get id => '$dateKey:${prayer.name}';
 
@@ -49,11 +59,22 @@ class PrayerTrackingRecord extends Equatable {
       'status': status.name,
       'congregation': congregation,
       'updatedAt': updatedAt.toIso8601String(),
+      'statusChangedAt': statusChangedAt.toIso8601String(),
+      if (debtCreatedAt != null)
+        'debtCreatedAt': debtCreatedAt!.toIso8601String(),
     };
   }
 
   @override
-  List<Object> get props => [dateKey, prayer, status, congregation, updatedAt];
+  List<Object?> get props => [
+    dateKey,
+    prayer,
+    status,
+    congregation,
+    updatedAt,
+    statusChangedAt,
+    debtCreatedAt,
+  ];
 }
 
 class QadaPlan extends Equatable {
@@ -69,7 +90,7 @@ class QadaPlan extends Equatable {
     final now = DateTime.now();
     return QadaPlan(
       baselineDue: 0,
-      baselineAt: now,
+      baselineAt: DateTime.fromMillisecondsSinceEpoch(0),
       dailyTarget: 1,
       enabled: false,
       updatedAt: now,

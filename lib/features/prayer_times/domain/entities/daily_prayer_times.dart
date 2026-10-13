@@ -11,6 +11,7 @@ class DailyPrayerTimes extends Equatable {
     required this.settings,
     required this.entries,
     required this.nextPrayer,
+    this.nextDayFajr,
   });
 
   final DateTime date;
@@ -18,7 +19,15 @@ class DailyPrayerTimes extends Equatable {
   final PrayerCalculationSettings settings;
   final List<PrayerTimeEntry> entries;
   final PrayerTimeEntry nextPrayer;
+  final PrayerTimeEntry? nextDayFajr;
 
   @override
-  List<Object> get props => [date, location, settings, entries, nextPrayer];
+  List<Object?> get props => [
+    date,
+    location,
+    settings,
+    entries,
+    nextPrayer,
+    nextDayFajr,
+  ];
 }

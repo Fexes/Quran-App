@@ -25,10 +25,12 @@ import '../../features/worship_tools/presentation/pages/ramadan_page.dart';
 import '../../features/worship_tools/presentation/pages/zakat_page.dart';
 import '../../features/tasbieh/presentation/pages/tasbieh_page.dart';
 import '../../core/storage/settings_store.dart';
+import '../../core/navigation/app_route_observer.dart';
 import '../di/injection.dart';
 import 'app_routes.dart';
 
 final appRouter = GoRouter(
+  observers: [appRouteObserver],
   initialLocation: AppRoutes.shell,
   redirect: (context, state) {
     if (!getIt.isRegistered<SettingsStore>()) {

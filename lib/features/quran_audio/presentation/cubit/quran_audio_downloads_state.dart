@@ -59,8 +59,12 @@ class QuranAudioDownloadsState extends Equatable {
   final bool wifiOnlyLargeDownloads;
   final String? errorMessage;
 
-  int get activeDownloadCount =>
-      activeGroups.fold(0, (sum, group) => sum + group.items.length);
+  int get activeDownloadCount => activeGroups
+      .expand((group) => group.items)
+      .where((item) => item.isActive)
+      .map((item) => item.id)
+      .toSet()
+      .length;
 
   String get audioTypeLabel {
     return audioType == QuranAudioDownloadAudioType.translation

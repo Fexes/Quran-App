@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 
 import '../../../../core/content/content_cache_policy.dart';
 import '../../domain/entities/quran_tafsir.dart';
@@ -114,19 +117,32 @@ class QuranTafsirRepositoryImpl
         text: cached,
       );
     }
+    if (_store.isVerseTafsirUnavailable(
+      resourceId: resource.id,
+      verseKey: verseKey,
+      cachePolicy: contentCachePolicy,
+    )) {
+      return null;
+    }
 
     final json = await _verseTafsirFetcher(
       resourceId: resource.id,
       verseKey: verseKey,
     );
     final tafsir = parseVerseTafsir(json);
-    if (tafsir == null || tafsir.text.isEmpty) {
+    final grouped = parseVerseTafsirs(json);
+    if (_isUnavailableVerseResponse(json, resource.id, verseKey)) {
+      await _store.saveUnavailableVerseTafsir(
+        resourceId: resource.id,
+        verseKey: verseKey,
+      );
       return null;
     }
-    await _store.saveVerseTafsir(
+    if (tafsir == null || tafsir.text.isEmpty) return null;
+    if (grouped.isNotEmpty && !grouped.containsKey(verseKey)) return null;
+    await _store.saveVerseTafsirs(
       resourceId: resource.id,
-      verseKey: verseKey,
-      tafsir: tafsir.text,
+      tafsirs: {...grouped, verseKey: tafsir.text},
     );
     return QuranTafsirResult(
       // Verse responses omit language_name; retain the complete catalog metadata.
@@ -173,25 +189,55 @@ class QuranTafsirRepositoryImpl
       return;
     }
 
-    if (await hasDownloadedSurahTafsir(
+    if (_store.hasSurahTafsir(
+      resourceId: resource.id,
       surahNumber: surahNumber,
-      languageName: languageName,
+      verseCount: expectedVerseCount,
+      cachePolicy: contentCachePolicy,
     )) {
       yield QuranTafsirDownloadProgress(
         completedVerses: expectedVerseCount,
         totalVerses: expectedVerseCount,
         isComplete: true,
+        unavailableVerses: _store
+            .unavailableSurahVerseKeys(
+              resourceId: resource.id,
+              surahNumber: surahNumber,
+              verseCount: expectedVerseCount,
+              cachePolicy: contentCachePolicy,
+            )
+            .length,
       );
       return;
     }
 
-    var page = 1;
-    var completedVerses = 0;
-    var totalVerses = expectedVerseCount;
-    var failed = false;
+    var page =
+        _store.nextSurahDownloadPage(
+          resourceId: resource.id,
+          surahNumber: surahNumber,
+          verseCount: expectedVerseCount,
+          cachePolicy: contentCachePolicy,
+        ) ??
+        1;
+    final cached = _store.cachedSurahTafsirs(
+      resourceId: resource.id,
+      surahNumber: surahNumber,
+      verseCount: expectedVerseCount,
+      cachePolicy: contentCachePolicy,
+    );
+    final unavailable = _store.unavailableSurahVerseKeys(
+      resourceId: resource.id,
+      surahNumber: surahNumber,
+      verseCount: expectedVerseCount,
+      cachePolicy: contentCachePolicy,
+    );
+    int completedVerses() => cached.length + unavailable.length;
+    if (completedVerses() == expectedVerseCount) page = 0;
+    String? errorMessage;
     yield QuranTafsirDownloadProgress(
-      completedVerses: completedVerses,
-      totalVerses: totalVerses,
+      completedVerses: completedVerses(),
+      totalVerses: expectedVerseCount,
+      unavailableVerses: unavailable.length,
     );
 
     while (page > 0) {
@@ -201,34 +247,97 @@ class QuranTafsirRepositoryImpl
           surahNumber: surahNumber,
           page: page,
         );
-        final parsed = parseSurahTafsirs(json);
-        totalVerses = _paginationTotalRecords(json) ?? totalVerses;
+        if (json['tafsirs'] is! List) {
+          throw const FormatException('Missing Tafsir chapter response');
+        }
+        final parsed = await compute(parseSurahTafsirs, json);
+        parsed.removeWhere(
+          (key, _) => !_isSurahVerseKey(key, surahNumber, expectedVerseCount),
+        );
         if (parsed.isNotEmpty) {
           await _store.saveVerseTafsirs(
             resourceId: resource.id,
             tafsirs: parsed,
           );
-          completedVerses += parsed.length;
+          cached.addAll(parsed);
+          unavailable.removeAll(parsed.keys);
         }
-        yield QuranTafsirDownloadProgress(
-          completedVerses: completedVerses.clamp(0, totalVerses).toInt(),
-          totalVerses: totalVerses,
-        );
-
         final nextPage = _paginationNextPage(json);
-        if (nextPage == null || nextPage <= page) {
-          page = 0;
-        } else {
-          page = nextPage;
-        }
-      } catch (_) {
-        failed = true;
+        page = nextPage != null && nextPage > page ? nextPage : 0;
+        await _store.saveSurahDownloadPage(
+          resourceId: resource.id,
+          surahNumber: surahNumber,
+          verseCount: expectedVerseCount,
+          nextPage: page,
+        );
+        yield QuranTafsirDownloadProgress(
+          completedVerses: completedVerses(),
+          totalVerses: expectedVerseCount,
+          unavailableVerses: unavailable.length,
+        );
+      } catch (error) {
+        errorMessage = _downloadErrorMessage(error);
         page = 0;
       }
     }
 
+    // Chapter lists omit repeated group passages; the ayah endpoint identifies
+    // exactly which verses share the commentary, without guessing a range.
+    if (errorMessage == null) {
+      for (var ayah = 1; ayah <= expectedVerseCount; ayah++) {
+        final verseKey = '$surahNumber:$ayah';
+        if (cached.containsKey(verseKey) || unavailable.contains(verseKey)) {
+          continue;
+        }
+        try {
+          final json = await _verseTafsirFetcher(
+            resourceId: resource.id,
+            verseKey: verseKey,
+          );
+          final parsed = await compute(parseVerseTafsirs, json);
+          parsed.removeWhere(
+            (key, _) => !_isSurahVerseKey(key, surahNumber, expectedVerseCount),
+          );
+          if (parsed.isEmpty) {
+            final single = parseVerseTafsir(json);
+            if (single != null &&
+                single.text.isNotEmpty &&
+                (single.verseKey.isEmpty || single.verseKey == verseKey)) {
+              parsed[verseKey] = single.text;
+            }
+          }
+          await _store.saveVerseTafsirs(
+            resourceId: resource.id,
+            tafsirs: parsed,
+          );
+          cached.addAll(parsed);
+          unavailable.removeAll(parsed.keys);
+          if (!cached.containsKey(verseKey)) {
+            // Some editions return a valid neighbouring group that explicitly
+            // excludes this ayah. Record the gap, never copy its commentary.
+            if (!_isUnavailableVerseResponse(json, resource.id, verseKey)) {
+              throw const FormatException('Missing Tafsir ayah response');
+            }
+            await _store.saveUnavailableVerseTafsir(
+              resourceId: resource.id,
+              verseKey: verseKey,
+            );
+            unavailable.add(verseKey);
+          }
+          yield QuranTafsirDownloadProgress(
+            completedVerses: completedVerses(),
+            totalVerses: expectedVerseCount,
+            unavailableVerses: unavailable.length,
+          );
+        } catch (error) {
+          errorMessage = _downloadErrorMessage(error);
+          break;
+        }
+      }
+    }
+
     final complete =
-        !failed && completedVerses >= totalVerses && completedVerses > 0;
+        errorMessage == null && completedVerses() == expectedVerseCount;
     if (complete) {
       await _store.markSurahTafsirComplete(
         resource: resource,
@@ -237,19 +346,21 @@ class QuranTafsirRepositoryImpl
       );
     }
     yield QuranTafsirDownloadProgress(
-      completedVerses: completedVerses.clamp(0, totalVerses).toInt(),
-      totalVerses: totalVerses,
+      completedVerses: completedVerses(),
+      totalVerses: expectedVerseCount,
       isComplete: complete,
       failed: !complete,
+      unavailableVerses: unavailable.length,
+      errorMessage: errorMessage,
     );
   }
 
   Future<List<QuranTafsirResource>> _resources() async {
-    await _store.purgeExpired(cachePolicy: contentCachePolicy);
     final cached = _store.catalog(cachePolicy: contentCachePolicy);
     if (cached.isNotEmpty) {
       return cached;
     }
+    await _store.purgeExpired(cachePolicy: contentCachePolicy);
     try {
       final json = await _resourcesFetcher();
       final resources = parseResources(json);
@@ -302,23 +413,77 @@ class QuranTafsirRepositoryImpl
   static Map<String, String> parseSurahTafsirs(Map<dynamic, dynamic> json) {
     final raw = json['tafsirs'];
     if (raw is! List) {
-      return const {};
+      return {};
     }
     final result = <String, String>{};
     for (final item in raw) {
       if (item is! Map) {
         continue;
       }
-      final verseKey = _string(item['verse_key'] ?? item['verseKey']);
-      if (verseKey.isEmpty) {
-        continue;
-      }
       final text = _cleanHtml(_string(item['text']));
       if (text.isNotEmpty) {
-        result[verseKey] = text;
+        for (final verseKey in _verseKeys(item)) {
+          result[verseKey] = text;
+        }
       }
     }
     return result;
+  }
+
+  static Map<String, String> parseVerseTafsirs(Map<dynamic, dynamic> json) {
+    final raw = json['tafsir'];
+    if (raw is! Map) return {};
+    final text = _cleanHtml(_string(raw['text']));
+    return {
+      if (text.isNotEmpty)
+        for (final key in _verseKeys(raw)) key: text,
+    };
+  }
+
+  static Set<String> _verseKeys(Map<dynamic, dynamic> tafsir) {
+    final keys = <String>{};
+    final key = _string(tafsir['verse_key'] ?? tafsir['verseKey']);
+    if (key.isNotEmpty) keys.add(key);
+    final verses = tafsir['verses'];
+    if (verses is Map) keys.addAll(verses.keys.map((key) => key.toString()));
+    return keys;
+  }
+
+  static bool _isUnavailableVerseResponse(
+    Map<dynamic, dynamic> json,
+    int resourceId,
+    String verseKey,
+  ) {
+    final raw = json['tafsir'];
+    if (raw is! Map ||
+        _int(raw['resource_id'] ?? raw['resourceId']) != resourceId ||
+        !raw.containsKey('text') ||
+        (raw['text'] != null && raw['text'] is! String)) {
+      return false;
+    }
+    final keys = _verseKeys(raw);
+    return keys.isNotEmpty &&
+        (!keys.contains(verseKey) || _cleanHtml(_string(raw['text'])).isEmpty);
+  }
+
+  static String _downloadErrorMessage(Object error) {
+    debugPrint('Tafsir download interrupted: $error');
+    if (error is SocketException || error is TimeoutException) {
+      return 'Could not reach the Tafsir source. Check your connection and resume.';
+    }
+    if (error is HttpException || error is FormatException) {
+      return 'The Tafsir source could not provide this response. Resume to retry.';
+    }
+    return 'Tafsir could not be saved. Check available storage and resume.';
+  }
+
+  static bool _isSurahVerseKey(String key, int surah, int ayahCount) {
+    final parts = key.split(':');
+    final ayah = parts.length == 2 ? int.tryParse(parts[1]) : null;
+    return parts.first == '$surah' &&
+        ayah != null &&
+        ayah >= 1 &&
+        ayah <= ayahCount;
   }
 
   static Future<Map<String, Object?>> _fetchResourcesJson() async {
@@ -355,20 +520,46 @@ class QuranTafsirRepositoryImpl
   }
 
   static Future<Map<String, Object?>> _getJson(Uri uri) async {
-    final client = HttpClient();
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await _getJsonOnce(uri);
+      } on SocketException {
+        if (attempt >= 2) rethrow;
+      } on TimeoutException {
+        if (attempt >= 2) rethrow;
+      } on _RetryableTafsirHttpException {
+        if (attempt >= 2) rethrow;
+      }
+      await Future<void>.delayed(Duration(seconds: attempt + 1));
+    }
+  }
+
+  static Future<Map<String, Object?>> _getJsonOnce(Uri uri) async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 30);
     try {
-      final request = await client.getUrl(uri);
+      final request = await client
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 30));
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      final response = await request.close();
-      final body = await utf8.decodeStream(response);
+      final response = await request.close().timeout(
+        const Duration(seconds: 30),
+      );
+      final body = await utf8.decodeStream(
+        response.timeout(const Duration(seconds: 45)),
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw const HttpException('Failed to fetch Quran tafsir data');
+        final status = response.statusCode;
+        if (status == 408 || status == 429 || status >= 500) {
+          throw _RetryableTafsirHttpException(status, uri);
+        }
+        throw HttpException('Tafsir source returned HTTP $status', uri: uri);
       }
       final decoded = jsonDecode(body);
       if (decoded is Map<String, Object?>) {
         return decoded;
       }
-      return const {};
+      throw const FormatException('Invalid Tafsir source response');
     } finally {
       client.close(force: true);
     }
@@ -388,16 +579,6 @@ class QuranTafsirRepositoryImpl
       return null;
     }
     return _nullableInt(pagination['next_page'] ?? pagination['nextPage']);
-  }
-
-  static int? _paginationTotalRecords(Map<dynamic, dynamic> json) {
-    final pagination = json['pagination'];
-    if (pagination is! Map) {
-      return null;
-    }
-    return _nullableInt(
-      pagination['total_records'] ?? pagination['totalRecords'],
-    );
   }
 
   static String _cleanHtml(String value) {
@@ -466,6 +647,11 @@ class QuranTafsirRepositoryImpl
     }
     return null;
   }
+}
+
+class _RetryableTafsirHttpException extends HttpException {
+  _RetryableTafsirHttpException(int status, Uri uri)
+    : super('Tafsir source returned HTTP $status', uri: uri);
 }
 
 const _surahAyahCounts = <int, int>{

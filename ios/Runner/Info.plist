@@ -51,6 +51,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Quran uses your location to find accurate prayer times, Qibla direction, and true compass heading.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Quran uses motion and compass sensors to keep Qibla direction stable as you turn your phone.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>
@@ -68,6 +70,10 @@
 	<array>
 		<string>audio</string>
 		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>tech.coreinfinite.quran.prayer-alert-renewal</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../entities/quran_translation.dart';
 
 abstract interface class QuranTranslationRepository {
@@ -19,6 +21,23 @@ abstract interface class QuranTranslationRepository {
     int resourceId,
     int surahNumber,
   );
+}
+
+abstract interface class QuranTranslationSelectionObservable {
+  Listenable get selectionChanges;
+}
+
+abstract interface class QuranReadingLanguageDownloadRepository {
+  Future<bool> hasFullReadingLanguage(int resourceId);
+}
+
+extension QuranReadingLanguageAvailability on QuranTranslationRepository {
+  Future<bool> hasReadyReadingLanguage(int resourceId) =>
+      this is QuranReadingLanguageDownloadRepository
+      ? (this as QuranReadingLanguageDownloadRepository).hasFullReadingLanguage(
+          resourceId,
+        )
+      : hasFullTranslation(resourceId);
 }
 
 abstract interface class QuranTranslationCacheMetadataRepository {

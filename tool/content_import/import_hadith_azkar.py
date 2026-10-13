@@ -552,6 +552,8 @@ def main():
     import_hadith()
     import_azkar()
     write_sources()
+    from import_azkar_translations import import_translations
+    import_translations(Path('/tmp/muslim_data_android.db'))
     validate_assets()
 
 

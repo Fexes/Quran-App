@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/search/local_search_revision.dart';
 
 import '../../../../core/content/content_cache_policy.dart';
 import '../../domain/entities/quran_tafsir.dart';
@@ -64,6 +65,40 @@ class QuranTafsirStore {
       'fetchedAt': DateTime.now().toIso8601String(),
     });
   }
+
+  bool isVerseTafsirUnavailable({
+    required int resourceId,
+    required String verseKey,
+    ContentCachePolicy? cachePolicy,
+  }) {
+    final raw = _read(_verseId(resourceId: resourceId, verseKey: verseKey));
+    return raw is Map &&
+        raw['unavailable'] == true &&
+        _isFresh(fetchedAt: _date(raw['fetchedAt']), cachePolicy: cachePolicy);
+  }
+
+  Future<void> saveUnavailableVerseTafsir({
+    required int resourceId,
+    required String verseKey,
+  }) => _write(_verseId(resourceId: resourceId, verseKey: verseKey), {
+    'unavailable': true,
+    'fetchedAt': DateTime.now().toIso8601String(),
+  });
+
+  Set<String> unavailableSurahVerseKeys({
+    required int resourceId,
+    required int surahNumber,
+    required int verseCount,
+    ContentCachePolicy? cachePolicy,
+  }) => {
+    for (var ayah = 1; ayah <= verseCount; ayah++)
+      if (isVerseTafsirUnavailable(
+        resourceId: resourceId,
+        verseKey: '$surahNumber:$ayah',
+        cachePolicy: cachePolicy,
+      ))
+        '$surahNumber:$ayah',
+  };
 
   Future<void> saveVerseTafsirs({
     required int resourceId,
@@ -134,8 +169,72 @@ class QuranTafsirStore {
           cachePolicy: cachePolicy,
         ) &&
         raw['complete'] == true &&
-        raw['verseCount'] == verseCount;
+        raw['verseCount'] == verseCount &&
+        {
+              ...cachedSurahTafsirs(
+                resourceId: resourceId,
+                surahNumber: surahNumber,
+                verseCount: verseCount,
+                cachePolicy: cachePolicy,
+              ).keys,
+              ...unavailableSurahVerseKeys(
+                resourceId: resourceId,
+                surahNumber: surahNumber,
+                verseCount: verseCount,
+                cachePolicy: cachePolicy,
+              ),
+            }.length ==
+            verseCount;
   }
+
+  Map<String, String> cachedSurahTafsirs({
+    required int resourceId,
+    required int surahNumber,
+    required int verseCount,
+    ContentCachePolicy? cachePolicy,
+  }) {
+    final result = <String, String>{};
+    for (var ayah = 1; ayah <= verseCount; ayah++) {
+      final key = '$surahNumber:$ayah';
+      final text = tafsirForVerse(
+        resourceId: resourceId,
+        verseKey: key,
+        cachePolicy: cachePolicy,
+      );
+      if (text != null) result[key] = text;
+    }
+    return result;
+  }
+
+  int? nextSurahDownloadPage({
+    required int resourceId,
+    required int surahNumber,
+    required int verseCount,
+    required ContentCachePolicy cachePolicy,
+  }) {
+    final raw = _read('tafsir:$resourceId:surah:$surahNumber:download');
+    if (raw is! Map ||
+        raw['verseCount'] != verseCount ||
+        !_isFresh(
+          fetchedAt: _date(raw['fetchedAt']),
+          cachePolicy: cachePolicy,
+        )) {
+      return null;
+    }
+    final nextPage = raw['nextPage'];
+    return nextPage is int && nextPage >= 0 ? nextPage : null;
+  }
+
+  Future<void> saveSurahDownloadPage({
+    required int resourceId,
+    required int surahNumber,
+    required int verseCount,
+    required int nextPage,
+  }) => _write('tafsir:$resourceId:surah:$surahNumber:download', {
+    'verseCount': verseCount,
+    'nextPage': nextPage,
+    'fetchedAt': DateTime.now().toIso8601String(),
+  });
 
   Future<void> markSurahTafsirComplete({
     required QuranTafsirResource resource,
@@ -151,6 +250,12 @@ class QuranTafsirStore {
         'surahNumber': surahNumber,
         'complete': true,
         'verseCount': verseCount,
+        'unavailableVerseCount': unavailableSurahVerseKeys(
+          resourceId: resource.id,
+          surahNumber: surahNumber,
+          verseCount: verseCount,
+          cachePolicy: ContentCachePolicy.quranFoundation,
+        ).length,
         'completedAt': DateTime.now().toIso8601String(),
       },
     );
@@ -194,18 +299,20 @@ class QuranTafsirStore {
     final box = _box;
     if (box != null) {
       await box.put(key, value);
-      return;
+    } else {
+      _memory?[key] = value;
     }
-    _memory?[key] = value;
+    LocalSearchRevision.changed();
   }
 
   Future<void> _delete(String key) async {
     final box = _box;
     if (box != null) {
       await box.delete(key);
-      return;
+    } else {
+      _memory?.remove(key);
     }
-    _memory?.remove(key);
+    LocalSearchRevision.changed();
   }
 
   Iterable<String> _keys() {

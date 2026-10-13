@@ -97,6 +97,15 @@ class _HadithTranslationSheetState extends State<_HadithTranslationSheet> {
             setState(() => _progress = progress);
             if (progress.isComplete) {
               if (ModalRoute.of(context)?.isCurrent == true) {
+                if (progress.unavailableTranslations > 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'All available Hadith data saved. ${progress.unavailableTranslations} translations are not provided by the source.',
+                      ),
+                    ),
+                  );
+                }
                 Navigator.of(context).pop(code);
               }
             } else if (progress.isFinished) {
@@ -167,9 +176,15 @@ class _HadithTranslationSheetState extends State<_HadithTranslationSheet> {
                   LinearProgressIndicator(value: _progress?.percent),
                   const SizedBox(height: 8),
                   Text(
-                    '${_progress?.completedBooks ?? 0} of ${catalog[downloading]?.length ?? 0} books ready',
+                    '${_progress?.completedBooks ?? 0} of ${catalog[downloading]?.length ?? 0} books ready'
+                    ' · ${((_progress?.percent ?? 0) * 100).floor()}%',
                   ),
+                  if ((_progress?.totalHadiths ?? 0) > 0)
+                    Text(
+                      '${_progress!.downloadedHadiths} of ${_progress!.totalHadiths} Hadith records saved',
+                    ),
                   if (_progress?.currentBook case final book?) Text(book),
+                  if (_progress?.currentStage case final stage?) Text(stage),
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),

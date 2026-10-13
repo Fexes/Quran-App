@@ -3,8 +3,12 @@ import '../../../../core/widgets/app_icon.dart';
 
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_sheet.dart';
+import '../../../../app/di/injection.dart';
+import '../../domain/entities/quran_audio_reciter.dart';
 import '../../domain/entities/quran_translation.dart';
+import '../../domain/repositories/quran_repository.dart';
 import '../../domain/repositories/quran_translation_repository.dart';
+import '../../domain/services/quran_reading_preferences.dart';
 
 class QuranTranslationPicker extends StatefulWidget {
   const QuranTranslationPicker({
@@ -12,11 +16,13 @@ class QuranTranslationPicker extends StatefulWidget {
     required this.repository,
     this.currentResource,
     this.languagesOnly = false,
+    this.reciters,
   });
 
   final QuranTranslationRepository repository;
   final QuranTranslationResource? currentResource;
   final bool languagesOnly;
+  final List<QuranAudioReciter>? reciters;
 
   @override
   State<QuranTranslationPicker> createState() => _QuranTranslationPickerState();
@@ -27,12 +33,31 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
   final _cacheChecks = <int, Future<bool>>{};
   late Future<List<QuranTranslationLanguage>> _languages;
   String _query = '';
+  bool _showEditions = false;
+  List<QuranAudioReciter> _reciters = const [];
 
   @override
   void initState() {
     super.initState();
-    _languages = widget.repository.translationLanguages();
+    _languages = _loadLanguages();
   }
+
+  Future<List<QuranTranslationLanguage>> _loadLanguages() async {
+    final languages = await widget.repository.translationLanguages();
+    _reciters =
+        widget.reciters ??
+        (getIt.isRegistered<QuranRepository>()
+            ? await getIt<QuranRepository>().getAudioReciters()
+            : const []);
+    return quranLanguagesWithAudioFirst(languages, _reciters);
+  }
+
+  QuranTranslationResource _recommended(QuranTranslationLanguage language) =>
+      quranRecommendedTranslationForLanguage(
+        language,
+        _reciters,
+        preferredResourceId: widget.currentResource?.id,
+      );
 
   @override
   void dispose() {
@@ -43,7 +68,8 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
   @override
   Widget build(BuildContext context) {
     return AppSheet(
-      title: 'Select translation',
+      title: 'Translation language',
+      subtitle: 'A matching text edition is chosen for you.',
       scrollableChild: true,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -54,13 +80,26 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
             onChanged: (value) =>
                 setState(() => _query = value.trim().toLowerCase()),
             decoration: InputDecoration(
-              hintText: widget.languagesOnly
-                  ? 'Search language'
-                  : 'Search language or translator',
+              hintText: _showEditions
+                  ? 'Search language or translator'
+                  : 'Search language',
               prefixIcon: const AppIcon(Icons.search_rounded),
             ),
           ),
           const SizedBox(height: 12),
+          if (!widget.languagesOnly)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _showEditions = !_showEditions),
+                icon: const AppIcon(Icons.tune_rounded),
+                label: Text(
+                  _showEditions
+                      ? 'Choose by language'
+                      : 'Choose a text edition',
+                ),
+              ),
+            ),
           Flexible(
             child: FutureBuilder<List<QuranTranslationLanguage>>(
               future: _languages,
@@ -74,8 +113,7 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
                         const Text('Unable to load translations.'),
                         TextButton.icon(
                           onPressed: () => setState(() {
-                            _languages = widget.repository
-                                .translationLanguages();
+                            _languages = _loadLanguages();
                           }),
                           icon: const AppIcon(Icons.refresh_rounded),
                           label: const Text('Retry'),
@@ -99,8 +137,8 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
                     >[
                       for (final language in snapshot.data!)
                         for (final resource
-                            in _query.isEmpty || widget.languagesOnly
-                                ? [language.defaultResource]
+                            in !_showEditions || _query.isEmpty
+                                ? [_recommended(language)]
                                 : language.availableResources)
                           if (_matches(language, resource))
                             (language: language, resource: resource),
@@ -121,9 +159,9 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
                   itemBuilder: (context, index) {
                     final entry = entries[index];
                     final resource = entry.resource;
-                    final selected = widget.languagesOnly
-                        ? widget.currentResource?.languageName ==
-                              resource.languageName
+                    final selected = !_showEditions
+                        ? widget.currentResource?.resolvedLanguageCode ==
+                              resource.resolvedLanguageCode
                         : widget.currentResource?.id == resource.id;
                     final cache = _cacheChecks.putIfAbsent(
                       resource.id,
@@ -138,8 +176,13 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
                         subtitle: Text(
                           [
                                 resource.displayEndonym,
-                                if (!widget.languagesOnly) resource.name,
-                                if (!widget.languagesOnly) resource.translator,
+                                if (_showEditions) resource.name,
+                                quranTranslationHasMatchingAudio(
+                                      resource,
+                                      _reciters,
+                                    )
+                                    ? 'Text + audio'
+                                    : 'Text only',
                               ]
                               .where((value) => value.isNotEmpty)
                               .toSet()
@@ -155,19 +198,19 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
                                   ? 'Selected'
                                   : cacheSnapshot.data == true
                                   ? 'Downloaded'
-                                  : 'Download required',
+                                  : 'Choose language',
                               child: AppIcon(
                                 selected
                                     ? Icons.check_rounded
                                     : cacheSnapshot.data == true
                                     ? Icons.offline_pin_outlined
-                                    : Icons.download_rounded,
+                                    : Icons.chevron_right_rounded,
                                 color: selected
                                     ? Theme.of(context).colorScheme.primary
                                     : QuranTheme.subText(context),
                               ),
                             ),
-                            if (!widget.languagesOnly &&
+                            if (_showEditions &&
                                 _query.isEmpty &&
                                 entry.language.availableResources.length > 1)
                               IconButton(
@@ -206,8 +249,10 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
             final resource = language.availableResources[index];
             return ListTile(
               title: Text(resource.name),
-              subtitle: Text(resource.translator),
-              trailing: resource.id == language.defaultResource.id
+              subtitle: Text(
+                '${resource.translator}\n${quranTranslationHasMatchingAudio(resource, _reciters) ? 'Text + audio' : 'Text only'}',
+              ),
+              trailing: resource.id == widget.currentResource?.id
                   ? const AppIcon(Icons.check_rounded)
                   : null,
               onTap: () => Navigator.of(context).pop(resource),
@@ -224,7 +269,7 @@ class _QuranTranslationPickerState extends State<QuranTranslationPicker> {
     QuranTranslationResource resource,
   ) {
     if (_query.isEmpty) return true;
-    if (widget.languagesOnly) {
+    if (!_showEditions) {
       return '${language.displayName} ${resource.displayEndonym} ${resource.languageName}'
           .toLowerCase()
           .contains(_query);

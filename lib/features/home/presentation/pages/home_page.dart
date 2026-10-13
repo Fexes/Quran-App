@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/daily_refresh.dart';
 import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +23,7 @@ import '../../../prayer_times/domain/entities/prayer_day_progress.dart';
 import '../../../prayer_times/presentation/widgets/animated_prayer_arc.dart';
 import '../../../quran/domain/repositories/quran_repository.dart';
 import '../../../quran/data/stores/quran_user_data_store.dart';
+import '../../../quran/data/stores/quran_translation_store.dart';
 import '../../../quran/domain/entities/surah_image_catalog.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
 import '../../../reading_goals/domain/repositories/reading_progress_repository.dart';
@@ -49,6 +51,9 @@ class HomePage extends StatelessWidget {
         lastReadChanges: getIt.isRegistered<QuranUserDataStore>()
             ? getIt<QuranUserDataStore>().lastReadChanges
             : null,
+        translationChanges: getIt.isRegistered<QuranTranslationStore>()
+            ? getIt<QuranTranslationStore>().selectionChanges
+            : null,
       )..load(),
       child: const _HomeView(),
     );
@@ -67,141 +72,148 @@ class _HomeView extends StatelessWidget {
           previous.destination != current.destination &&
           current.destination == ShellDestination.home,
       listener: (context, state) => context.read<HomeCubit>().load(),
-      child: PremiumSurfaceShadowScope(
-        style: PremiumSurfaceShadowStyle.none,
-        child: AdaptiveInsetArea(
-          top: true,
-          bottom: true,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-                child: ShellScreenHeader(
-                  icon: Icons.home_rounded,
-                  title: 'Assalamu alaikum',
-                  subtitle: DateFormat('EEEE, d MMMM').format(DateTime.now()),
-                  actions: [
-                    ShellHeaderAction(
-                      icon: Icons.search_rounded,
-                      tooltip: 'Search Quran',
-                      onTap: () => context.push(AppRoutes.quranSearchPath()),
-                    ),
-                    ShellHeaderAction(
-                      icon: Icons.tune_rounded,
-                      tooltip: 'Settings',
-                      onTap: () => context.read<ShellCubit>().setDestination(
-                        ShellDestination.settings,
+      child: DailyRefresh(
+        onRefresh: context.read<HomeCubit>().load,
+        timeZone: () => getIt<SettingsStore>().prayerTimeZone,
+        builder: (context) => PremiumSurfaceShadowScope(
+          style: PremiumSurfaceShadowStyle.none,
+          child: AdaptiveInsetArea(
+            top: true,
+            bottom: true,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                  child: ShellScreenHeader(
+                    icon: Icons.home_rounded,
+                    title: 'Assalamu alaikum',
+                    subtitle: DateFormat('EEEE, d MMMM').format(DateTime.now()),
+                    actions: [
+                      ShellHeaderAction(
+                        icon: Icons.search_rounded,
+                        tooltip: 'Search Quran',
+                        onTap: () => context.push(AppRoutes.quranSearchPath()),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: context.read<HomeCubit>().load,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(
-                      0,
-                      0,
-                      0,
-                      QuranFloatingAudioPlayer.scrollInset(context),
-                    ),
-                    children: [
-                      BlocBuilder<HomeCubit, HomeState>(
-                        buildWhen: (previous, next) =>
-                            previous.dailyPrayerTimes !=
-                                next.dailyPrayerTimes ||
-                            previous.prayerErrorMessage !=
-                                next.prayerErrorMessage,
-                        builder: (context, state) {
-                          return _NextPrayerCard(
-                            dailyPrayerTimes: state.dailyPrayerTimes,
-                            title: l10n.nextPrayerTitle,
-                            errorMessage: state.prayerErrorMessage,
-                            onRetry: context.read<HomeCubit>().load,
-                          );
-                        },
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const SizedBox(height: 24),
-                            BlocBuilder<HomeCubit, HomeState>(
-                              builder: (context, state) {
-                                final lastRead = state.lastRead;
-                                final surah = state.lastReadSurah;
-                                final loading =
-                                    state.status == HomeStatus.loading &&
-                                    lastRead == null;
-                                final subtitle =
-                                    state.readingErrorMessage ??
-                                    (loading
-                                        ? 'Loading your reading position'
-                                        : state.hasLastRead
-                                        ? '${surah!.englishName} • ${l10n.ayahLabel} '
-                                              '${lastRead!.ayahNumber}'
-                                              '${lastRead.page == null ? '' : ' • Page ${lastRead.page}'}'
-                                        : l10n.continueReadingEmptySubtitle);
-                                final title =
-                                    surah?.englishName ?? 'Al-Fatihah';
-                                final progress =
-                                    lastRead == null || surah == null
-                                    ? 0.0
-                                    : (lastRead.ayahNumber / surah.ayahCount)
-                                          .clamp(0.0, 1.0);
-                                final targetSurah = lastRead?.surahNumber ?? 1;
-                                return _ContinueReadingCard(
-                                  surahNumber: targetSurah,
-                                  title: title,
-                                  subtitle: subtitle,
-                                  progress: progress,
-                                  progressLabel:
-                                      lastRead == null || surah == null
-                                      ? ''
-                                      : '${lastRead.ayahNumber} / ${surah.ayahCount}',
-                                  buttonLabel: state.hasLastRead
-                                      ? 'Resume'
-                                      : 'Start',
-                                  onTap: () => context.push(
-                                    AppRoutes.quranReaderPath(
-                                      targetSurah,
-                                      ayahNumber: lastRead?.ayahNumber,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 22),
-                            const _HomeDestinations(),
-                            const SizedBox(height: 26),
-                          ],
+                      ShellHeaderAction(
+                        icon: Icons.tune_rounded,
+                        tooltip: 'Settings',
+                        onTap: () => context.read<ShellCubit>().setDestination(
+                          ShellDestination.settings,
                         ),
                       ),
-                      BlocBuilder<HomeCubit, HomeState>(
-                        buildWhen: (previous, next) =>
-                            previous.dailyPrayerTimes !=
-                                next.dailyPrayerTimes ||
-                            previous.dailyAyah != next.dailyAyah ||
-                            previous.readingDashboard != next.readingDashboard,
-                        builder: (context, state) => HomeDashboardTiles(
-                          settingsStore: getIt<SettingsStore>(),
-                          prayerTimes: state.dailyPrayerTimes,
-                          onRefreshTimes: context.read<HomeCubit>().load,
-                          readingDashboard: state.readingDashboard,
-                          dailyAyah: state.dailyAyah,
-                          loading: state.status == HomeStatus.loading,
-                          dailyAyahErrorMessage: state.dailyAyahErrorMessage,
-                        ),
-                      ),
-                      const SizedBox(height: 22),
                     ],
                   ),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: context.read<HomeCubit>().load,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        0,
+                        0,
+                        0,
+                        QuranFloatingAudioPlayer.scrollInset(context),
+                      ),
+                      children: [
+                        BlocBuilder<HomeCubit, HomeState>(
+                          buildWhen: (previous, next) =>
+                              previous.dailyPrayerTimes !=
+                                  next.dailyPrayerTimes ||
+                              previous.prayerErrorMessage !=
+                                  next.prayerErrorMessage,
+                          builder: (context, state) {
+                            return _NextPrayerCard(
+                              dailyPrayerTimes: state.dailyPrayerTimes,
+                              title: l10n.nextPrayerTitle,
+                              errorMessage: state.prayerErrorMessage,
+                              onRetry: context.read<HomeCubit>().load,
+                            );
+                          },
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(height: 24),
+                              BlocBuilder<HomeCubit, HomeState>(
+                                builder: (context, state) {
+                                  final lastRead = state.lastRead;
+                                  final surah = state.lastReadSurah;
+                                  final loading =
+                                      state.status == HomeStatus.loading &&
+                                      lastRead == null;
+                                  final subtitle =
+                                      state.readingErrorMessage ??
+                                      (loading
+                                          ? 'Loading your reading position'
+                                          : state.hasLastRead
+                                          ? '${surah!.englishName} • ${l10n.ayahLabel} '
+                                                '${lastRead!.ayahNumber}'
+                                                '${lastRead.page == null ? '' : ' • Page ${lastRead.page}'}'
+                                          : l10n.continueReadingEmptySubtitle);
+                                  final title =
+                                      surah?.englishName ?? 'Al-Fatihah';
+                                  final progress =
+                                      lastRead == null || surah == null
+                                      ? 0.0
+                                      : (lastRead.ayahNumber / surah.ayahCount)
+                                            .clamp(0.0, 1.0);
+                                  final targetSurah =
+                                      lastRead?.surahNumber ?? 1;
+                                  return _ContinueReadingCard(
+                                    surahNumber: targetSurah,
+                                    title: title,
+                                    subtitle: subtitle,
+                                    progress: progress,
+                                    progressLabel:
+                                        lastRead == null || surah == null
+                                        ? ''
+                                        : '${lastRead.ayahNumber} / ${surah.ayahCount}',
+                                    buttonLabel: state.hasLastRead
+                                        ? 'Resume'
+                                        : 'Start',
+                                    onTap: () => context.push(
+                                      AppRoutes.quranReaderPath(
+                                        targetSurah,
+                                        ayahNumber: lastRead?.ayahNumber,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 22),
+                              const _HomeDestinations(),
+                              const SizedBox(height: 26),
+                            ],
+                          ),
+                        ),
+                        BlocBuilder<HomeCubit, HomeState>(
+                          buildWhen: (previous, next) =>
+                              previous.status != next.status ||
+                              previous.dailyPrayerTimes !=
+                                  next.dailyPrayerTimes ||
+                              previous.dailyAyah != next.dailyAyah ||
+                              previous.readingDashboard !=
+                                  next.readingDashboard,
+                          builder: (context, state) => HomeDashboardTiles(
+                            settingsStore: getIt<SettingsStore>(),
+                            prayerTimes: state.dailyPrayerTimes,
+                            onRefreshTimes: context.read<HomeCubit>().load,
+                            readingDashboard: state.readingDashboard,
+                            dailyAyah: state.dailyAyah,
+                            loading: state.status == HomeStatus.loading,
+                            dailyAyahErrorMessage: state.dailyAyahErrorMessage,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -291,6 +303,7 @@ class _NextPrayerCard extends StatelessWidget {
       builder: (context, now) {
         final dayProgress = PrayerDayProgress.calculate(
           entries: dailyPrayerTimes!.entries,
+          nextDayFajr: dailyPrayerTimes!.nextDayFajr,
           now: now,
         );
         final nextPrayer = dayProgress.nextPrayer;

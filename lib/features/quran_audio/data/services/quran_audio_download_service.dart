@@ -44,21 +44,27 @@ class QuranAudioDownloadService implements QuranAudioDownloadServicePort {
   final StreamController<void> _updatesController =
       StreamController<void>.broadcast();
   bool _initialized = false;
+  Future<void>? _initialization;
+  final Map<String, Future<void>> _itemUpdates = {};
 
   @override
   Stream<void> get updates => _updatesController.stream;
 
-  Future<void> initialize() async {
-    if (_initialized) {
-      return;
-    }
-    _initialized = true;
+  Future<void> initialize() {
+    if (_initialized) return Future.value();
+    return _initialization ??= _initialize().whenComplete(
+      () => _initialization = null,
+    );
+  }
+
+  Future<void> _initialize() async {
     _downloader.registerCallbacks(
       group: group,
       taskStatusCallback: (update) => unawaited(_handleStatus(update)),
       taskProgressCallback: _handleProgress,
     );
     await _downloader.start();
+    _initialized = true;
   }
 
   @override
@@ -77,7 +83,14 @@ class QuranAudioDownloadService implements QuranAudioDownloadServicePort {
           existing.status == QuranAudioDownloadStatus.downloading) {
         continue;
       }
+      if (existing.status == QuranAudioDownloadStatus.paused) {
+        final task = _taskForItem(existing, requiresWiFi: requiresWiFi);
+        final resumed = await _downloader.resume(task);
+        if (resumed) continue;
+      }
       final queued = existing.copyWith(
+        isBulkDownload: existing.isBulkDownload || item.isBulkDownload,
+        requestedSurahNumber: item.downloadSurahNumber,
         status: QuranAudioDownloadStatus.queued,
         updatedAt: now,
         clearError: true,
@@ -86,6 +99,7 @@ class QuranAudioDownloadService implements QuranAudioDownloadServicePort {
       tasks.add(_taskForItem(queued, requiresWiFi: requiresWiFi));
     }
     if (tasks.isEmpty) {
+      _notify();
       return;
     }
     await _store.saveItems(queuedItems);
@@ -118,11 +132,11 @@ class QuranAudioDownloadService implements QuranAudioDownloadServicePort {
     if (tasks.isEmpty) {
       return;
     }
-    await _downloader.pauseAll(tasks: tasks);
+    final paused = await _downloader.pauseAll(tasks: tasks);
+    final pausedIds = paused.map((task) => task.taskId).toSet();
     final now = DateTime.now().toUtc();
     for (final item in items) {
-      if (item.status == QuranAudioDownloadStatus.downloading ||
-          item.status == QuranAudioDownloadStatus.queued) {
+      if (pausedIds.contains(item.id)) {
         await _store.saveItem(
           item.copyWith(
             status: QuranAudioDownloadStatus.paused,
@@ -147,14 +161,22 @@ class QuranAudioDownloadService implements QuranAudioDownloadServicePort {
       await enqueueItems(items, requiresWiFi: requiresWiFi);
       return;
     }
-    final tasks = [for (final item in paused) _taskForItem(item)];
-    await _downloader.resumeAll(tasks: tasks);
-    final now = DateTime.now().toUtc();
+    final tasks = [
+      for (final item in paused) _taskForItem(item, requiresWiFi: requiresWiFi),
+    ];
+    // Status callbacks are authoritative; do not overwrite a completed task
+    // with queued after resumeAll returns.
+    final resumed = await _downloader.resumeAll(tasks: tasks);
+    final resumedIds = resumed.map((task) => task.taskId).toSet();
     for (final item in paused) {
-      await _store.saveItem(
-        item.copyWith(status: QuranAudioDownloadStatus.queued, updatedAt: now),
-      );
+      if (!resumedIds.contains(item.id)) {
+        await enqueueItems([item], requiresWiFi: requiresWiFi);
+      }
     }
+    await enqueueItems(
+      items.where((item) => item.status != QuranAudioDownloadStatus.paused),
+      requiresWiFi: requiresWiFi,
+    );
     _notify();
   }
 
@@ -204,7 +226,10 @@ class QuranAudioDownloadService implements QuranAudioDownloadServicePort {
     );
   }
 
-  Future<void> _handleStatus(TaskStatusUpdate update) async {
+  Future<void> _handleStatus(TaskStatusUpdate update) =>
+      _updateItem(update.task.taskId, () => _applyStatus(update));
+
+  Future<void> _applyStatus(TaskStatusUpdate update) async {
     final item = _store.itemById(update.task.taskId);
     if (item == null) {
       return;
@@ -289,27 +314,39 @@ class QuranAudioDownloadService implements QuranAudioDownloadServicePort {
   }
 
   void _handleProgress(TaskProgressUpdate update) {
-    final item = _store.itemById(update.task.taskId);
-    if (item == null || update.progress < 0) {
-      return;
-    }
-    final total = update.hasExpectedFileSize ? update.expectedFileSize : null;
-    final downloaded = total == null
-        ? item.bytesDownloaded
-        : (total * update.progress).round();
+    if (update.progress < 0) return;
     unawaited(
-      _store
-          .saveItem(
-            item.copyWith(
-              status: QuranAudioDownloadStatus.downloading,
-              bytesDownloaded: downloaded,
-              bytesTotal: total,
-              updatedAt: DateTime.now().toUtc(),
-              clearError: true,
-            ),
-          )
-          .then((_) => _notify()),
+      _updateItem(update.task.taskId, () async {
+        final item = _store.itemById(update.task.taskId);
+        if (item == null || !item.isActive) return;
+        final total = update.hasExpectedFileSize
+            ? update.expectedFileSize
+            : null;
+        final downloaded = total == null
+            ? item.bytesDownloaded
+            : (total * update.progress).round();
+        await _store.saveItem(
+          item.copyWith(
+            status: QuranAudioDownloadStatus.downloading,
+            bytesDownloaded: downloaded,
+            bytesTotal: total,
+            updatedAt: DateTime.now().toUtc(),
+            clearError: true,
+          ),
+        );
+        _notify();
+      }),
     );
+  }
+
+  // Preserve callback order so late progress cannot overwrite paused/completed.
+  Future<void> _updateItem(String id, Future<void> Function() action) {
+    final previous = _itemUpdates[id] ?? Future<void>.value();
+    final next = previous.catchError((Object _) {}).then((_) => action());
+    _itemUpdates[id] = next;
+    return next.whenComplete(() {
+      if (identical(_itemUpdates[id], next)) _itemUpdates.remove(id);
+    });
   }
 
   void _notify() {

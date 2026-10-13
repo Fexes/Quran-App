@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quran/features/quran/domain/entities/quran_audio_reciter.dart';
+import 'package:quran/features/quran/domain/entities/quran_translation.dart';
 import 'package:quran/features/quran_audio/presentation/widgets/quran_playback_settings_sheet.dart';
 
 void main() {
   const translationReciter = QuranAudioReciter(
-    id: 'translation:english',
+    id: 'alqurancloud:en.walk',
     name: 'English Voice',
     provider: QuranAudioProvider.alQuranCloud,
     identifier: 'en.walk',
@@ -77,6 +78,13 @@ void main() {
             translationRecitersAvailable: false,
             languageLabel: 'Indonesian',
             selectedReciter: null,
+            selectedTranslation: const QuranTranslationResource(
+              id: 33,
+              languageName: 'indonesian',
+              name: 'Indonesian Ministry of Religious Affairs',
+              authorName: 'Indonesian Ministry of Religious Affairs',
+              slug: 'indonesian',
+            ),
             onEnabledChanged: (_) => toggled = true,
             onVoiceTap: () {},
           ),
@@ -87,7 +95,7 @@ void main() {
     final switchWidget = tester.widget<Switch>(find.byType(Switch));
 
     expect(
-      find.text('No Indonesian translation voice available.'),
+      find.text('Translation audio is unavailable in Indonesian.'),
       findsOneWidget,
     );
     expect(find.text('Translation voice'), findsNothing);

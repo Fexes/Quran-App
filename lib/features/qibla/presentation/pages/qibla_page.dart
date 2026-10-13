@@ -14,6 +14,7 @@ import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../prayer_times/domain/entities/prayer_location.dart';
 import '../../domain/repositories/qibla_repository.dart';
+import '../../domain/services/qibla_heading_filter.dart';
 import '../bloc/qibla_cubit.dart';
 import '../bloc/qibla_state.dart';
 import '../widgets/qibla_compass.dart';
@@ -143,21 +144,20 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
   late final _rotation = AnimationController.unbounded(vsync: this);
   final _status = ValueNotifier('Finding compass');
   final _hapticClock = Stopwatch()..start();
+  final _headingFilter = QiblaHeadingFilter();
   StreamSubscription<dynamic>? _headingSubscription;
   Timer? _alignmentTimer;
   Timer? _firstReadingTimer;
+  Timer? _accuracyTimer;
   double? _heading;
   String? _sensorError;
   bool _active = true;
   bool _aligned = false;
   bool _reliable = false;
   bool _magneticOnly = false;
-  bool _calibrating = false;
+  bool _accuracyLimited = false;
   int _streamRevision = 0;
-  int _lowAccuracySamples = 0;
-  int _calibrationVisibleSince = 0;
   int? _lastHapticAt;
-  static int _calibrationSuppressedUntil = 0;
 
   @override
   void initState() {
@@ -198,6 +198,9 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
       _alignmentTimer?.cancel();
       _alignmentTimer = null;
       _firstReadingTimer?.cancel();
+      _accuracyTimer?.cancel();
+      _accuracyTimer = null;
+      _headingFilter.reset();
       _rotation.stop();
       setState(() {
         _heading = null;
@@ -215,6 +218,7 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
     _headingSubscription?.cancel();
     _alignmentTimer?.cancel();
     _firstReadingTimer?.cancel();
+    _accuracyTimer?.cancel();
     _rotation.dispose();
     _status.dispose();
     _hapticClock.stop();
@@ -226,6 +230,9 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
     _alignmentTimer?.cancel();
     _alignmentTimer = null;
     _firstReadingTimer?.cancel();
+    _accuracyTimer?.cancel();
+    _accuracyTimer = null;
+    _headingFilter.reset();
     await _headingSubscription?.cancel();
     if (!mounted || !_active || revision != _streamRevision) return;
     if (resetState) {
@@ -236,8 +243,7 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
         _aligned = false;
         _reliable = false;
         _magneticOnly = false;
-        _calibrating = false;
-        _lowAccuracySamples = 0;
+        _accuracyLimited = false;
       });
       _status.value = 'Finding compass';
     }
@@ -278,39 +284,38 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
       _handleHeadingError(const FormatException('Invalid heading event'));
       return;
     }
-    final raw = event['heading'];
-    if (raw is! num || !raw.isFinite) {
-      _handleHeadingError(const FormatException('Invalid heading value'));
+    final ({double heading, bool reliable, bool magneticOnly}) reading;
+    try {
+      reading = _headingFilter.add(event, now: _hapticClock.elapsed);
+    } on FormatException {
+      // A transient invalid sample must not erase the last valid direction.
+      final changed = _reliable || _aligned || _alignmentTimer != null;
+      _reliable = false;
+      _alignmentTimer?.cancel();
+      _alignmentTimer = null;
+      _aligned = false;
+      _updateAccuracyWarning();
+      if (changed) setState(() {});
+      _updateStatus();
       return;
     }
-    final heading = raw.toDouble() % 360;
-    final source = event['source']?.toString();
-    final accuracyValue = event['accuracy'];
-    final accuracy = accuracyValue is num && accuracyValue.isFinite
-        ? accuracyValue.toDouble()
-        : null;
+    final heading = reading.heading;
     final before = (
       _heading == null,
       _sensorError,
       _aligned,
       _reliable,
       _magneticOnly,
-      _calibrating,
+      _accuracyLimited,
       _alignmentTimer != null,
     );
     final firstReading = _heading == null;
     _firstReadingTimer?.cancel();
     _sensorError = null;
     _heading = heading;
-    _magneticOnly = source == 'ios_core_location_magnetic';
-    _reliable = switch (source) {
-      'android_rotation_vector' || 'android_geomagnetic_rotation_vector' =>
-        accuracy != null && accuracy >= 2 && accuracy <= 3,
-      'ios_core_location' =>
-        accuracy != null && accuracy >= 0 && accuracy <= 20,
-      _ => false,
-    };
-    _updateCalibration();
+    _magneticOnly = reading.magneticOnly;
+    _reliable = reading.reliable;
+    _updateAccuracyWarning();
     final relative = _signedAngle(widget.qiblaBearing - heading);
 
     // Warning visibility is independent of whether a reading can confirm Qibla.
@@ -333,7 +338,7 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
           _aligned,
           _reliable,
           _magneticOnly,
-          _calibrating,
+          _accuracyLimited,
           _alignmentTimer != null,
         )) {
       setState(() {});
@@ -372,7 +377,9 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
     _status.value = _magneticOnly
         ? 'True north unavailable'
         : !_reliable
-        ? 'Compass needs calibration'
+        ? _accuracyLimited
+              ? 'Direction is approximate'
+              : 'Finding accurate direction'
         : _aligned
         ? 'Facing Qibla'
         : _alignmentTimer != null
@@ -381,30 +388,29 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
               '${relative.abs().round()}°';
   }
 
-  void _updateCalibration() {
+  void _updateAccuracyWarning() {
     if (_reliable || _magneticOnly) {
-      _lowAccuracySamples = 0;
-      _calibrating = false;
+      _accuracyTimer?.cancel();
+      _accuracyTimer = null;
+      _accuracyLimited = false;
       return;
     }
-    final now = DateTime.now().millisecondsSinceEpoch;
-    ++_lowAccuracySamples;
-    if (_calibrating && now - _calibrationVisibleSince >= 7000) {
-      _calibrating = false;
-      _calibrationSuppressedUntil = now + 120000;
-    } else if (!_calibrating &&
-        now >= _calibrationSuppressedUntil &&
-        _lowAccuracySamples >= 12) {
-      _calibrating = true;
-      _calibrationVisibleSince = now;
-      _calibrationSuppressedUntil = now + 120000;
-    }
+    if (_accuracyLimited || _accuracyTimer != null) return;
+    _accuracyTimer = Timer(const Duration(seconds: 3), () {
+      _accuracyTimer = null;
+      if (!mounted || !_active || _reliable || _magneticOnly) return;
+      setState(() => _accuracyLimited = true);
+      _updateStatus();
+    });
   }
 
   void _handleHeadingError(Object error) {
     if (!mounted || !_active) return;
     _rotation.stop();
     _firstReadingTimer?.cancel();
+    _accuracyTimer?.cancel();
+    _accuracyTimer = null;
+    _headingFilter.reset();
     _alignmentTimer?.cancel();
     _alignmentTimer = null;
     setState(() {
@@ -412,7 +418,7 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
       _aligned = false;
       _reliable = false;
       _magneticOnly = false;
-      _calibrating = false;
+      _accuracyLimited = false;
       _sensorError = error is PlatformException && error.code == 'no_sensor'
           ? 'This device has no compass sensor'
           : 'Compass reading unavailable';
@@ -432,10 +438,10 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
         ? 'Your Qibla bearing is still available below.'
         : _magneticOnly
         ? 'Allow location access in Settings to use true north.'
-        : _calibrating
-        ? 'Move your phone in a slow figure-eight, away from metal.'
+        : _accuracyLimited
+        ? 'Move away from magnetic cases, chargers, or metal.'
         : hasHeading && !_reliable
-        ? 'Keep your phone away from magnets and metal.'
+        ? 'Hold your phone flat while the sensors settle.'
         : _aligned
         ? 'Your phone is pointing towards the Kaaba.'
         : settling
@@ -449,6 +455,7 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
           hasHeading: hasHeading,
           unavailable: _sensorError != null,
           reliable: _reliable,
+          recovering: !_reliable && !_accuracyLimited && !_magneticOnly,
           aligned: _aligned,
           settling: settling,
         ),
@@ -506,7 +513,10 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
                     ? Icons.verified_outlined
                     : Icons.info_outline_rounded,
                 size: 16,
-                color: hasHeading && !_reliable
+                color:
+                    hasHeading &&
+                        !_reliable &&
+                        (_accuracyLimited || _magneticOnly)
                     ? warning
                     : QuranTheme.subText(context),
               ),
@@ -517,9 +527,14 @@ class _LiveQiblaCompassState extends State<_LiveQiblaCompass>
                     ? 'Magnetic north only'
                     : _reliable
                     ? 'True north'
-                    : 'Accuracy limited',
+                    : _accuracyLimited
+                    ? 'Low compass confidence'
+                    : 'Refining direction',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: hasHeading && !_reliable
+                  color:
+                      hasHeading &&
+                          !_reliable &&
+                          (_accuracyLimited || _magneticOnly)
                       ? warning
                       : QuranTheme.subText(context),
                 ),

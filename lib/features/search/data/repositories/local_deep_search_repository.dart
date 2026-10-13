@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:isolate';
+import '../../../../core/search/local_search_revision.dart';
+import '../../../library/data/stores/library_user_data_store.dart';
 import '../../../azkar/domain/repositories/azkar_repository.dart';
 import '../../../hadith/domain/repositories/hadith_repository.dart';
 import '../../../../core/search/deep_search_index_record.dart';
@@ -11,7 +15,8 @@ import '../../domain/entities/deep_search_result.dart';
 import '../../domain/repositories/deep_search_repository.dart';
 import '../utils/search_text_normalizer.dart';
 
-class LocalDeepSearchRepository implements DeepSearchRepository {
+class LocalDeepSearchRepository
+    implements DeepSearchRepository, DisposableDeepSearchRepository {
   LocalDeepSearchRepository({
     required QuranRepository quranRepository,
     required QuranTranslationStore translationStore,
@@ -19,12 +24,14 @@ class LocalDeepSearchRepository implements DeepSearchRepository {
     required QuranUserDataStore userDataStore,
     required HadithRepository hadithRepository,
     required AzkarRepository azkarRepository,
+    LibraryUserDataStore? libraryUserDataStore,
   }) : _quranRepository = quranRepository,
        _translationStore = translationStore,
        _tafsirStore = tafsirStore,
        _userDataStore = userDataStore,
        _hadithRepository = hadithRepository,
-       _azkarRepository = azkarRepository;
+       _azkarRepository = azkarRepository,
+       _libraryUserDataStore = libraryUserDataStore;
 
   final QuranRepository _quranRepository;
   final QuranTranslationStore _translationStore;
@@ -32,12 +39,12 @@ class LocalDeepSearchRepository implements DeepSearchRepository {
   final QuranUserDataStore _userDataStore;
   final HadithRepository _hadithRepository;
   final AzkarRepository _azkarRepository;
+  final LibraryUserDataStore? _libraryUserDataStore;
 
   static const _indexYieldInterval = 64;
-  static const _searchYieldInterval = 512;
-
-  Future<List<_SearchEntry>>? _indexFuture;
-  int _indexedTranslationRevision = -1;
+  Future<_SearchWorker>? _indexFuture;
+  String _indexedRevision = '';
+  bool _disposed = false;
 
   @override
   Future<void> warmUp() async {
@@ -55,47 +62,52 @@ class LocalDeepSearchRepository implements DeepSearchRepository {
       return const [];
     }
 
-    final entries = await _currentIndex();
-    final matches = <DeepSearchCategory, List<DeepSearchResult>>{};
-    var scanned = 0;
-    for (final entry in entries) {
-      final scored = entry.score(normalizedQuery);
-      if (scored == null) {
-        scanned += 1;
-        if (scanned % _searchYieldInterval == 0) {
-          await _yieldToEventLoop();
-        }
-        continue;
-      }
-      if (entry.category == DeepSearchCategory.hadith &&
-          !await _isVisibleHadithResult(entry)) {
-        scanned += 1;
-        if (scanned % _searchYieldInterval == 0) {
-          await _yieldToEventLoop();
-        }
-        continue;
-      }
-      matches.putIfAbsent(entry.category, () => []).add(entry.toResult(scored));
-      scanned += 1;
-      if (scanned % _searchYieldInterval == 0) {
-        await _yieldToEventLoop();
-      }
+    final pending = _currentIndex();
+    final worker = await pending;
+    try {
+      return await worker.search(normalizedQuery, limitPerCategory);
+    } catch (_) {
+      if (identical(_indexFuture, pending)) _indexFuture = null;
+      worker.dispose();
+      rethrow;
     }
-
-    return [
-      for (final category in DeepSearchCategory.values)
-        if (matches[category]?.isNotEmpty == true)
-          _sectionFor(category, matches[category]!, limitPerCategory),
-    ];
   }
 
-  Future<List<_SearchEntry>> _currentIndex() {
-    final revision = _translationStore.contentRevision;
-    if (_indexFuture == null || revision != _indexedTranslationRevision) {
-      _indexedTranslationRevision = revision;
-      _indexFuture = _buildIndex();
+  Future<_SearchWorker> _currentIndex() {
+    if (_disposed) throw StateError('Search is closed');
+    final revision =
+        '${_translationStore.contentRevision}:${LocalSearchRevision.value}';
+    if (_indexFuture == null || revision != _indexedRevision) {
+      final previous = _indexFuture;
+      if (previous != null) {
+        unawaited(
+          previous.then((worker) => worker.dispose()).catchError((Object _) {}),
+        );
+      }
+      _indexedRevision = revision;
+      final pending = _buildIndex().then(_SearchWorker.start);
+      _indexFuture = pending;
+      unawaited(
+        pending.then<void>(
+          (worker) {
+            if (_disposed) worker.dispose();
+          },
+          onError: (Object error, StackTrace stack) {
+            if (identical(_indexFuture, pending)) _indexFuture = null;
+          },
+        ),
+      );
     }
     return _indexFuture!;
+  }
+
+  @override
+  Future<void> dispose() async {
+    _disposed = true;
+    try {
+      final worker = await _indexFuture;
+      worker?.dispose();
+    } catch (_) {}
   }
 
   Future<List<_SearchEntry>> _buildIndex() async {
@@ -216,7 +228,9 @@ class LocalDeepSearchRepository implements DeepSearchRepository {
     }
 
     final hadithRecords = await _hadithRepository.getSearchIndexRecords();
+    final contentIds = <String>{};
     for (final record in hadithRecords) {
+      contentIds.add(record.targetId);
       entries.add(_contentIndexEntry(record));
       indexed += 1;
       if (indexed % _indexYieldInterval == 0) {
@@ -226,6 +240,7 @@ class LocalDeepSearchRepository implements DeepSearchRepository {
 
     final azkarRecords = await _azkarRepository.getSearchIndexRecords();
     for (final record in azkarRecords) {
+      contentIds.add(record.targetId);
       entries.add(_contentIndexEntry(record));
       indexed += 1;
       if (indexed % _indexYieldInterval == 0) {
@@ -233,15 +248,30 @@ class LocalDeepSearchRepository implements DeepSearchRepository {
       }
     }
 
-    return entries;
-  }
-
-  Future<bool> _isVisibleHadithResult(_SearchEntry entry) async {
-    final id = entry.target.itemId;
-    if (id == null || id.isEmpty) {
-      return false;
+    for (final note
+        in _libraryUserDataStore?.notes.entries ??
+            const <MapEntry<String, String>>[]) {
+      if (note.value.isEmpty || !contentIds.contains(note.key)) continue;
+      entries.add(
+        _SearchEntry(
+          id: 'library-note:${note.key}',
+          category: DeepSearchCategory.notes,
+          title: 'Note',
+          subtitle: note.key.startsWith('hadith:')
+              ? 'Hadith reflection'
+              : 'Dhikr reflection',
+          primaryText: note.value,
+          secondaryText: '',
+          target: DeepSearchTarget(
+            type: DeepSearchTargetType.note,
+            itemId: note.key,
+            noteId: note.key,
+          ),
+          fields: [_SearchField('note', note.value, boost: 640)],
+        ),
+      );
     }
-    return _hadithRepository.getHadithById(id).then((hadith) => hadith != null);
+    return entries;
   }
 
   Future<void> _yieldToEventLoop() {
@@ -347,7 +377,11 @@ class LocalDeepSearchRepository implements DeepSearchRepository {
       subtitle: record.subtitle,
       primaryText: record.primaryPreview,
       secondaryText: record.secondaryPreview,
-      target: DeepSearchTarget(type: targetType, itemId: record.targetId),
+      target: DeepSearchTarget(
+        type: targetType,
+        itemId: record.targetId,
+        languageCode: record.languageCode,
+      ),
       fields: [
         _SearchField.normalized(
           category == DeepSearchCategory.hadith ? 'hadith text' : 'azkar text',
@@ -358,7 +392,7 @@ class LocalDeepSearchRepository implements DeepSearchRepository {
     );
   }
 
-  DeepSearchSection _sectionFor(
+  static DeepSearchSection _sectionFor(
     DeepSearchCategory category,
     List<DeepSearchResult> results,
     int limit,
@@ -438,17 +472,23 @@ class _SearchEntry {
 
 class _SearchField {
   _SearchField(this.name, String text, {required this.boost})
-    : normalizedText = SearchTextNormalizer.normalize(text);
+    : normalizedText = text,
+      _needsNormalization = true;
 
-  const _SearchField.normalized(
-    this.name,
-    this.normalizedText, {
-    required this.boost,
-  });
+  _SearchField.normalized(this.name, this.normalizedText, {required this.boost})
+    : _needsNormalization = false;
 
   final String name;
-  final String normalizedText;
+  String normalizedText;
+  bool _needsNormalization;
   final int boost;
+
+  void prepare() {
+    if (_needsNormalization) {
+      normalizedText = SearchTextNormalizer.normalize(normalizedText);
+      _needsNormalization = false;
+    }
+  }
 
   _SearchScore? score(String normalizedQuery) {
     if (normalizedText.isEmpty || !normalizedText.contains(normalizedQuery)) {
@@ -469,4 +509,118 @@ class _SearchScore {
 
   final String fieldName;
   final int score;
+}
+
+// Keep the normalized index in a worker. Keystrokes send only the query and
+// receive capped results, rather than copying or resolving the full corpus.
+class _SearchWorker {
+  _SearchWorker(this._isolate, this._receive);
+  final Isolate _isolate;
+  final ReceivePort _receive;
+  late SendPort _send;
+  final _ready = Completer<void>();
+  final _requests = <int, Completer<List<DeepSearchSection>>>{};
+  int _nextId = 0;
+  bool _closed = false;
+  Object? _failure;
+
+  static Future<_SearchWorker> start(List<_SearchEntry> entries) async {
+    final receive = ReceivePort();
+    final Isolate isolate;
+    try {
+      isolate = await Isolate.spawn(
+        _runSearchWorker,
+        (receive.sendPort, entries),
+        onError: receive.sendPort,
+        onExit: receive.sendPort,
+      );
+    } catch (_) {
+      receive.close();
+      rethrow;
+    }
+    final worker = _SearchWorker(isolate, receive);
+    receive.listen((dynamic message) {
+      if (message is SendPort) {
+        worker._send = message;
+        worker._ready.complete();
+      } else if (message is (int, List<DeepSearchSection>)) {
+        worker._requests.remove(message.$1)?.complete(message.$2);
+      } else {
+        worker._fail(StateError('Search worker stopped unexpectedly'));
+      }
+    });
+    try {
+      await worker._ready.future;
+    } catch (_) {
+      worker.dispose();
+      rethrow;
+    }
+    return worker;
+  }
+
+  Future<List<DeepSearchSection>> search(String query, int limit) {
+    if (_failure case final error?) return Future.error(error);
+    if (_closed) return Future.value(const []);
+    final id = ++_nextId;
+    final result = Completer<List<DeepSearchSection>>();
+    _requests[id] = result;
+    _send.send((id, query, limit));
+    return result.future;
+  }
+
+  void _fail(Object error) {
+    if (_closed) return;
+    _failure = error;
+    if (!_ready.isCompleted) _ready.completeError(error);
+    for (final request in _requests.values) {
+      request.completeError(error);
+    }
+    _requests.clear();
+    dispose();
+  }
+
+  void dispose() {
+    _closed = true;
+    _isolate.kill(priority: Isolate.immediate);
+    _receive.close();
+    for (final request in _requests.values) {
+      request.complete(const []);
+    }
+    _requests.clear();
+  }
+}
+
+void _runSearchWorker((SendPort, List<_SearchEntry>) args) {
+  final (reply, entries) = args;
+  for (final entry in entries) {
+    for (final field in entry.fields) {
+      field.prepare();
+    }
+  }
+  final requests = ReceivePort();
+  reply.send(requests.sendPort);
+  requests.listen((dynamic message) {
+    final (id, query, limit) = message as (int, String, int);
+    final matches = <DeepSearchCategory, List<DeepSearchResult>>{};
+    for (final entry in entries) {
+      final score = entry.score(query);
+      if (score != null) {
+        matches
+            .putIfAbsent(entry.category, () => [])
+            .add(entry.toResult(score));
+      }
+    }
+    reply.send((
+      id,
+      [
+        for (final category in DeepSearchCategory.values)
+          if (matches[category]?.isNotEmpty == true)
+            LocalDeepSearchRepository._sectionFor(
+              category,
+              matches[category]!,
+              limit,
+            ),
+      ],
+    ));
+  });
 }

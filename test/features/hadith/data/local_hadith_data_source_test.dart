@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quran/features/hadith/data/datasources/local_hadith_data_source.dart';
 import 'package:quran/features/hadith/domain/entities/hadith_item.dart';
+import 'package:quran/features/hadith/domain/services/hadith_authenticity_policy.dart';
 
 void main() {
   group('LocalHadithDataSource', () {
@@ -20,12 +21,17 @@ void main() {
           limit: 2,
         );
 
-        expect(sources, hasLength(1));
-        expect(sources.single.id, 'fawaz_hadith_api');
-        expect(books, hasLength(10));
+        expect(
+          sources.map((source) => source.id),
+          unorderedEquals(['fawaz_hadith_api', 'ummah_library_hadith']),
+        );
+        expect(books, hasLength(9));
+        expect(books.map((book) => book.id), isNot(contains('dehlawi')));
+        expect(books.every((book) => book.hadithCount > 0), isTrue);
         expect(chapters.length, greaterThan(1));
         expect(hadiths, hasLength(2));
-        expect(hadiths.first.sourceId, sources.single.id);
+        expect(hadiths.first.sourceId, bukhari.sourceId);
+        expect(hadiths.every(HadithAuthenticityPolicy.shouldShow), isTrue);
         expect(hadiths.first.translation, isNotEmpty);
         expect(hadiths.first.arabic, isNotEmpty);
       },
@@ -139,6 +145,8 @@ void main() {
       expect(await dataSource.getHadithById(noChain.id), isNull);
       expect(await dataSource.search('weak report'), isEmpty);
       expect(await dataSource.search('sound report'), const [authentic]);
+      final index = await dataSource.getSearchIndexRecords();
+      expect(index.map((record) => record.targetId), [authentic.id]);
     });
 
     test(

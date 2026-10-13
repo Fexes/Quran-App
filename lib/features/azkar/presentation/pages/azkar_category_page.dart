@@ -41,9 +41,7 @@ class AzkarCategoryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) =>
-          AzkarLibraryCubit(repository: getIt<AzkarRepository>())
-            ..load(categoryId: categoryId),
+      create: (_) => AzkarLibraryCubit(repository: getIt<AzkarRepository>()),
       child: _AzkarCategoryView(
         categoryId: categoryId,
         initialItemId: initialItemId,
@@ -74,6 +72,9 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
     null,
   );
   bool _translationAvailable = true;
+  bool _loadingLanguage = true;
+  String? _languageError;
+  int _languageRevision = 0;
   String? _selectedItemKey;
   int _currentNumber = 1;
   final _repeatProgress = <String, int>{};
@@ -102,37 +103,45 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
   }
 
   Future<void> _loadContentLanguage() async {
-    final translationRepository = getIt<QuranTranslationRepository>();
-    final previousQuranSelection = await translationRepository
-        .selectedTranslation();
-    var code = _settingsStore.azkarLanguageCodeOrNull;
-    if (code == null) {
-      code =
-          libraryLanguageFromQuranTranslation(
-            previousQuranSelection,
-          ).azkarCode ??
-          'en';
-      await _settingsStore.setAzkarLanguageCode(code);
-    }
-    QuranTranslationResource? displayResource;
-    final languages = await translationRepository.translationLanguages();
-    for (final language in languages) {
-      final resource = language.defaultResource;
-      if (libraryLanguageFromQuranTranslation(resource).azkarCode == code) {
-        displayResource = resource;
-        break;
-      }
-    }
-    final language = libraryLanguageFromCode(code, resource: displayResource);
-    final available = await getIt<AzkarRepository>().hasFullTranslation(code);
-    if (!mounted) {
-      return;
-    }
+    final revision = ++_languageRevision;
     setState(() {
-      _selectedTranslation = displayResource;
-      _language = language;
-      _translationAvailable = available;
+      _loadingLanguage = true;
+      _languageError = null;
     });
+    try {
+      final resource = await getIt<QuranTranslationRepository>()
+          .selectedTranslation();
+      final shared = libraryLanguageFromQuranTranslation(resource);
+      final stored = _settingsStore.azkarLanguageCodeOrNull;
+      final language = stored == null
+          ? shared
+          : libraryLanguageFromCode(
+              stored,
+              resource: shared.azkarCode == stored ? resource : null,
+            );
+      final code = language.azkarCode;
+      final available =
+          code != null &&
+          await getIt<AzkarRepository>().hasInstalledTranslation(code);
+      if (!mounted || revision != _languageRevision) return;
+      setState(() {
+        _selectedTranslation = language.resource;
+        _language = language;
+        _translationAvailable = available;
+      });
+      await context.read<AzkarLibraryCubit>().load(
+        categoryId: widget.categoryId,
+        languageCode: code ?? 'unavailable',
+      );
+      if (!mounted || revision != _languageRevision) return;
+      setState(() => _loadingLanguage = false);
+    } catch (error) {
+      if (!mounted || revision != _languageRevision) return;
+      setState(() {
+        _loadingLanguage = false;
+        _languageError = error.toString();
+      });
+    }
   }
 
   void _onScroll() {
@@ -187,17 +196,20 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
           ),
           body: BlocBuilder<AzkarLibraryCubit, AzkarLibraryState>(
             builder: (context, state) {
-              if (state.status == AzkarLibraryStatus.failure) {
+              if (_languageError != null ||
+                  state.status == AzkarLibraryStatus.failure) {
                 return AppErrorView(
                   title: 'Azkar could not be loaded',
-                  message: state.errorMessage ?? 'Please try again.',
-                  onRetry: () => context.read<AzkarLibraryCubit>().load(
-                    categoryId: widget.categoryId,
-                  ),
+                  message:
+                      _languageError ??
+                      state.errorMessage ??
+                      'Please try again.',
+                  onRetry: _loadContentLanguage,
                 );
               }
-              if (state.status == AzkarLibraryStatus.loading &&
-                  state.dhikr.isEmpty) {
+              if (_loadingLanguage ||
+                  (state.status == AzkarLibraryStatus.loading &&
+                      state.dhikr.isEmpty)) {
                 return const AppLoadingView(label: 'Loading azkar');
               }
               _selectInitialItemIfNeeded(state);
@@ -236,6 +248,7 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
                                 translationAvailable: _translationAvailable,
                                 languageLabel: _language.label,
                                 translationResource: _selectedTranslation,
+                                languageCode: _language.azkarCode,
                                 showTransliteration: _showTransliteration,
                                 repeatProgress:
                                     _repeatProgress[_itemKey(item)] ?? 0,
@@ -535,7 +548,7 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
               for (final language in languages)
                 ListTile(
                   title: Text(libraryLanguageLabel(language)),
-                  subtitle: Text(language.toUpperCase()),
+                  subtitle: const Text('Available offline'),
                   selected: _language.azkarCode == language,
                   trailing: const AppIcon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.of(context).pop(language),
@@ -548,7 +561,7 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
     if (selected == null) {
       return;
     }
-    if (!await repository.hasFullTranslation(selected)) {
+    if (!await repository.hasInstalledTranslation(selected)) {
       final downloaded = await _downloadAzkarTranslation(repository, selected);
       if (downloaded != true) {
         return;
@@ -700,6 +713,7 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
                 text: item.translation,
                 themeState: context.read<QuranThemeCubit>().state,
                 resource: _selectedTranslation,
+                languageCode: _language.azkarCode,
               ),
             ],
             if (item.benefit.isNotEmpty) ...[
@@ -785,6 +799,7 @@ class _DhikrReaderCard extends StatelessWidget {
     required this.translationAvailable,
     required this.languageLabel,
     required this.translationResource,
+    required this.languageCode,
     required this.showTransliteration,
     required this.repeatProgress,
     required this.onRepeat,
@@ -798,6 +813,7 @@ class _DhikrReaderCard extends StatelessWidget {
   final bool translationAvailable;
   final String languageLabel;
   final QuranTranslationResource? translationResource;
+  final String? languageCode;
   final bool showTransliteration;
   final int repeatProgress;
   final VoidCallback onRepeat;
@@ -865,6 +881,7 @@ class _DhikrReaderCard extends StatelessWidget {
                     text: item.translation,
                     themeState: themeState,
                     resource: translationResource,
+                    languageCode: languageCode,
                   )
                 else
                   LibraryTranslationUnavailable(languageLabel: languageLabel),

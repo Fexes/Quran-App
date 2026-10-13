@@ -90,12 +90,16 @@ class QuranTafsirDownloadProgress extends Equatable {
     required this.totalVerses,
     this.isComplete = false,
     this.failed = false,
+    this.unavailableVerses = 0,
+    this.errorMessage,
   });
 
   final int completedVerses;
   final int totalVerses;
   final bool isComplete;
   final bool failed;
+  final int unavailableVerses;
+  final String? errorMessage;
 
   double get percent {
     if (totalVerses <= 0) {
@@ -105,7 +109,14 @@ class QuranTafsirDownloadProgress extends Equatable {
   }
 
   @override
-  List<Object> get props => [completedVerses, totalVerses, isComplete, failed];
+  List<Object?> get props => [
+    completedVerses,
+    totalVerses,
+    isComplete,
+    failed,
+    unavailableVerses,
+    errorMessage,
+  ];
 }
 
 class QuranCachedTafsirVerse extends Equatable {

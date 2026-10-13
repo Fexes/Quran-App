@@ -4,8 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/storage/settings_store.dart';
 import '../../../quran/domain/entities/quran_audio_reciter.dart';
+import '../../../quran/domain/entities/quran_translation.dart';
 import '../../../quran/domain/repositories/quran_repository.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
+import '../../../quran/domain/services/quran_translation_audio_pairings.dart';
 import '../../data/repositories/quran_audio_download_repository.dart';
 import '../../data/services/quran_audio_download_service.dart';
 import '../../domain/entities/quran_audio_download_item.dart';
@@ -39,8 +41,12 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
   final SettingsStore _settingsStore;
   late final StreamSubscription<void> _downloadSubscription;
   Timer? _refreshDebounce;
+  int _refreshVersion = 0;
+  List<QuranAudioReciter> _allReciters = const [];
 
   Future<void> load() async {
+    if (isClosed) return;
+    _refreshVersion += 1;
     emit(
       state.copyWith(
         status: QuranAudioDownloadsStatus.loading,
@@ -50,6 +56,7 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
     );
     try {
       final allReciters = await _quranRepository.getAudioReciters();
+      _allReciters = allReciters;
       final selectedId = await _quranRepository.getSelectedAudioReciterId();
       final selectedTranslation = await _translationRepository
           ?.selectedTranslation();
@@ -62,6 +69,7 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
       final selectedArabic = _selectedReciter(arabicReciters, selectedId);
       final selectedTranslationReciter = _preferredTranslationReciter(
         translationReciters,
+        selectedTranslation,
       );
       final visibleReciters = _recitersForAudioType(
         state.audioType,
@@ -73,6 +81,7 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
         selectedArabic: selectedArabic,
         selectedTranslation: selectedTranslationReciter,
       );
+      if (isClosed) return;
       emit(
         state.copyWith(
           status: QuranAudioDownloadsStatus.success,
@@ -91,6 +100,7 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
       );
       await _refresh();
     } catch (error) {
+      if (isClosed) return;
       emit(
         state.copyWith(
           status: QuranAudioDownloadsStatus.failure,
@@ -102,15 +112,24 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
 
   Future<void> selectReciter(QuranAudioReciter reciter) async {
     if (state.audioType == QuranAudioDownloadAudioType.translation) {
+      final pair = quranTranslationPairForVoice(reciter.id);
+      final repository = _translationRepository;
+      if (pair == null ||
+          repository == null ||
+          !await repository.hasFullTranslation(pair.resource.id)) {
+        throw StateError('Prepare the matching text translation first.');
+      }
       await _settingsStore.setAudioMeaningLanguageCode(reciter.languageCode);
       await _settingsStore.setAudioTranslationReciterId(
         reciter.id,
         languageCode: reciter.languageCode,
       );
+      await repository.setSelectedTranslation(pair.resource.id);
       emit(
         state.copyWith(
           selectedReciter: reciter,
           selectedTranslationReciter: reciter,
+          selectedTranslation: pair.resource,
         ),
       );
     } else {
@@ -143,6 +162,7 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
         );
     final selectedTranslationReciter = _preferredTranslationReciter(
       translationReciters,
+      selectedTranslation,
     );
     final visibleReciters = _recitersForAudioType(
       audioType,
@@ -198,6 +218,7 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
         );
     final selectedTranslationReciter = _preferredTranslationReciter(
       translationReciters,
+      selectedTranslation,
     );
     emit(
       state.copyWith(
@@ -223,8 +244,12 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
 
   QuranAudioReciter? _preferredTranslationReciter(
     List<QuranAudioReciter> reciters,
+    QuranTranslationResource? selectedTranslation,
   ) => preferredQuranTranslationVoice(
-    reciters,
+    quranCompatibleTranslationAudioReciters(
+      reciters: reciters,
+      selectedTranslation: selectedTranslation,
+    ),
     preferredId: _settingsStore.translationVoiceForLanguage(
       reciters.firstOrNull?.languageCode ?? '',
     ),
@@ -236,8 +261,10 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
     emit(state.copyWith(wifiOnlyLargeDownloads: value));
   }
 
-  Future<void> downloadSurah(int surahNumber) async {
-    final reciter = state.selectedReciter;
+  Future<void> downloadSurah(int surahNumber, {String? reciterId}) async {
+    final reciter = reciterId == null
+        ? state.selectedReciter
+        : _allReciters.where((item) => item.id == reciterId).firstOrNull;
     if (reciter == null) {
       return;
     }
@@ -294,19 +321,31 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
       group.items,
       requiresWiFi:
           state.wifiOnlyLargeDownloads &&
-          group.scope == QuranAudioDownloadScope.reciter,
+          (group.scope == QuranAudioDownloadScope.reciter ||
+              group.items.any((item) => item.isBulkDownload)),
     );
     await _refresh();
   }
 
   Future<void> retryGroup(QuranAudioDownloadGroup group) async {
-    await _downloadService.retryItems(group.items);
+    await _downloadService.retryItems(
+      group.items,
+      requiresWiFi:
+          state.wifiOnlyLargeDownloads &&
+          (group.scope == QuranAudioDownloadScope.reciter ||
+              group.items.any((item) => item.isBulkDownload)),
+    );
     await _refresh();
   }
 
   Future<void> deleteGroup(QuranAudioDownloadGroup group) async {
-    await _downloadService.cancelItems(group.items);
-    await _downloadRepository.deleteItems(group.items);
+    final items = group.surahNumber == null
+        ? group.items
+        : group.items
+              .where((item) => item.surahNumber == group.surahNumber)
+              .toList(growable: false);
+    await _downloadService.cancelItems(items);
+    await _downloadRepository.deleteItems(items);
     await _refresh();
   }
 
@@ -349,25 +388,65 @@ class QuranAudioDownloadsCubit extends Cubit<QuranAudioDownloadsState> {
   }
 
   Future<void> _refresh() async {
-    final reciter = state.selectedReciter;
-    if (isClosed) {
+    if (isClosed || state.status != QuranAudioDownloadsStatus.success) {
       return;
     }
+    final version = ++_refreshVersion;
+    final reciter = state.selectedReciter;
     final surahGroups = reciter == null
         ? const <QuranAudioDownloadGroup>[]
         : await _downloadRepository.surahGroups(reciter: reciter);
     final activeGroups = _downloadRepository.activeGroups();
     final downloadedGroups = _downloadRepository.downloadedGroups();
+    final pendingItems = _downloadRepository.store.allItems
+        .where(
+          (item) =>
+              item.isActive ||
+              item.status == QuranAudioDownloadStatus.paused ||
+              item.status == QuranAudioDownloadStatus.failed,
+        )
+        .toList(growable: false);
+    final pendingGroupIds = {
+      for (final item in pendingItems)
+        '${item.reciterId}_${item.downloadSurahNumber}',
+    };
+    final allGroupsById = {for (final group in surahGroups) group.id: group};
+    final otherReciterIds = {
+      for (final group in [...activeGroups, ...downloadedGroups])
+        if (group.reciterId != reciter?.id) group.reciterId,
+      for (final item in pendingItems)
+        if (item.reciterId != reciter?.id) item.reciterId,
+    };
+    final otherGroups = await Future.wait([
+      for (final otherReciter in _allReciters)
+        if (otherReciterIds.contains(otherReciter.id))
+          _downloadRepository.surahGroups(reciter: otherReciter),
+    ]);
+    for (final groups in otherGroups) {
+      for (final group in groups) {
+        allGroupsById[group.id] = group;
+      }
+    }
+    for (final group in activeGroups) {
+      allGroupsById.putIfAbsent(group.id, () => group);
+    }
+    final pendingGroups = [
+      for (final group in allGroupsById.values)
+        if (pendingGroupIds.contains(group.id)) group,
+    ]..sort((a, b) => (a.surahNumber ?? 0).compareTo(b.surahNumber ?? 0));
     final storageUsedBytes = await _downloadRepository.storageUsedBytes();
-    if (isClosed) {
+    if (isClosed || version != _refreshVersion) {
       return;
     }
     emit(
       state.copyWith(
         status: QuranAudioDownloadsStatus.success,
         surahGroups: surahGroups,
-        activeGroups: activeGroups,
-        downloadedGroups: downloadedGroups,
+        activeGroups: pendingGroups,
+        downloadedGroups: [
+          for (final group in downloadedGroups)
+            allGroupsById[group.id] ?? group,
+        ],
         storageUsedBytes: storageUsedBytes,
         wifiOnlyLargeDownloads: _settingsStore.audioWifiOnlyLargeDownloads,
         clearError: true,

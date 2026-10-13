@@ -9,6 +9,8 @@ import '../../../../../core/theme/quran_theme.dart';
 import '../../../../../core/widgets/app_error_view.dart';
 import '../../../../../core/widgets/app_loading_view.dart';
 import '../../../../../core/widgets/app_sheet.dart';
+import '../../../../../core/widgets/note_editor_sheet.dart';
+import '../../../../library/data/stores/library_user_data_store.dart';
 import '../../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../../core/widgets/premium_surface.dart';
 import '../../../../../l10n/gen/app_localizations.dart';
@@ -475,8 +477,16 @@ void _openResult(BuildContext context, DeepSearchResult result) {
     case DeepSearchTargetType.surah:
       context.push(AppRoutes.quranReaderPath(target.surahNumber ?? 1));
     case DeepSearchTargetType.note:
+      if (target.itemId != null) {
+        _editLibraryNote(context, target.itemId!);
+        return;
+      }
       context.push(AppRoutes.quranNotesPath(noteId: target.noteId));
     case DeepSearchTargetType.hadith:
+      if (target.languageCode != null) {
+        _showTextResultSheet(context, result);
+        return;
+      }
       final itemId = target.itemId ?? '';
       final parts = itemId.split(':');
       if (parts.length >= 3 && parts.first == 'hadith') {
@@ -495,6 +505,21 @@ void _openResult(BuildContext context, DeepSearchResult result) {
       }
       _showTextResultSheet(context, result);
   }
+}
+
+Future<void> _editLibraryNote(BuildContext context, String key) async {
+  final store = getIt<LibraryUserDataStore>();
+  final note = await showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => NoteEditorSheet(
+      title: 'Note',
+      initialText: store.noteFor(key),
+      allowEmpty: true,
+    ),
+  );
+  if (note != null) await store.saveNote(key, note);
 }
 
 Future<void> _showTextResultSheet(

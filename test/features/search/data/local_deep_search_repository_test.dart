@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:quran/features/hadith/data/datasources/local_hadith_data_source.dart';
 import 'package:quran/core/content/content_source.dart';
 import 'package:quran/core/search/deep_search_index_record.dart';
 import 'package:quran/features/azkar/domain/entities/azkar_category.dart';
@@ -112,6 +113,7 @@ void main() {
           hadithRepository: _FakeHadithRepository(),
           azkarRepository: _FakeAzkarRepository(),
         );
+        addTearDown(repository.dispose);
 
         final sections = await repository.search('throne');
         final categories = sections.map((section) => section.category).toSet();
@@ -141,6 +143,7 @@ void main() {
         hadithRepository: _FakeHadithRepository(),
         azkarRepository: _FakeAzkarRepository(),
       );
+      addTearDown(repository.dispose);
 
       final sections = await repository.search('2:255');
       final first = sections.expand((section) => section.results).first;
@@ -160,6 +163,7 @@ void main() {
         hadithRepository: _FakeHadithRepository(),
         azkarRepository: _FakeAzkarRepository(),
       );
+      addTearDown(repository.dispose);
 
       final sections = await repository.search('Mishary Alafasy');
 
@@ -192,6 +196,7 @@ void main() {
           hadithRepository: _FakeHadithRepository(),
           azkarRepository: _FakeAzkarRepository(),
         );
+        addTearDown(repository.dispose);
 
         expect(await repository.search('Cached English Author'), isEmpty);
         expect(await repository.search('Tester Author'), isEmpty);
@@ -241,6 +246,7 @@ void main() {
           hadithRepository: _FakeHadithRepository(),
           azkarRepository: _FakeAzkarRepository(),
         );
+        addTearDown(repository.dispose);
 
         final allahSections = await repository.search('Allah');
         final quranSections = await repository.search('Quran');
@@ -273,6 +279,7 @@ void main() {
           hadithRepository: hadithRepository,
           azkarRepository: azkarRepository,
         );
+        addTearDown(repository.dispose);
 
         await repository.search('throne');
         await repository.search('mercy');
@@ -295,6 +302,7 @@ void main() {
           hadithRepository: _HiddenHadithRepository(),
           azkarRepository: _FakeAzkarRepository(),
         );
+        addTearDown(repository.dispose);
 
         final sections = await repository.search('throne');
 
@@ -435,6 +443,21 @@ class _FakeQuranRepository implements QuranRepository {
 }
 
 class _FakeHadithRepository implements HadithRepository {
+  @override
+  Future<List<String>> availableTranslationLanguagesForBook(
+    String bookId,
+  ) async => const ['en'];
+
+  @override
+  Future<bool> hasFullTranslation(String bookId, String languageCode) async =>
+      languageCode == 'en';
+
+  @override
+  Stream<HadithTranslationDownloadProgress> downloadBookTranslation(
+    String bookId,
+    String languageCode,
+  ) => Stream.error(UnsupportedError('This fixture only uses bundled English'));
+
   int getHadithsCalls = 0;
   int searchCalls = 0;
 
@@ -454,6 +477,7 @@ class _FakeHadithRepository implements HadithRepository {
   Future<List<HadithItem>> getHadiths({
     String? bookId,
     String? chapterId,
+    String? languageCode,
     int offset = 0,
     int limit = 50,
   }) async {
@@ -462,7 +486,7 @@ class _FakeHadithRepository implements HadithRepository {
   }
 
   @override
-  Future<HadithItem?> getHadithById(String id) async {
+  Future<HadithItem?> getHadithById(String id, {String? languageCode}) async {
     return id == _hadith.id ? _hadith : null;
   }
 
@@ -532,11 +556,44 @@ class _FakeHadithRepository implements HadithRepository {
 }
 
 class _HiddenHadithRepository extends _FakeHadithRepository {
+  final _source = LocalHadithDataSource(
+    hadiths: const [
+      HadithItem(
+        id: 'hadith:hidden:1',
+        bookId: 'hidden',
+        chapterId: 'hidden_1',
+        hadithNumber: '1',
+        arabic: 'حَدَّثَنَا فُلَانٌ عَنْ فُلَانٍ',
+        translation: 'Narrated: a weak report mentioning throne.',
+        grade: 'Daif',
+        reference: 'Hidden 1',
+        sourceId: 'test',
+      ),
+    ],
+  );
+
   @override
-  Future<HadithItem?> getHadithById(String id) async => null;
+  Future<HadithItem?> getHadithById(String id, {String? languageCode}) =>
+      _source.getHadithById(id);
+
+  @override
+  Future<List<DeepSearchIndexRecord>> getSearchIndexRecords() =>
+      _source.getSearchIndexRecords();
 }
 
 class _FakeAzkarRepository implements AzkarRepository {
+  @override
+  Future<List<String>> availableTranslationLanguages() async => const ['en'];
+
+  @override
+  Future<bool> hasFullTranslation(String languageCode) async =>
+      languageCode == 'en';
+
+  @override
+  Stream<AzkarTranslationDownloadProgress> downloadTranslation(
+    String languageCode,
+  ) => Stream.error(UnsupportedError('This fixture only uses bundled English'));
+
   int getDhikrCalls = 0;
   int searchCalls = 0;
 
@@ -549,6 +606,7 @@ class _FakeAzkarRepository implements AzkarRepository {
   @override
   Future<List<DhikrItem>> getDhikr({
     String? categoryId,
+    String? languageCode,
     int offset = 0,
     int limit = 100,
   }) async {

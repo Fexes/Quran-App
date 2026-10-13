@@ -33,10 +33,11 @@ private class QiblaHeadingStreamHandler(
     private var longitude = 0.0
     private var altitude = 0.0
     private var declination = 0.0
-    private var sensorAccuracy = SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+    private var sensorAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE
     private var sensorSource = "android_rotation_vector"
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+        sensorManager.unregisterListener(this)
         eventSink = events
         val args = arguments as? Map<*, *>
         latitude = (args?.get("latitude") as? Number)?.toDouble() ?: 0.0
@@ -48,7 +49,7 @@ private class QiblaHeadingStreamHandler(
             altitude.toFloat(),
             System.currentTimeMillis(),
         ).declination.toDouble()
-        sensorAccuracy = SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+        sensorAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE
 
         val sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
             ?: sensorManager.getDefaultSensor(Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR)
@@ -63,7 +64,9 @@ private class QiblaHeadingStreamHandler(
         } else {
             "android_geomagnetic_rotation_vector"
         }
-        sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
+        if (!sensorManager.registerListener(this, sensor, 50_000)) {
+            events.error("heading_error", "Compass heading could not be started.", null)
+        }
     }
 
     override fun onCancel(arguments: Any?) {
@@ -85,6 +88,10 @@ private class QiblaHeadingStreamHandler(
 
         val magneticHeading = normalizeDegrees(Math.toDegrees(orientation[0].toDouble()))
         val trueHeading = normalizeDegrees(magneticHeading + declination)
+        sensorAccuracy = event.accuracy
+        val accuracyDegrees = event.values.getOrNull(4)
+            ?.takeIf { it.isFinite() && it >= 0 }
+            ?.let { Math.toDegrees(it.toDouble()) }
 
         eventSink?.success(
             mapOf(
@@ -92,6 +99,7 @@ private class QiblaHeadingStreamHandler(
                 "magneticHeading" to magneticHeading,
                 "declination" to declination,
                 "accuracy" to sensorAccuracy,
+                "accuracyDegrees" to accuracyDegrees,
                 "source" to sensorSource,
             ),
         )

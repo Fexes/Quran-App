@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:just_audio/just_audio.dart';
@@ -11,6 +12,7 @@ import '../../../quran/domain/entities/quran_ayah.dart';
 import '../../../quran/domain/entities/quran_surah.dart';
 import '../../../quran/domain/repositories/quran_repository.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
+import '../../../quran/domain/services/quran_translation_audio_pairings.dart';
 import '../../data/repositories/quran_audio_download_repository.dart';
 import '../../data/services/quran_audio_download_service.dart';
 import '../../data/services/quran_audio_playback_port.dart';
@@ -72,6 +74,13 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       ),
       _audioHandler.playerStateStream.listen(_onPlayerStateChanged),
     ];
+    if (translationRepository is QuranTranslationSelectionObservable) {
+      _translationChanges =
+          (translationRepository as QuranTranslationSelectionObservable)
+              .selectionChanges;
+      _translationChanges!.addListener(_onTranslationPreferenceChanged);
+    }
+    _settingsStore.beforePersonalDataErase.add(_prepareForPersonalDataErase);
     unawaited(_restoreAudioSnapshot());
   }
 
@@ -95,16 +104,118 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
   final Set<String> _autoCacheQueuedIds = <String>{};
   int _settingsQueueRevision = 0;
   int _translationToggleRevision = 0;
+  Listenable? _translationChanges;
+  int _translationSelectionRevision = 0;
+  bool _changingTranslationEdition = false;
+  bool _translationResumeAfterUpdate = false;
+  int _playbackIntentRevision = 0;
+  bool _suppressSnapshots = false;
+  Future<void> _snapshotWrite = Future.value();
+  final Set<Future<void>> _preferenceOperations = {};
+
+  Future<T> _trackPreferenceOperation<T>(Future<T> Function() action) async {
+    final settled = Completer<void>();
+    _preferenceOperations.add(settled.future);
+    try {
+      return await action();
+    } finally {
+      _preferenceOperations.remove(settled.future);
+      settled.complete();
+    }
+  }
+
+  Future<void> _prepareForPersonalDataErase() async {
+    await stopAndClear();
+    // Drain writes already started by a settings sheet before its stores clear.
+    while (_preferenceOperations.isNotEmpty) {
+      await Future.wait(_preferenceOperations.toList());
+    }
+    await stopAndClear();
+    emit(const QuranAudioState.initial());
+  }
+
+  QuranTranslationRepository? get translationRepository =>
+      _translationRepository;
+
+  void _onTranslationPreferenceChanged() {
+    if (!_changingTranslationEdition && !isClosed) {
+      unawaited(
+        synchronizeTranslationSelection().catchError((Object error) {
+          _translationResumeAfterUpdate = false;
+          if (!isClosed) {
+            emit(
+              state.copyWith(
+                errorMessage: 'Could not update translation playback.',
+              ),
+            );
+          }
+        }),
+      );
+    }
+  }
+
+  Future<void> synchronizeTranslationSelection() =>
+      _trackPreferenceOperation(_synchronizeTranslationSelection);
+
+  Future<void> _synchronizeTranslationSelection() async {
+    final revision = ++_translationSelectionRevision;
+    final playbackIntent = _playbackIntentRevision;
+    _translationResumeAfterUpdate =
+        _translationResumeAfterUpdate || _audioHandler.playing;
+    if (state.queue.any((item) => item.isTranslationSegment) &&
+        _audioHandler.playing) {
+      await _audioHandler.pause();
+    }
+    final voices = await _selectedTranslationAudioReciters();
+    if (isClosed || revision != _translationSelectionRevision) return;
+    final voice = preferredTranslationReciter(voices);
+    final enabled = _settingsStore.audioPlayTranslationEnabled && voice != null;
+    final oldId = state.translationReciterId;
+    final oldEnabled = state.playTranslationAudio;
+    emit(
+      state.copyWith(
+        playTranslationAudio: enabled,
+        translationReciterId: voice?.id,
+        translationReciterName: voice?.name,
+        clearTranslationReciter: voice == null,
+      ),
+    );
+    if (voice == null) {
+      await _settingsStore.setAudioPlayTranslationEnabled(false);
+    }
+    final staleQueue = state.queue.any(
+      (item) =>
+          item.isTranslationSegment && (!enabled || item.reciterId != voice.id),
+    );
+    if (revision == _translationSelectionRevision &&
+        (oldId != voice?.id || oldEnabled != enabled || staleQueue)) {
+      await _reloadCurrentScope(
+        autoPlayOverride:
+            _translationResumeAfterUpdate &&
+            playbackIntent == _playbackIntentRevision,
+      );
+    } else if (_translationResumeAfterUpdate &&
+        playbackIntent == _playbackIntentRevision &&
+        !_audioHandler.playing &&
+        state.hasItem) {
+      await _audioHandler.play();
+    }
+    if (revision == _translationSelectionRevision) {
+      _translationResumeAfterUpdate = false;
+    }
+  }
 
   Future<void> playAyah({
     required QuranAyah ayah,
     required QuranSurah surah,
     required QuranAudioReciter reciter,
   }) async {
+    final intent = ++_playbackIntentRevision;
+    _suppressSnapshots = false;
     final queue = await _buildQueueForAyahs([
       (ayah: ayah, surah: surah),
     ], reciter: reciter);
-    if (!await _canStartQueue(queue, 0)) {
+    if (!await _canStartQueue(queue, 0) || intent != _playbackIntentRevision) {
       return;
     }
     _activeSurah = surah;
@@ -127,7 +238,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       ),
     );
     _persistAudioRestoreSnapshot(force: true);
-    await _audioHandler.setQuranRepeatMode(state.repeatMode);
+    await _applyRepeatSettings();
+    if (intent != _playbackIntentRevision || isClosed) return;
     await _audioHandler.loadAndPlay(queue);
   }
 
@@ -137,6 +249,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     required QuranAudioReciter reciter,
     String? startVerseKey,
   }) async {
+    final intent = ++_playbackIntentRevision;
+    _suppressSnapshots = false;
     if (ayahs.isEmpty) {
       return;
     }
@@ -146,7 +260,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     _activeSurah = surah;
     _activeReciter = reciter;
     final startIndex = _startIndex(queue, startVerseKey);
-    if (!await _canStartQueue(queue, startIndex)) {
+    if (!await _canStartQueue(queue, startIndex) ||
+        intent != _playbackIntentRevision) {
       return;
     }
     _resetRepeatProgress();
@@ -167,7 +282,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       ),
     );
     _persistAudioRestoreSnapshot(force: true);
-    await _audioHandler.setQuranRepeatMode(state.repeatMode);
+    await _applyRepeatSettings();
+    if (intent != _playbackIntentRevision || isClosed) return;
     await _audioHandler.loadAndPlay(queue, startIndex: startIndex);
   }
 
@@ -176,6 +292,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     required QuranSurah surah,
     required QuranAudioReciter reciter,
   }) async {
+    final intent = ++_playbackIntentRevision;
+    _suppressSnapshots = false;
     final ayahs = await _quranRepository.getAyahs(surah.number);
     final selectedAyahs = ayahs
         .where((candidate) => candidate.number >= ayah.number)
@@ -187,7 +305,7 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       for (final selectedAyah in selectedAyahs)
         (ayah: selectedAyah, surah: surah),
     ], reciter: reciter);
-    if (!await _canStartQueue(queue, 0)) {
+    if (!await _canStartQueue(queue, 0) || intent != _playbackIntentRevision) {
       return;
     }
     _activeSurah = surah;
@@ -210,7 +328,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       ),
     );
     _persistAudioRestoreSnapshot(force: true);
-    await _audioHandler.setQuranRepeatMode(state.repeatMode);
+    await _applyRepeatSettings();
+    if (intent != _playbackIntentRevision || isClosed) return;
     await _audioHandler.loadAndPlay(queue);
   }
 
@@ -219,6 +338,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     required QuranAudioReciter reciter,
     String? startVerseKey,
   }) async {
+    final intent = ++_playbackIntentRevision;
+    _suppressSnapshots = false;
     if (ayahs.isEmpty) {
       return;
     }
@@ -235,7 +356,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     _activeSurah = surahs[queue.first.surahNumber];
     _activeReciter = reciter;
     final startIndex = _startIndex(queue, startVerseKey);
-    if (!await _canStartQueue(queue, startIndex)) {
+    if (!await _canStartQueue(queue, startIndex) ||
+        intent != _playbackIntentRevision) {
       return;
     }
     _resetRepeatProgress();
@@ -256,7 +378,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       ),
     );
     _persistAudioRestoreSnapshot(force: true);
-    await _audioHandler.setQuranRepeatMode(state.repeatMode);
+    await _applyRepeatSettings();
+    if (intent != _playbackIntentRevision || isClosed) return;
     await _audioHandler.loadAndPlay(queue, startIndex: startIndex);
   }
 
@@ -266,6 +389,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     String? startVerseKey,
     bool autoPlay = true,
   }) async {
+    final intent = ++_playbackIntentRevision;
+    _suppressSnapshots = false;
     final surah = _activeSurah;
     final reciter = _activeReciter;
     if (surah == null || reciter == null) {
@@ -287,7 +412,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       for (final ayah in selectedAyahs) (ayah: ayah, surah: surah),
     ], reciter: reciter);
     final startIndex = _startIndex(queue, startVerseKey);
-    if (!await _canStartQueue(queue, startIndex)) {
+    if (!await _canStartQueue(queue, startIndex) ||
+        intent != _playbackIntentRevision) {
       return;
     }
     _resetRepeatProgress();
@@ -308,7 +434,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       ),
     );
     _persistAudioRestoreSnapshot(force: true);
-    await _audioHandler.setQuranRepeatMode(state.repeatMode);
+    await _applyRepeatSettings();
+    if (intent != _playbackIntentRevision || isClosed) return;
     await _audioHandler.loadAndPlay(
       queue,
       startIndex: startIndex,
@@ -328,6 +455,7 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
   }
 
   Future<void> playCurrentPageRange() async {
+    final intent = _playbackIntentRevision;
     final current = state.currentItem;
     if (current == null) {
       return;
@@ -356,7 +484,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     );
     _persistAudioRestoreSnapshot(force: true);
     _resetRepeatProgress();
-    await _audioHandler.setQuranRepeatMode(state.repeatMode);
+    await _applyRepeatSettings();
+    if (intent != _playbackIntentRevision || isClosed) return;
     await _audioHandler.loadAndPlay(pageQueue);
   }
 
@@ -378,6 +507,7 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
   }
 
   Future<void> playOrPause() async {
+    final intent = ++_playbackIntentRevision;
     if (!state.hasItem) {
       return;
     }
@@ -385,37 +515,48 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       await _audioHandler.pause();
       return;
     }
+    if (state.queue.any((item) => item.isTranslationSegment) &&
+        !await _translationQueueMatchesSelection(state.queue)) {
+      await _reloadCurrentScope(autoPlayOverride: false);
+      if (!await _translationQueueMatchesSelection(state.queue)) return;
+    }
     if (_audioHandler.currentQueue.isEmpty && state.queue.isNotEmpty) {
       final startIndex = (state.currentIndex ?? 0)
           .clamp(0, state.queue.length - 1)
           .toInt();
       final restorePosition = state.position;
       emit(state.copyWith(status: QuranAudioStatus.loading, clearError: true));
-      await _audioHandler.setQuranRepeatMode(state.repeatMode);
+      await _applyRepeatSettings();
+      if (intent != _playbackIntentRevision || isClosed) return;
       await _audioHandler.loadAndPlay(state.queue, startIndex: startIndex);
-      if (restorePosition > Duration.zero) {
+      if (restorePosition > Duration.zero &&
+          intent == _playbackIntentRevision) {
         await _audioHandler.seek(restorePosition);
       }
       return;
     }
-    await _audioHandler.play();
+    if (intent == _playbackIntentRevision && !isClosed) {
+      await _audioHandler.play();
+    }
   }
 
   Future<void> pause() async {
+    _playbackIntentRevision++;
     if (state.hasItem) {
       await _audioHandler.pause();
     }
   }
 
   Future<void> resume() async {
-    if (state.hasItem) {
-      await _audioHandler.play();
+    if (state.hasItem && !state.isPlaying) {
+      await playOrPause();
     }
   }
 
   Future<void> togglePlayPause() => playOrPause();
 
   Future<void> replayQueue() async {
+    final intent = ++_playbackIntentRevision;
     if (state.queue.isEmpty) {
       return;
     }
@@ -430,14 +571,25 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       ),
     );
     _persistAudioRestoreSnapshot(force: true);
-    await _audioHandler.setQuranRepeatMode(state.repeatMode);
+    await _applyRepeatSettings();
+    if (intent != _playbackIntentRevision || isClosed) return;
     await _audioHandler.loadAndPlay(state.queue);
   }
 
   Future<void> stopAndClear() async {
+    _suppressSnapshots = true;
+    _playbackIntentRevision++;
+    _translationSelectionRevision++;
+    _translationToggleRevision++;
+    _wordTimingRequestId++;
+    _translationResumeAfterUpdate = false;
     _settingsQueueRevision++;
-    await _settingsStore.clearAudioRestoreState();
     await _audioHandler.stop();
+    await _snapshotWrite;
+    await _settingsStore.clearAudioRestoreState();
+    _resetRepeatProgress();
+    _activeSurah = null;
+    _activeReciter = null;
     emit(
       const QuranAudioState.initial().copyWith(
         playTranslationAudio: state.playTranslationAudio,
@@ -475,12 +627,23 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
   Future<void> setRepeatMode(QuranAudioRepeatMode repeatMode) async {
     _resetRepeatProgress();
     emit(state.copyWith(repeatMode: repeatMode));
-    await _audioHandler.setQuranRepeatMode(repeatMode);
+    await _applyRepeatSettings();
   }
 
   void setRepeatCount(int repeatCount) {
     _resetRepeatProgress();
     emit(state.copyWith(repeatCount: repeatCount.clamp(1, 10)));
+    unawaited(_applyRepeatSettings());
+  }
+
+  Future<void> _applyRepeatSettings() async {
+    final handler = _audioHandler;
+    if (handler is QuranAudioFiniteRepeatPort) {
+      await (handler as QuranAudioFiniteRepeatPort).setAyahRepeatCount(
+        state.repeatCount,
+      );
+    }
+    await handler.setQuranRepeatMode(state.repeatMode);
   }
 
   void setRepeatAfterAction(QuranAudioRepeatAfterAction action) {
@@ -495,7 +658,10 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
         autoPlay: _audioHandler.playing,
       );
 
-  Future<void> changeReciter(String reciterId) async {
+  Future<void> changeReciter(String reciterId) =>
+      _trackPreferenceOperation(() => _changeReciter(reciterId));
+
+  Future<void> _changeReciter(String reciterId) async {
     final reciters = await _quranRepository.getAudioReciters();
     QuranAudioReciter? selected;
     for (final reciter in reciters) {
@@ -531,7 +697,10 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     return reciters.where((reciter) => reciter.isTranslation).toList();
   }
 
-  Future<void> setPlayTranslationAudio(bool enabled) async {
+  Future<void> setPlayTranslationAudio(bool enabled) =>
+      _trackPreferenceOperation(() => _setPlayTranslationAudio(enabled));
+
+  Future<void> _setPlayTranslationAudio(bool enabled) async {
     final revision = ++_translationToggleRevision;
     if (!enabled) {
       emit(state.copyWith(playTranslationAudio: false, clearError: true));
@@ -547,8 +716,7 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       emit(
         state.copyWith(
           playTranslationAudio: false,
-          status: QuranAudioStatus.failure,
-          errorMessage: 'No translation voice is available.',
+          errorMessage: 'No verified audio is available for this translation.',
         ),
       );
       return;
@@ -568,28 +736,71 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     await _reloadCurrentScope();
   }
 
-  Future<void> changeTranslationReciter(String reciterId) async {
-    final reciter = await _translationReciterById(
-      reciterId,
-      selectedLanguageOnly: true,
-    );
-    if (reciter == null) {
-      return;
+  Future<void> changeTranslationReciter(String reciterId) =>
+      _trackPreferenceOperation(() => _changeTranslationReciter(reciterId));
+
+  Future<void> _changeTranslationReciter(String reciterId) async {
+    final reciter = await _translationReciterById(reciterId);
+    final pair = quranTranslationPairForVoice(reciterId);
+    final repository = _translationRepository;
+    if (reciter == null || pair == null || repository == null) {
+      throw StateError('This voice has no verified translation edition.');
     }
-    await _settingsStore.setAudioMeaningLanguageCode(reciter.languageCode);
-    await _settingsStore.setAudioTranslationReciterId(
-      reciter.id,
-      languageCode: reciter.languageCode,
-    );
-    emit(
-      state.copyWith(
-        translationReciterId: reciter.id,
-        translationReciterName: reciter.name,
-        clearError: true,
-      ),
-    );
-    if (state.playTranslationAudio) {
-      await _reloadCurrentScope();
+    if (!await repository.hasFullTranslation(pair.resource.id)) {
+      throw StateError(
+        'Download ${pair.resource.name} before selecting this voice.',
+      );
+    }
+    final previous = await repository.selectedTranslation();
+    final previousState = state;
+    final previousEnabled = _settingsStore.audioPlayTranslationEnabled;
+    final previousVoice = _settingsStore.audioTranslationReciterId;
+    final wasPlaying = _audioHandler.playing;
+    final playbackIntent = _playbackIntentRevision;
+    _changingTranslationEdition = true;
+    ++_translationSelectionRevision;
+    try {
+      if (state.playTranslationAudio && wasPlaying) await _audioHandler.pause();
+      await _settingsStore.setAudioMeaningLanguageCode(reciter.languageCode);
+      await _settingsStore.setAudioTranslationReciterId(
+        reciter.id,
+        languageCode: reciter.languageCode,
+      );
+      await repository.setSelectedTranslation(pair.resource.id);
+      if ((await repository.selectedTranslation())?.id != pair.resource.id) {
+        throw StateError('Could not select the matching translation.');
+      }
+      emit(
+        state.copyWith(
+          translationReciterId: reciter.id,
+          translationReciterName: reciter.name,
+          clearError: true,
+        ),
+      );
+      if (state.playTranslationAudio) {
+        await _reloadCurrentScope(
+          autoPlayOverride:
+              wasPlaying && playbackIntent == _playbackIntentRevision,
+        );
+      }
+    } catch (_) {
+      await repository.setSelectedTranslation(previous?.id);
+      await _settingsStore.setAudioTranslationReciterId(
+        previousVoice,
+        languageCode: previous?.resolvedLanguageCode,
+      );
+      await _settingsStore.setAudioPlayTranslationEnabled(previousEnabled);
+      if (!isClosed && playbackIntent == _playbackIntentRevision) {
+        emit(previousState);
+      }
+      if (wasPlaying &&
+          playbackIntent == _playbackIntentRevision &&
+          state.hasItem) {
+        await _audioHandler.play();
+      }
+      rethrow;
+    } finally {
+      _changingTranslationEdition = false;
     }
   }
 
@@ -724,6 +935,15 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       );
       return;
     }
+    final previous = state.currentItem;
+    if (previous?.playbackUri == queueItem.playbackUri &&
+        previous?.verseKey == queueItem.verseKey &&
+        previous?.segmentType == queueItem.segmentType &&
+        previous?.isBismillah == queueItem.isBismillah &&
+        previous?.surahArtworkUri != queueItem.surahArtworkUri) {
+      emit(state.copyWith(currentItem: queueItem));
+      return;
+    }
     _activeWordTiming = null;
     emit(
       state.copyWith(
@@ -760,7 +980,12 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
 
   void _onCurrentIndexChanged(int? index) {
     if (index != state.currentIndex) {
-      _resetRepeatProgress();
+      // A range iteration spans the entire queue, not each individual ayah.
+      if (state.repeatMode != QuranAudioRepeatMode.queue) {
+        _currentRepeatIteration = 1;
+      }
+      _ayahRepeatArmed = true;
+      _lastCompletedVerseKey = null;
     }
     QuranAudioQueueItem? currentItem;
     if (index != null && index >= 0 && index < state.queue.length) {
@@ -796,6 +1021,7 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
   }
 
   Future<void> _continueAfterRepeatedRange() async {
+    final intent = _playbackIntentRevision;
     final surah = _activeSurah;
     final reciter = _activeReciter;
     final completedRangeEnd = state.rangeEndAyah;
@@ -820,7 +1046,7 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     final queue = await _buildQueueForAyahs([
       for (final ayah in remainingAyahs) (ayah: ayah, surah: surah),
     ], reciter: reciter);
-    if (!await _canStartQueue(queue, 0)) {
+    if (!await _canStartQueue(queue, 0) || intent != _playbackIntentRevision) {
       return;
     }
 
@@ -845,11 +1071,13 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
         clearActiveWord: true,
       ),
     );
-    await _audioHandler.setQuranRepeatMode(QuranAudioRepeatMode.off);
+    await _applyRepeatSettings();
+    if (intent != _playbackIntentRevision || isClosed) return;
     await _audioHandler.loadAndPlay(queue);
   }
 
   void _maybeRepeatActiveAyah(Duration position) {
+    if (_audioHandler is QuranAudioFiniteRepeatPort) return;
     if (!state.isPlaying ||
         state.repeatMode != QuranAudioRepeatMode.ayah ||
         state.repeatCount <= 1 ||
@@ -869,13 +1097,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     if (!_ayahRepeatArmed) {
       return;
     }
-    final thresholdMs = duration.inMilliseconds < 1500
-        ? 120
-        : duration.inMilliseconds < 4000
-        ? 260
-        : 420;
     final remainingMs = duration.inMilliseconds - position.inMilliseconds;
-    if (remainingMs > thresholdMs) {
+    if (remainingMs > 0) {
       return;
     }
     _ayahRepeatArmed = false;
@@ -883,8 +1106,13 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       return;
     }
     _currentRepeatIteration += 1;
+    final intent = _playbackIntentRevision;
     unawaited(
-      _audioHandler.seek(Duration.zero).then((_) => _audioHandler.play()),
+      _audioHandler.seek(Duration.zero).then((_) async {
+        if (!isClosed && intent == _playbackIntentRevision && state.hasItem) {
+          await _audioHandler.play();
+        }
+      }),
     );
   }
 
@@ -1020,12 +1248,22 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     legacyId: _settingsStore.audioTranslationReciterId,
   );
 
-  Future<QuranAudioReciter?> _ensureTranslationReciter() async {
+  Future<QuranAudioReciter?> _ensureTranslationReciter() =>
+      _trackPreferenceOperation(_resolveTranslationReciter);
+
+  Future<QuranAudioReciter?> _resolveTranslationReciter() async {
     final selected = preferredTranslationReciter(
       await _selectedTranslationAudioReciters(),
     );
+    if (isClosed) return null;
     if (selected == null) {
-      emit(state.copyWith(clearTranslationReciter: true));
+      emit(
+        state.copyWith(
+          clearTranslationReciter: true,
+          playTranslationAudio: false,
+        ),
+      );
+      await _settingsStore.setAudioPlayTranslationEnabled(false);
       return null;
     }
     await _settingsStore.setAudioTranslationReciterId(
@@ -1043,29 +1281,22 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
 
   Future<List<QuranAudioReciter>> _selectedTranslationAudioReciters() async {
     final reciters = await getTranslationAudioReciters();
-    var languageCode = _settingsStore.audioMeaningLanguageCodeOrNull;
     final selectedTranslation = await _translationRepository
         ?.selectedTranslation();
-    if (languageCode == null) {
-      languageCode = selectedTranslation?.resolvedLanguageCode;
-      if (languageCode != null && languageCode.isNotEmpty) {
-        await _settingsStore.setAudioMeaningLanguageCode(languageCode);
-      }
+    if (selectedTranslation == null ||
+        !await _translationRepository!.hasFullTranslation(
+          selectedTranslation.id,
+        )) {
+      return const [];
     }
-    return quranTranslationAudioRecitersFor(
+    return quranCompatibleTranslationAudioReciters(
       reciters: reciters,
       selectedTranslation: selectedTranslation,
-      preferredLanguageCode: languageCode,
     );
   }
 
-  Future<QuranAudioReciter?> _translationReciterById(
-    String? reciterId, {
-    bool selectedLanguageOnly = false,
-  }) async {
-    final reciters = selectedLanguageOnly
-        ? await _selectedTranslationAudioReciters()
-        : await getTranslationAudioReciters();
+  Future<QuranAudioReciter?> _translationReciterById(String? reciterId) async {
+    final reciters = await getTranslationAudioReciters();
     return _translationReciterByIdFrom(reciterId, reciters);
   }
 
@@ -1085,7 +1316,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     return null;
   }
 
-  Future<void> _reloadCurrentScope() async {
+  Future<void> _reloadCurrentScope({bool? autoPlayOverride}) async {
+    final playbackIntent = _playbackIntentRevision;
     final reciter = _activeReciter;
     if (!state.hasItem || state.queue.isEmpty || reciter == null) {
       return;
@@ -1135,7 +1367,9 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
         revision != _settingsQueueRevision) {
       return;
     }
-    final autoPlay = _audioHandler.playing;
+    final autoPlay = playbackIntent == _playbackIntentRevision
+        ? autoPlayOverride ?? _audioHandler.playing
+        : _audioHandler.playing;
     _resetRepeatProgress();
     emit(
       state.copyWith(
@@ -1165,6 +1399,7 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
   }
 
   Future<void> _restoreAudioSnapshot() async {
+    final revision = _playbackIntentRevision;
     final snapshot = _settingsStore.audioRestoreState;
     if (snapshot.isEmpty) {
       return;
@@ -1176,9 +1411,25 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       return;
     }
 
-    final cachedQueue = rawQueue
+    final compatibleVoices = await _selectedTranslationAudioReciters();
+    final allowedVoiceIds = compatibleVoices.map((voice) => voice.id).toSet();
+    final originalQueue = rawQueue
         .map(QuranAudioQueueItem.fromCacheMap)
         .whereType<QuranAudioQueueItem>()
+        .toList(growable: false);
+    final restoredItem = originalQueue.isEmpty
+        ? null
+        : originalQueue[_clampedIndex(
+            snapshot['currentIndex'],
+            originalQueue.length,
+          )];
+    final cachedQueue = originalQueue
+        .where(
+          (item) =>
+              !item.isTranslationSegment ||
+              (_settingsStore.audioPlayTranslationEnabled &&
+                  allowedVoiceIds.contains(item.reciterId)),
+        )
         .toList(growable: false);
     if (cachedQueue.isEmpty) {
       await _settingsStore.clearAudioRestoreState();
@@ -1186,23 +1437,28 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     }
 
     final restoredQueue = await _resolveQueue(cachedQueue);
-    if (isClosed || restoredQueue.isEmpty) {
+    if (isClosed ||
+        revision != _playbackIntentRevision ||
+        restoredQueue.isEmpty) {
       return;
     }
 
-    final currentIndex = _clampedIndex(
-      snapshot['currentIndex'],
-      restoredQueue.length,
+    var currentIndex = restoredQueue.indexWhere(
+      (item) => restoredItem != null && _sameQueueItem(item, restoredItem),
     );
+    if (currentIndex < 0) {
+      currentIndex = _startIndex(restoredQueue, restoredItem?.verseKey);
+    }
     final currentItem = restoredQueue[currentIndex];
     await _hydrateRestoredAudioContext(restoredQueue, currentItem);
-    if (isClosed) {
+    if (isClosed || revision != _playbackIntentRevision) {
       return;
     }
 
-    final position = Duration(
-      milliseconds: _intFromSnapshot(snapshot['positionMs']) ?? 0,
-    );
+    final position =
+        restoredItem != null && _sameQueueItem(currentItem, restoredItem)
+        ? Duration(milliseconds: _intFromSnapshot(snapshot['positionMs']) ?? 0)
+        : Duration.zero;
     emit(
       state.copyWith(
         status: QuranAudioStatus.paused,
@@ -1218,14 +1474,13 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
         rangeStartVerseKey: snapshot['rangeStartVerseKey'] as String?,
         rangeEndVerseKey: snapshot['rangeEndVerseKey'] as String?,
         playTranslationAudio:
-            snapshot['playTranslationAudio'] as bool? ??
-            state.playTranslationAudio,
-        translationReciterId:
-            snapshot['translationReciterId'] as String? ??
-            state.translationReciterId,
-        translationReciterName:
-            snapshot['translationReciterName'] as String? ??
-            state.translationReciterName,
+            _settingsStore.audioPlayTranslationEnabled &&
+            compatibleVoices.isNotEmpty,
+        translationReciterId: preferredTranslationReciter(compatibleVoices)?.id,
+        translationReciterName: preferredTranslationReciter(
+          compatibleVoices,
+        )?.name,
+        clearTranslationReciter: compatibleVoices.isEmpty,
         wordTimingStatus: QuranAudioWordTimingStatus.unavailable,
         clearDuration: true,
         clearError: true,
@@ -1270,7 +1525,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
   }
 
   void _persistAudioRestoreSnapshot({bool force = false}) {
-    if (isClosed ||
+    if (_suppressSnapshots ||
+        isClosed ||
         state.queue.isEmpty ||
         state.currentItem == null ||
         state.status == QuranAudioStatus.idle ||
@@ -1290,7 +1546,14 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
 
     _lastRestoreSnapshotIndex = currentIndex;
     _lastRestoreSnapshotPositionMs = positionMs;
-    unawaited(_settingsStore.setAudioRestoreState(_audioRestoreSnapshot()));
+    final snapshot = _audioRestoreSnapshot();
+    _snapshotWrite = _snapshotWrite
+        .then((_) async {
+          if (!_suppressSnapshots) {
+            await _settingsStore.setAudioRestoreState(snapshot);
+          }
+        })
+        .catchError((Object _) {});
   }
 
   int _currentSnapshotIndex() {
@@ -1366,6 +1629,14 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
     if (queue.isEmpty) {
       return false;
     }
+    if (!await _translationQueueMatchesSelection(queue)) {
+      emit(
+        state.copyWith(
+          errorMessage: 'Translation changed. Please try playback again.',
+        ),
+      );
+      return false;
+    }
     final pendingQueue = queue
         .skip(startIndex.clamp(0, queue.length - 1))
         .toList(growable: false);
@@ -1392,6 +1663,17 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
       return true;
     }
     return true;
+  }
+
+  Future<bool> _translationQueueMatchesSelection(
+    List<QuranAudioQueueItem> queue,
+  ) async {
+    final translated = queue.where((item) => item.isTranslationSegment);
+    if (translated.isEmpty) return true;
+    if (!state.playTranslationAudio) return false;
+    final compatible = await _selectedTranslationAudioReciters();
+    final ids = compatible.map((voice) => voice.id).toSet();
+    return translated.every((item) => ids.contains(item.reciterId));
   }
 
   Future<void> _autoCacheIfNeeded(QuranAudioQueueItem item) async {
@@ -1457,6 +1739,8 @@ class QuranAudioCubit extends Cubit<QuranAudioState> {
 
   @override
   Future<void> close() async {
+    _settingsStore.beforePersonalDataErase.remove(_prepareForPersonalDataErase);
+    _translationChanges?.removeListener(_onTranslationPreferenceChanged);
     for (final subscription in _subscriptions) {
       await subscription.cancel();
     }

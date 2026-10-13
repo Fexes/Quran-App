@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 import '../constants/app_constants.dart';
 
@@ -15,6 +16,19 @@ class SettingsStore {
   final Box<dynamic>? _box;
   final Map<String, Object?>? _memory;
   final bool _isFreshInstall;
+  final prayerLocationChanges = ValueNotifier(0);
+  bool get prayerLocationUsesDevice => _readBool(
+    'prayer_location_uses_device',
+    _read(_prayerLatitudeKey) is num && _read(_prayerLongitudeKey) is num,
+  );
+
+  final Set<Future<void> Function()> beforePersonalDataErase = {};
+
+  Future<void> prepareForPersonalDataErase() async {
+    await Future.wait([
+      for (final stopWriter in beforePersonalDataErase.toList()) stopWriter(),
+    ]);
+  }
 
   static const _themeModeKey = 'theme_mode';
   static const _themePresetIdKey = 'theme_preset_id';
@@ -43,7 +57,6 @@ class SettingsStore {
   static const _onboardingStepKey = 'onboarding_step';
   static const _onboardingLocationConfirmedKey =
       'onboarding_location_confirmed';
-  static const _readingIntentKey = 'reading_intent';
   static const _prayerMethodKey = 'prayer_method';
   static const _prayerAsrMadhabKey = 'prayer_asr_madhab';
   static const _prayerLocationNameKey = 'prayer_location_name';
@@ -142,7 +155,6 @@ class SettingsStore {
   int get onboardingStep => _readInt(_onboardingStepKey, 0).clamp(0, 5);
   bool get onboardingLocationConfirmed =>
       _readBool(_onboardingLocationConfirmedKey, false);
-  String get readingIntent => _readString(_readingIntentKey, 'read');
 
   bool get shouldShowOnboarding {
     if (onboardingComplete) {
@@ -269,9 +281,6 @@ class SettingsStore {
   Future<void> setOnboardingLocationConfirmed(bool value) =>
       _write(_onboardingLocationConfirmedKey, value);
 
-  Future<void> setReadingIntent(String value) =>
-      _write(_readingIntentKey, value);
-
   Future<void> completeOnboarding() async {
     await _write(_onboardingStartedKey, true);
     await _write(_onboardingCompleteKey, true);
@@ -306,11 +315,14 @@ class SettingsStore {
     required double latitude,
     required double longitude,
     required String timeZone,
+    bool usesDeviceLocation = false,
   }) async {
     await _write(_prayerLocationNameKey, name);
     await _write(_prayerLatitudeKey, latitude);
     await _write(_prayerLongitudeKey, longitude);
     await _write(_prayerTimeZoneKey, timeZone);
+    await _write('prayer_location_uses_device', usesDeviceLocation);
+    prayerLocationChanges.value++;
   }
 
   Future<void> setPrayerAlertSettings({

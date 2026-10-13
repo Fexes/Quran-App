@@ -11,6 +11,7 @@ class AppSheet extends StatefulWidget {
     this.subtitle,
     this.footer,
     this.scrollableChild = false,
+    this.onClose,
   });
 
   final String title;
@@ -18,6 +19,7 @@ class AppSheet extends StatefulWidget {
   final Widget? footer;
   final Widget child;
   final bool scrollableChild;
+  final VoidCallback? onClose;
 
   @override
   State<AppSheet> createState() => _AppSheetState();
@@ -29,6 +31,10 @@ class _AppSheetState extends State<AppSheet> {
 
   void _close() {
     if (_dismissing || !mounted || ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    if (widget.onClose case final onClose?) {
+      onClose();
       return;
     }
     _dismissing = true;

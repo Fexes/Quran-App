@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../../core/network/resumable_file_downloader.dart';
+
 import '../../domain/entities/surah_image_catalog.dart';
 
 typedef SurahCoverDirectoryProvider = Future<Directory> Function();
@@ -24,6 +26,11 @@ class SurahCoverCache {
   final SurahCoverImageUrlBuilder _imageUrlBuilder;
   final HttpClient _httpClient;
   final Map<int, Future<File?>> _inFlight = {};
+  final Map<int, DateTime> _fallbackAttempts = {};
+  late final _downloads = ResumableFileDownloader(
+    directoryProvider: _directoryProvider,
+    httpClient: _httpClient,
+  );
 
   Future<File?> fileFor(int surahNumber) {
     final normalized = SurahImageCatalog.normalize(surahNumber);
@@ -42,13 +49,23 @@ class SurahCoverCache {
 
   Future<File?> _fileFor(int surahNumber) async {
     final file = await _coverFile(surahNumber);
-    if (await _isUsable(file)) {
+    final fallbackMarker = File('${file.path}.fallback');
+    final usable = await _isUsable(file);
+    final lastAttempt = _fallbackAttempts[surahNumber];
+    if (usable &&
+        (!await fallbackMarker.exists() ||
+            (lastAttempt != null &&
+                DateTime.now().difference(lastAttempt) <
+                    const Duration(minutes: 5)))) {
       return file;
     }
+    _fallbackAttempts[surahNumber] = DateTime.now();
     final downloaded = await _downloadCover(surahNumber, file);
     if (downloaded != null) {
+      if (await fallbackMarker.exists()) await fallbackMarker.delete();
       return downloaded;
     }
+    if (usable) return file;
 
     // Device media players need a file URI, not a Flutter asset path.
     final tempFile = File('${file.path}.part');
@@ -61,7 +78,9 @@ class SurahCoverCache {
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
         flush: true,
       );
-      return await tempFile.rename(file.path);
+      final saved = await tempFile.rename(file.path);
+      await fallbackMarker.writeAsString('fallback', flush: true);
+      return saved;
     } catch (_) {
       if (await tempFile.exists()) {
         await tempFile.delete();
@@ -79,24 +98,13 @@ class SurahCoverCache {
     final tempFile = File('${destination.path}.part');
     try {
       await destination.parent.create(recursive: true);
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
-      final request = await _httpClient
-          .getUrl(uri)
-          .timeout(const Duration(seconds: 5));
-      final response = await request.close().timeout(
-        const Duration(seconds: 5),
+      final download = await _downloads.download(
+        uri,
+        expectedContentType: 'image/',
+        timeout: const Duration(seconds: 5),
+        attempts: 1,
       );
-      if (response.statusCode < 200 ||
-          response.statusCode >= 300 ||
-          response.headers.contentType?.primaryType != 'image') {
-        await response.drain<void>();
-        return null;
-      }
-
-      final sink = tempFile.openWrite();
-      await response.pipe(sink);
+      await tempFile.writeAsBytes(await download.readBytes(), flush: true);
       if (!await _isUsable(tempFile)) {
         await tempFile.delete();
         return null;
@@ -105,6 +113,7 @@ class SurahCoverCache {
         await destination.delete();
       }
       await tempFile.rename(destination.path);
+      await _downloads.discard(uri);
       return destination;
     } catch (_) {
       if (await tempFile.exists()) {

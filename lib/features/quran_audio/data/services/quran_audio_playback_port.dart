@@ -4,6 +4,10 @@ import 'package:just_audio/just_audio.dart';
 import '../../domain/entities/quran_audio_queue_item.dart';
 import '../../domain/entities/quran_audio_state.dart';
 
+abstract interface class QuranAudioFiniteRepeatPort {
+  Future<void> setAyahRepeatCount(int count);
+}
+
 abstract interface class QuranAudioPlaybackPort {
   Stream<PlaybackState> get playbackState;
   Stream<MediaItem?> get mediaItem;

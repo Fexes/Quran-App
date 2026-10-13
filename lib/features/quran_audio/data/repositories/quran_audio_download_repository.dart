@@ -126,7 +126,7 @@ class QuranAudioDownloadRepository {
       ),
     );
     if (existing != null) {
-      return existing;
+      return existing.copyWith(requestedSurahNumber: surah.number);
     }
     return QuranAudioDownloadItem(
       id: QuranAudioDownloadItem.idFor(
@@ -137,6 +137,7 @@ class QuranAudioDownloadRepository {
       reciterId: reciter.id,
       reciterName: reciter.name,
       surahNumber: ayah.surahNumber,
+      requestedSurahNumber: surah.number,
       ayahNumber: ayah.number,
       verseKey: ayah.verseKey,
       page: ayah.page,
@@ -175,7 +176,13 @@ class QuranAudioDownloadRepository {
     for (final surah in surahs) {
       final ayahs = await _quranRepository.getAyahs(surah.number);
       for (final ayah in ayahs) {
-        items.add(itemForAyah(ayah: ayah, surah: surah, reciter: reciter));
+        items.add(
+          itemForAyah(
+            ayah: ayah,
+            surah: surah,
+            reciter: reciter,
+          ).copyWith(isBulkDownload: true),
+        );
       }
     }
     return items;
@@ -203,8 +210,14 @@ class QuranAudioDownloadRepository {
           reciter: reciter,
           surah: surah,
           items: [
-            ...?bySurah[surah.number],
-            if (surah.number != 1 && surah.number != 9 && bismillah != null)
+            ...?bySurah[surah.number]?.where(
+              (item) =>
+                  item.downloadSurahNumber == surah.number || item.isDownloaded,
+            ),
+            if (surah.number != 1 &&
+                surah.number != 9 &&
+                bySurah[surah.number]?.isNotEmpty == true &&
+                bismillah != null)
               bismillah,
           ],
         ),
@@ -215,11 +228,16 @@ class QuranAudioDownloadRepository {
     final active = _store.activeItems();
     final byKey = <String, List<QuranAudioDownloadItem>>{};
     for (final item in active) {
-      final key = '${item.reciterId}_${item.surahNumber}';
+      final key = '${item.reciterId}_${item.downloadSurahNumber}';
       byKey.putIfAbsent(key, () => []).add(item);
     }
     return byKey.entries
-        .map((entry) => _groupFromItems(entry.value))
+        .map(
+          (entry) => _groupFromItems(
+            entry.value,
+            surahNumber: entry.value.first.downloadSurahNumber,
+          ),
+        )
         .toList(growable: false)
       ..sort((a, b) => a.title.compareTo(b.title));
   }
@@ -329,6 +347,10 @@ class QuranAudioDownloadRepository {
     required QuranSurah surah,
     required List<QuranAudioDownloadItem> items,
   }) {
+    // The shared opening audio is a dependency, not another surah's download.
+    final surahItems = items.where(
+      (item) => item.downloadSurahNumber == surah.number,
+    );
     return QuranAudioDownloadGroup(
       id: '${reciter.id}_${surah.number}',
       title: surah.englishName,
@@ -341,13 +363,13 @@ class QuranAudioDownloadRepository {
       downloadedAyahs: items
           .where((item) => item.status == QuranAudioDownloadStatus.downloaded)
           .length,
-      failedAyahs: items
+      failedAyahs: surahItems
           .where((item) => item.status == QuranAudioDownloadStatus.failed)
           .length,
-      queuedAyahs: items
+      queuedAyahs: surahItems
           .where((item) => item.status == QuranAudioDownloadStatus.queued)
           .length,
-      downloadingAyahs: items
+      downloadingAyahs: surahItems
           .where((item) => item.status == QuranAudioDownloadStatus.downloading)
           .length,
       bytesDownloaded: items.fold<int>(
@@ -362,20 +384,24 @@ class QuranAudioDownloadRepository {
     );
   }
 
-  QuranAudioDownloadGroup _groupFromItems(List<QuranAudioDownloadItem> items) {
+  QuranAudioDownloadGroup _groupFromItems(
+    List<QuranAudioDownloadItem> items, {
+    int? surahNumber,
+  }) {
     final sorted = [...items]
       ..sort((a, b) {
         final surah = a.surahNumber.compareTo(b.surahNumber);
         return surah != 0 ? surah : a.ayahNumber.compareTo(b.ayahNumber);
       });
     final first = sorted.first;
+    final groupSurahNumber = surahNumber ?? first.surahNumber;
     return QuranAudioDownloadGroup(
-      id: '${first.reciterId}_${first.surahNumber}',
-      title: 'Surah ${first.surahNumber}',
+      id: '${first.reciterId}_$groupSurahNumber',
+      title: 'Surah $groupSurahNumber',
       subtitle: first.reciterName,
       reciterId: first.reciterId,
       scope: QuranAudioDownloadScope.surah,
-      surahNumber: first.surahNumber,
+      surahNumber: groupSurahNumber,
       totalAyahs: sorted.length,
       downloadedAyahs: sorted
           .where((item) => item.status == QuranAudioDownloadStatus.downloaded)

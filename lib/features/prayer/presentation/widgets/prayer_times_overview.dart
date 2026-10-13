@@ -39,6 +39,7 @@ class PrayerTimesOverview extends StatelessWidget {
       builder: (context, now) {
         final progress = PrayerDayProgress.calculate(
           entries: dailyTimes.entries,
+          nextDayFajr: dailyTimes.nextDayFajr,
           now: now,
         );
         final currentName = DateUtils.isSameDay(dailyTimes.date, now)
@@ -147,6 +148,9 @@ class _PrayerHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hijri = HijriCalendarConfig.fromGregorian(dailyTimes.date);
+    final prayers = dailyTimes.entries
+        .where((entry) => entry.name != PrayerTimeName.sunrise)
+        .toList(growable: false);
     return Stack(
       children: [
         Positioned.fill(
@@ -222,6 +226,63 @@ class _PrayerHero extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+              const SizedBox(height: 4),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns =
+                      ((constraints.maxWidth + 8) /
+                              (MediaQuery.textScalerOf(context).scale(48) + 8))
+                          .floor()
+                          .clamp(1, prayers.length);
+                  final itemWidth =
+                      (constraints.maxWidth - (columns - 1) * 8) / columns;
+                  return Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 16,
+                    children: [
+                      for (final entry in prayers)
+                        SizedBox(
+                          width: itemWidth,
+                          child: Semantics(
+                            label:
+                                '${entry.displayName}, ${entry.name == progress.nextPrayer.name ? 'next prayer at ' : ''}${DateFormat.jm().format(entry.time)}',
+                            excludeSemantics: true,
+                            child: Column(
+                              children: [
+                                Text(
+                                  entry.displayName,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color:
+                                        entry.name == progress.nextPrayer.name
+                                        ? const Color(0xFFE9D6AD)
+                                        : Colors.white70,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  DateFormat.jm().format(entry.time),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    fontFeatures: [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ],
           ),

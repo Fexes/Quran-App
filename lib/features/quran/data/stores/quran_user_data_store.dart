@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/search/local_search_revision.dart';
 
 import '../../domain/entities/quran_note.dart';
 import '../../domain/entities/quran_bookmark.dart';
@@ -308,9 +309,10 @@ class QuranUserDataStore {
     final box = _box;
     if (box != null) {
       await box.put(key, value);
-      return;
+    } else {
+      _memory?[key] = value;
     }
-    _memory?[key] = value;
+    if (key == _notesKey) LocalSearchRevision.changed();
   }
 
   Iterable<String> _keys() {
@@ -328,6 +330,7 @@ class QuranUserDataStore {
     } else {
       _memory?.clear();
     }
+    LocalSearchRevision.changed();
   }
 
   QuranNote? _parseNote(Object? raw) {

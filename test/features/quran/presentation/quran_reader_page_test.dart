@@ -119,8 +119,13 @@ void main() {
     expect(find.text('Preview'), findsOneWidget);
     final preview = find.byKey(const ValueKey('reader-settings-preview'));
     final previewRect = tester.getRect(preview);
-    expect(previewRect.height, greaterThan(210));
-    expect(previewRect.height, lessThanOrEqualTo(320));
+    final availableHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio -
+        kToolbarHeight;
+    expect(
+      previewRect.height,
+      closeTo((availableHeight * 0.32).clamp(0, 256), 0.01),
+    );
     expect(
       find.descendant(of: preview, matching: find.byType(Scrollable)),
       findsOneWidget,
@@ -235,8 +240,13 @@ void main() {
     tester,
   ) async {
     final repository = _FakeQuranRepository();
-    final translationRepository = _FakeTranslationRepository();
-    final settingsStore = SettingsStore.memory();
+    final translationRepository = _FakeTranslationRepository(
+      selected: _FakeTranslationRepository._englishTranslation,
+    );
+    final settingsStore = SettingsStore.memory({
+      'quran_translation_visible': false,
+    });
+    getIt.registerSingleton<SettingsStore>(settingsStore);
     final downloadStore = QuranAudioDownloadStore.memory();
     final audioCubit = QuranAudioCubit(
       audioHandler: _FakePlaybackPort(),
@@ -292,7 +302,7 @@ void main() {
     await tester.tap(find.byTooltip('Reader settings'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Translation'),
+      find.text('Show translation'),
       150,
       scrollable: find.descendant(
         of: find.byKey(const ValueKey('reader-settings-controls')),
@@ -300,9 +310,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Translation'));
+    await tester.tap(find.text('Show translation'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('English'));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
 
     expect(find.text('Translated opening.'), findsOneWidget);
@@ -312,8 +322,13 @@ void main() {
     tester,
   ) async {
     final repository = _FakeQuranRepository();
-    final translationRepository = _FakeTranslationRepository();
-    final settingsStore = SettingsStore.memory();
+    final translationRepository = _FakeTranslationRepository(
+      selected: _FakeTranslationRepository._englishTranslation,
+    );
+    final settingsStore = SettingsStore.memory({
+      'quran_translation_visible': false,
+    });
+    getIt.registerSingleton<SettingsStore>(settingsStore);
     final downloadStore = QuranAudioDownloadStore.memory();
     final audioCubit = QuranAudioCubit(
       audioHandler: _FakePlaybackPort(),
@@ -368,27 +383,29 @@ void main() {
     await tester.tap(find.byTooltip('Reader settings'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Translation'),
+      find.text('Show translation'),
       150,
       scrollable: find.descendant(
         of: find.byKey(const ValueKey('reader-settings-controls')),
         matching: find.byType(Scrollable),
       ),
     );
-    final switchFinder = find.byType(Switch);
-    expect(switchFinder, findsAtLeastNWidgets(1));
+    final switchFinder = find.descendant(
+      of: find.widgetWithText(SwitchListTile, 'Show translation'),
+      matching: find.byType(Switch),
+    );
+    expect(switchFinder, findsOneWidget);
 
     await tester.ensureVisible(switchFinder.first);
     await tester.pumpAndSettle();
     await tester.tap(switchFinder.first);
     await tester.pumpAndSettle();
-    expect(find.text('Hide ayah translation'), findsNothing);
-    await tester.tap(find.text('English'));
-    await tester.pumpAndSettle();
+    expect(tester.widget<Switch>(switchFinder).value, isTrue);
     expect(find.text('Translated opening.'), findsOneWidget);
 
-    await tester.tap(find.byType(Switch).first);
+    await tester.tap(switchFinder);
     await tester.pumpAndSettle();
+    expect(tester.widget<Switch>(switchFinder).value, isFalse);
     expect(find.text('Translated opening.'), findsNothing);
   });
 

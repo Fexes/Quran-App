@@ -3,6 +3,7 @@ import '../../../../core/widgets/app_icon.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/content/content_source.dart';
+import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
@@ -10,6 +11,9 @@ import '../../../azkar/domain/entities/azkar_category.dart';
 import '../../../azkar/domain/entities/dhikr_item.dart';
 import '../../../azkar/domain/repositories/azkar_repository.dart';
 import '../../../library/data/stores/library_user_data_store.dart';
+import '../../../library/domain/library_translation_language_mapper.dart';
+import '../../../quran/domain/repositories/quran_translation_repository.dart';
+import '../../../quran/presentation/widgets/quran_translation_text.dart';
 
 class DuasPage extends StatefulWidget {
   const DuasPage({super.key});
@@ -35,15 +39,24 @@ class _DuasPageState extends State<DuasPage> {
   }
 
   Future<_DuaData> _load() async {
+    final resource = await getIt<QuranTranslationRepository>()
+        .selectedTranslation();
+    final shared = libraryLanguageFromQuranTranslation(resource);
+    final stored = getIt<SettingsStore>().azkarLanguageCodeOrNull;
+    final language = stored == null ? shared : libraryLanguageFromCode(stored);
     final results = await Future.wait<Object>([
       _repository.getCategories(),
-      _repository.getDhikr(limit: 1000),
+      _repository.getDhikr(
+        languageCode: language.azkarCode ?? 'unavailable',
+        limit: 1000,
+      ),
       _repository.getContentSources(),
     ]);
     return _DuaData(
       categories: results[0] as List<AzkarCategory>,
       items: results[1] as List<DhikrItem>,
       sources: results[2] as List<ContentSource>,
+      language: language,
     );
   }
 
@@ -148,7 +161,7 @@ class _DuasPageState extends State<DuasPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    _FeaturedDua(item: featured),
+                    _FeaturedDua(item: featured, language: data.language),
                     const Divider(height: 28),
                     if (visible.isEmpty)
                       const Padding(
@@ -169,6 +182,7 @@ class _DuasPageState extends State<DuasPage> {
                       padding: const EdgeInsets.only(bottom: 18),
                       child: _DuaCard(
                         item: item,
+                        language: data.language,
                         favorite: _userData.isBookmarked('dua:${item.id}'),
                         onFavorite: () async {
                           await _userData.toggleBookmark('dua:${item.id}');
@@ -214,17 +228,20 @@ class _DuaData {
     required this.categories,
     required this.items,
     required this.sources,
+    required this.language,
   });
 
   final List<AzkarCategory> categories;
   final List<DhikrItem> items;
   final List<ContentSource> sources;
+  final LibraryLanguageSelection language;
 }
 
 class _FeaturedDua extends StatelessWidget {
-  const _FeaturedDua({required this.item});
+  const _FeaturedDua({required this.item, required this.language});
 
   final DhikrItem item;
+  final LibraryLanguageSelection language;
 
   @override
   Widget build(BuildContext context) {
@@ -246,7 +263,15 @@ class _FeaturedDua extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(item.translation),
+        if (item.translation.isNotEmpty)
+          QuranTranslationText(
+            text: item.translation,
+            style: Theme.of(context).textTheme.bodyMedium,
+            languageCode: language.azkarCode,
+            resource: language.resource,
+          )
+        else
+          Text('Translation not available in ${language.label}.'),
         const SizedBox(height: 8),
         Text(
           item.reference,
@@ -263,11 +288,13 @@ class _FeaturedDua extends StatelessWidget {
 class _DuaCard extends StatelessWidget {
   const _DuaCard({
     required this.item,
+    required this.language,
     required this.favorite,
     required this.onFavorite,
   });
 
   final DhikrItem item;
+  final LibraryLanguageSelection language;
   final bool favorite;
   final VoidCallback onFavorite;
 
@@ -306,7 +333,15 @@ class _DuaCard extends StatelessWidget {
             ).textTheme.titleLarge?.copyWith(height: 1.8),
           ),
           const SizedBox(height: 8),
-          Text(item.translation),
+          if (item.translation.isNotEmpty)
+            QuranTranslationText(
+              text: item.translation,
+              style: Theme.of(context).textTheme.bodyMedium,
+              languageCode: language.azkarCode,
+              resource: language.resource,
+            )
+          else
+            Text('Translation not available in ${language.label}.'),
           if (item.transliteration.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(

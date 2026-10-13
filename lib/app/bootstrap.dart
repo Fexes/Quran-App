@@ -5,6 +5,7 @@ import '../core/widgets/app_icon.dart';
 import 'package:flutter/services.dart';
 
 import 'di/injection.dart';
+import '../features/prayer/data/services/prayer_location_refresh_service.dart';
 import 'observers/app_bloc_observer.dart';
 
 typedef AppBuilder = Widget Function();
@@ -24,6 +25,7 @@ Future<void> _startApp(AppBuilder builder) async {
       'UthmanicHafs',
     )..addFont(rootBundle.load('assets/fonts/UthmanicHafs.ttf'))).load();
     runApp(builder());
+    getIt<PrayerLocationRefreshService>().start();
   } catch (error, stackTrace) {
     FlutterError.reportError(
       FlutterErrorDetails(

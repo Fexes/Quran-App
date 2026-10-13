@@ -7,6 +7,12 @@ import 'package:quran/app/di/injection.dart';
 import 'package:quran/app/router/app_router.dart';
 import 'package:quran/app/router/app_routes.dart';
 import 'package:quran/core/storage/settings_store.dart';
+import 'package:quran/features/hadith/data/stores/hadeeth_enc_store.dart';
+import 'package:quran/features/hadith/data/stores/hadith_translation_store.dart';
+import 'package:quran/features/hadith/domain/repositories/hadith_repository.dart';
+import 'package:quran/features/library/data/stores/library_user_data_store.dart';
+import 'package:quran/features/home/domain/entities/home_tile.dart';
+import 'package:quran/features/home/presentation/pages/home_page.dart';
 import 'package:quran/features/quran/data/repositories/quran_interlinear_repository_impl.dart';
 import 'package:quran/features/quran/data/stores/quran_interlinear_words_store.dart';
 import 'package:quran/features/quran/data/stores/quran_tafsir_store.dart';
@@ -19,10 +25,13 @@ import 'package:quran/features/quran_audio/data/stores/quran_word_timing_store.d
 import 'package:quran/features/quran_audio/domain/entities/quran_audio_download_item.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUpAll(() async {
     final downloadStore = QuranAudioDownloadStore.memory();
     await configureDependencies(
       settingsStore: SettingsStore.memory({
+        'onboarding_complete': true,
         'interlinear_translation_skip_version':
             QuranInterlinearRepositoryImpl.currentCacheVersion,
       }),
@@ -33,16 +42,25 @@ void main() {
       quranAudioHandler: QuranAudioHandler(),
       quranAudioDownloadStore: downloadStore,
       quranWordTimingStore: QuranWordTimingStore.memory(),
+      hadeethEncStore: HadeethEncStore.memory(),
+      hadithTranslationStore: HadithTranslationStore.memory(),
+      libraryUserDataStore: LibraryUserDataStore.memory(),
       quranAudioDownloadService: _NoopDownloadService(downloadStore),
       initializePrayerAlerts: false,
     );
+    // Asset parsing uses real isolates, which must complete outside the
+    // widget test's fake clock. Reader/data-source tests cover lazy loading.
+    await getIt<HadithRepository>().getBooks();
+    await getIt<HadithRepository>().getContentSources();
   });
+
+  setUp(() => appRouter.go(AppRoutes.shell));
 
   testWidgets('app starts on the home dashboard', (tester) async {
     await tester.pumpWidget(const QuranApp());
     await _pumpStable(tester);
 
-    expect(find.text('Guidance for the heart'), findsOneWidget);
+    expect(find.text('Assalamu alaikum'), findsOneWidget);
     expect(find.text('Quran'), findsWidgets);
   });
 
@@ -54,14 +72,13 @@ void main() {
     await _pumpStable(tester);
 
     expect(find.text('Hadith'), findsWidgets);
-    expect(find.text('Sahih al Bukhari'), findsOneWidget);
+    await _pumpUntilVisible(tester, find.text('Sahih al-Bukhari'));
+    expect(find.text('Sahih al-Bukhari'), findsOneWidget);
 
     expect(find.text('Azkar'), findsWidgets);
   });
 
-  testWidgets('search screen accepts a deep search query', (
-    tester,
-  ) async {
+  testWidgets('search screen accepts a deep search query', (tester) async {
     appRouter.go(AppRoutes.quranSearchPath());
     addTearDown(() => appRouter.go(AppRoutes.shell));
 
@@ -82,7 +99,20 @@ void main() {
     await tester.pumpWidget(const QuranApp());
     await _pumpStable(tester);
 
-    await tester.drag(find.byType(ListView).first, const Offset(0, -1000));
+    await tester.tap(find.text('Home').last);
+    await _pumpStable(tester);
+    final shortcut = find.byKey(const ValueKey(HomeTile.tasbieh));
+    await tester.scrollUntilVisible(
+      shortcut,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(HomePage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await Scrollable.ensureVisible(tester.element(shortcut), alignment: 0.3);
     await _pumpStable(tester);
 
     expect(find.text('Tasbieh'), findsOneWidget);
@@ -100,6 +130,24 @@ Future<void> _pumpStable(WidgetTester tester) async {
   for (var i = 0; i < 8; i += 1) {
     await tester.pump(const Duration(milliseconds: 250));
   }
+}
+
+Future<void> _pumpUntilVisible(WidgetTester tester, Finder finder) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (finder.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+  expect(
+    finder,
+    findsWidgets,
+    reason: tester
+        .widgetList<Text>(find.byType(Text))
+        .map((text) => text.data)
+        .join(' | '),
+  );
 }
 
 class _NoopDownloadService extends QuranAudioDownloadService {

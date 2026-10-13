@@ -37,6 +37,7 @@ class _HifzReviewPageState extends State<HifzReviewPage> {
   bool _loading = true;
   bool _revealed = false;
   bool _hint = false;
+  bool _ratingInProgress = false;
   String? _error;
   QuranAudioCubit? _audioCubit;
 
@@ -277,18 +278,31 @@ class _HifzReviewPageState extends State<HifzReviewPage> {
   }
 
   Future<void> _rate(HifzReviewRating rating) async {
-    await _repository.reviewCard(
-      verseKey: _cards[_index].verseKey,
-      rating: rating,
-    );
-    if (!mounted) {
-      return;
+    if (_ratingInProgress || _loading || _index >= _cards.length) return;
+    _ratingInProgress = true;
+    final index = _index;
+    try {
+      await _repository.reviewCard(
+        verseKey: _cards[index].verseKey,
+        rating: rating,
+      );
+      if (!mounted || index != _index) return;
+      setState(() {
+        _index++;
+        _loading = true;
+      });
+      await _loadCurrentAyah();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save review. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      _ratingInProgress = false;
     }
-    setState(() {
-      _index++;
-      _loading = true;
-    });
-    await _loadCurrentAyah();
   }
 }
 

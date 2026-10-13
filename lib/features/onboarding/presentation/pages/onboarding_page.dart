@@ -16,17 +16,23 @@ import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/theme/quran_theme_cubit.dart';
 import '../../../../core/widgets/architectural_backdrop.dart';
 import '../../../../core/widgets/app_sheet.dart';
+import '../../../../core/widgets/animated_expansion.dart';
 import '../../../prayer/data/datasources/offline_prayer_city_data_source.dart';
 import '../../../prayer/data/services/prayer_alert_notification_service.dart';
 import '../../../prayer/domain/entities/prayer_alert_settings.dart';
 import '../../../prayer_times/domain/entities/daily_prayer_times.dart';
 import '../../../prayer_times/domain/entities/prayer_calculation_settings.dart';
 import '../../../prayer_times/domain/entities/prayer_location.dart';
+import '../../../prayer_times/domain/entities/prayer_time_entry.dart';
 import '../../../prayer_times/domain/repositories/prayer_times_repository.dart';
+import '../../../quran/domain/entities/quran_audio_reciter.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
+import '../../../quran/domain/repositories/quran_repository.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
 import '../../../quran/presentation/widgets/quran_translation_download_sheet.dart';
-import '../../../quran/presentation/widgets/quran_translation_picker.dart';
+import '../../../quran/presentation/widgets/quran_reading_preferences.dart';
+import '../../../quran_audio/domain/services/quran_translation_audio_selector.dart';
+import '../../../quran_audio/presentation/cubit/quran_audio_cubit.dart';
 import '../../data/ip_country_lookup.dart';
 
 class OnboardingPage extends StatefulWidget {
@@ -44,6 +50,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   late final SettingsStore _store;
   late final PrayerTimesRepository _prayerRepository;
   late final QuranTranslationRepository _translationRepository;
+  late final QuranRepository _quranRepository;
   late final OfflinePrayerCityDataSource _cityDataSource;
   late Future<List<QuranTranslationLanguage>> _translationLanguagesFuture;
   Future<DailyPrayerTimes>? _previewFuture;
@@ -53,9 +60,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
   late PrayerCalculationMethod _method;
   late PrayerAsrMadhab _madhab;
   late bool _locationConfirmed;
-  late String _readingIntent;
   bool _enableNotifications = false;
-  int _selectedTranslationId = 0;
+  late PrayerAlertSettings _alertSettings;
+  bool _notificationPermissionGranted = false;
+  bool _movingForward = true;
+  bool _leaving = false;
+  QuranTranslationResource? _selectedTranslation;
+  bool _translationSkipped = false;
+  int? _preparedTranslationId;
+  QuranAudioReciter? _selectedReciter;
+  QuranAudioReciter? _selectedTranslationVoice;
+  List<QuranAudioReciter> _reciters = const [];
+  bool _loadingReadingPreferences = true;
+  bool _readingPreferencesLoadFailed = false;
   bool _saving = false;
   late QuranArabicScript _script;
   late bool _scriptChosenManually;
@@ -74,6 +91,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     _scriptChosenManually = _store.hasManualArabicScript;
     _prayerRepository = getIt<PrayerTimesRepository>();
     _translationRepository = getIt<QuranTranslationRepository>();
+    _quranRepository = getIt<QuranRepository>();
     _cityDataSource = getIt<OfflinePrayerCityDataSource>();
     _step = widget.editMode ? 0 : _store.onboardingStep;
     _location = PrayerLocation(
@@ -81,12 +99,22 @@ class _OnboardingPageState extends State<OnboardingPage> {
       latitude: _store.prayerLatitude,
       longitude: _store.prayerLongitude,
       timeZone: _store.prayerTimeZone,
+      usesDeviceLocation: _store.prayerLocationUsesDevice,
     );
     _method = _methodFromName(_store.prayerMethod);
     _madhab = _madhabFromName(_store.prayerAsrMadhab);
     _locationConfirmed = widget.editMode || _store.onboardingLocationConfirmed;
-    _readingIntent = _store.readingIntent;
     _enableNotifications = _store.prayerAlertEnabledPrayerNames.isNotEmpty;
+    _alertSettings = PrayerAlertSettings.fromStored(
+      enabledPrayerNames: _store.prayerAlertEnabledPrayerNames,
+      notifyAtPrayerTime: _store.prayerAlertAtPrayerTime,
+      notifyBeforePrayer: _store.prayerAlertBeforePrayer,
+      beforeMinutes: _store.prayerAlertBeforeMinutes,
+      includeSunrise: _store.prayerAlertIncludeSunrise,
+    );
+    if (_alertSettings.enabledPrayerNames.isEmpty) {
+      _alertSettings = _alertSettings.withAllCorePrayers(true);
+    }
     _translationLanguagesFuture = _loadTranslationLanguages();
     if (!widget.editMode) {
       unawaited(_store.setOnboardingStep(_step));
@@ -95,27 +123,61 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Future<List<QuranTranslationLanguage>> _loadTranslationLanguages() async {
-    final selected = await _translationRepository.selectedTranslation();
-    final languages = await _translationRepository.translationLanguages();
-    var suggestedId = selected?.id ?? 0;
-    if (selected == null && !_store.contentLocaleSuggestionApplied) {
-      final deviceLanguage = WidgetsBinding
-          .instance
-          .platformDispatcher
-          .locale
-          .languageCode
-          .toLowerCase();
-      for (final language in languages) {
-        if (language.defaultResource.resolvedLanguageCode == deviceLanguage) {
-          suggestedId = language.defaultResource.id;
-          break;
-        }
+    _readingPreferencesLoadFailed = false;
+    try {
+      final selected = await _translationRepository.selectedTranslation();
+      List<QuranAudioReciter> reciters;
+      String? savedReciterId;
+      try {
+        reciters = await _quranRepository.getAudioReciters();
+        savedReciterId = await _quranRepository.getSelectedAudioReciterId();
+      } catch (_) {
+        reciters = const [];
       }
+      final arabicReciters = reciters.where((item) => !item.isTranslation);
+      final selectedReciter = arabicReciters
+          .where((item) => item.id == savedReciterId)
+          .firstOrNull;
+      if (mounted) {
+        setState(() {
+          _reciters = reciters;
+          if (_step > 1 &&
+              !_translationSkipped &&
+              _selectedTranslation == null) {
+            _selectedTranslation = selected;
+            _preparedTranslationId = selected?.id;
+            _translationSkipped =
+                selected == null && !_store.quranTranslationVisible;
+          }
+          _selectedReciter = selectedReciter ?? arabicReciters.firstOrNull;
+          _selectedTranslationVoice = _preferredTranslationVoice(
+            _selectedTranslation,
+          );
+        });
+      }
+      final languages = await _translationRepository.translationLanguages();
+      return languages;
+    } catch (_) {
+      if (mounted) setState(() => _readingPreferencesLoadFailed = true);
+      return const [];
+    } finally {
+      if (mounted) setState(() => _loadingReadingPreferences = false);
     }
-    if (mounted && suggestedId != 0) {
-      setState(() => _selectedTranslationId = suggestedId);
-    }
-    return languages;
+  }
+
+  QuranAudioReciter? _preferredTranslationVoice(
+    QuranTranslationResource? translation,
+  ) {
+    return preferredQuranTranslationVoice(
+      quranCompatibleTranslationAudioReciters(
+        reciters: _reciters,
+        selectedTranslation: translation,
+      ),
+      preferredId: _store.translationVoiceForLanguage(
+        translation?.resolvedLanguageCode ?? '',
+      ),
+      legacyId: _store.audioTranslationReciterId,
+    );
   }
 
   Future<void> _suggestScript() async {
@@ -161,102 +223,139 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    return Scaffold(
-      appBar: AppBar(
-        leading: _step > 0 || widget.editMode
-            ? IconButton(
-                tooltip: 'Back',
-                onPressed: _saving ? null : _back,
-                icon: const AppIcon(Icons.arrow_back_rounded),
-              )
-            : null,
-        title: Text(widget.editMode ? 'Setup preferences' : 'Welcome'),
-        flexibleSpace: const ArchitecturalBackdrop(),
-        actions: [
-          if (widget.editMode)
-            IconButton(
-              tooltip: 'Close',
-              onPressed: _saving ? null : () => context.pop(),
-              icon: const AppIcon(Icons.close_rounded),
-            ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Step ${_step + 1} of $_stepCount',
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.w600),
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    return PopScope(
+      canPop: !_saving,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: _step > 0 || widget.editMode
+              ? IconButton(
+                  tooltip: 'Back',
+                  onPressed: _saving ? null : _back,
+                  icon: const AppIcon(Icons.arrow_back_rounded),
+                )
+              : null,
+          title: Text(widget.editMode ? 'Setup preferences' : 'Welcome'),
+          flexibleSpace: const ArchitecturalBackdrop(),
+          actions: [
+            if (widget.editMode)
+              IconButton(
+                tooltip: 'Close',
+                onPressed: _saving ? null : () => context.pop(),
+                icon: const AppIcon(Icons.close_rounded),
+              ),
+            if (_step == 1)
+              TextButton(
+                onPressed: _saving ? null : _skipTranslation,
+                child: const Text('Skip'),
+              ),
+          ],
+        ),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Step ${_step + 1} of $_stepCount',
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(end: (_step + 1) / _stepCount),
+                      duration: reducedMotion
+                          ? Duration.zero
+                          : const Duration(milliseconds: 320),
+                      curve: Curves.easeInOutCubic,
+                      builder: (context, value, _) => LinearProgressIndicator(
+                        value: value,
+                        minHeight: 3,
+                        borderRadius: BorderRadius.circular(999),
+                        color: primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: reducedMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 320),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  layoutBuilder: (currentChild, previousChildren) => Stack(
+                    alignment: Alignment.topCenter,
+                    fit: StackFit.expand,
+                    children: [...previousChildren, ?currentChild],
+                  ),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      textDirection: Directionality.of(context),
+                      position: animation.drive(
+                        Tween<Offset>(
+                          begin: Offset(_movingForward ? 0.06 : -0.06, 0),
+                          end: Offset.zero,
                         ),
                       ),
-                    ],
+                      child: child,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: (_step + 1) / _stepCount,
-                    minHeight: 3,
-                    borderRadius: BorderRadius.circular(999),
-                    color: primary,
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: KeyedSubtree(
+                  child: SingleChildScrollView(
                     key: ValueKey(_step),
+                    padding: const EdgeInsets.only(bottom: 20),
                     child: _stepContent(),
                   ),
                 ),
               ),
-            ),
-            if (_message != null)
+              if (_message != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text(
+                    _message!,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(
-                  _message!,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                    fontWeight: FontWeight.w700,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _saving || !_canContinue ? null : _continue,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : AppIcon(
+                            _step == _stepCount - 1
+                                ? Icons.check_rounded
+                                : Icons.arrow_forward_rounded,
+                          ),
+                    label: Text(
+                      _step == _stepCount - 1 ? 'Finish setup' : 'Continue',
+                    ),
                   ),
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _saving || !_canContinue ? null : _continue,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : AppIcon(
-                          _step == _stepCount - 1
-                              ? Icons.check_rounded
-                              : Icons.arrow_forward_rounded,
-                        ),
-                  label: Text(
-                    _step == _stepCount - 1 ? 'Finish setup' : 'Continue',
-                  ),
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -268,7 +367,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
       1 => _translationStep(),
       2 => _locationStep(),
       3 => _calculationStep(),
-      4 => _intentAndNotificationsStep(),
+      4 => _scriptAndNotificationsStep(),
       _ => _previewStep(),
     };
   }
@@ -302,28 +401,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   Widget _translationStep() {
     return _StepPanel(
-      icon: Icons.translate_rounded,
-      title: 'Choose Quran translation',
+      icon: Icons.menu_book_rounded,
+      title: 'Reading and listening',
       description:
-          'The Arabic Quran remains unchanged. Downloaded editions show their translator and source in the reader.',
+          'Choose your translation language and reciter. We choose the translation for you, with matching audio where available.',
       child: FutureBuilder<List<QuranTranslationLanguage>>(
         future: _translationLanguagesFuture,
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Column(
-              children: [
-                const Text('Translation editions could not be loaded.'),
-                TextButton.icon(
-                  onPressed: () => setState(() {
-                    _translationLanguagesFuture = _loadTranslationLanguages();
-                  }),
-                  icon: const AppIcon(Icons.refresh_rounded),
-                  label: const Text('Retry'),
-                ),
-              ],
-            );
-          }
-          if (!snapshot.hasData) {
+          if (_loadingReadingPreferences) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(20),
@@ -331,49 +416,49 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             );
           }
-          final resources = [
-            for (final language in snapshot.data!)
-              ...language.availableResources,
-          ];
-          final ids = resources.map((item) => item.id).toSet();
-          final selectedId = ids.contains(_selectedTranslationId)
-              ? _selectedTranslationId
-              : 0;
-          QuranTranslationResource? selected;
-          for (final resource in resources) {
-            if (resource.id == selectedId) {
-              selected = resource;
-              break;
-            }
-          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const AppIcon(Icons.translate_rounded),
-                title: Text(selected?.displayEndonym ?? 'Bundled English'),
-                subtitle: Text(selected?.name ?? 'Default edition'),
-                trailing: const AppIcon(Icons.chevron_right_rounded),
-                onTap: _saving ? null : () => _chooseTranslation(selected),
-              ),
-              if (selected != null)
-                TextButton(
+              if (_readingPreferencesLoadFailed) ...[
+                const Text(
+                  'Your translation choices could not be loaded. You can keep your current choice or try again.',
+                ),
+                TextButton.icon(
                   onPressed: _saving
                       ? null
-                      : () => setState(() => _selectedTranslationId = 0),
-                  child: const Text('Use bundled English'),
+                      : () => setState(() {
+                          _loadingReadingPreferences = true;
+                          _translationLanguagesFuture =
+                              _loadTranslationLanguages();
+                        }),
+                  icon: const AppIcon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
                 ),
-              const SizedBox(height: 12),
-              Text(
-                selected == null
-                    ? 'Preview: bundled English translation is available offline.'
-                    : 'Preview: ${selected.displayEndonym} by ${selected.translator}. '
-                          'Source ${selected.sourceUrl}.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  height: 1.45,
-                  color: QuranTheme.subText(context),
-                ),
+                const SizedBox(height: 12),
+              ],
+              QuranReadingPreferences(
+                translation: _selectedTranslation,
+                requireLanguageSelection: true,
+                arabicReciterFirst: true,
+                reciterId: _selectedReciter?.id,
+                translationVoiceId: _selectedTranslationVoice?.id,
+                enabled: !_saving,
+                onTranslationChanged: (translation) => setState(() {
+                  _selectedTranslation = translation;
+                  _translationSkipped = false;
+                  _preparedTranslationId = null;
+                  _selectedTranslationVoice = _preferredTranslationVoice(
+                    translation,
+                  );
+                  _message = null;
+                }),
+                onReciterChanged: (reciter) => setState(() {
+                  _selectedReciter = reciter;
+                  _message = null;
+                }),
+                onTranslationVoiceChanged: (voice) => setState(() {
+                  _selectedTranslationVoice = voice;
+                }),
               ),
             ],
           );
@@ -508,12 +593,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
-  Widget _intentAndNotificationsStep() {
+  Widget _scriptAndNotificationsStep() {
     return _StepPanel(
-      icon: Icons.track_changes_rounded,
+      icon: Icons.tune_rounded,
       title: 'Personalize your journey',
-      description:
-          'Your reading intent stays private on this device. Notification permission is requested only after you finish setup.',
+      description: 'Choose your Arabic script and prayer reminders.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -544,31 +628,90 @@ class _OnboardingPageState extends State<OnboardingPage> {
             ).textTheme.bodySmall?.copyWith(color: QuranTheme.subText(context)),
           ),
           const SizedBox(height: 20),
-          Text('Reading intent', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          SegmentedButton<String>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 'read', label: Text('Read')),
-              ButtonSegment(value: 'memorize', label: Text('Memorize')),
-              ButtonSegment(value: 'both', label: Text('Both')),
-            ],
-            selected: {_readingIntent},
-            onSelectionChanged: (values) {
-              setState(() => _readingIntent = values.first);
-            },
-          ),
-          const SizedBox(height: 14),
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             value: _enableNotifications,
-            onChanged: (value) {
-              setState(() => _enableNotifications = value);
-            },
+            onChanged: _saving
+                ? null
+                : (value) {
+                    setState(() => _enableNotifications = value);
+                  },
             secondary: const AppIcon(Icons.notifications_rounded),
             title: const Text('Prayer notifications'),
             subtitle: const Text(
-              'Remind me at the five daily prayer times. The system prompt appears after this explanation.',
+              'Choose the prayers and reminder times below.',
+            ),
+          ),
+          AnimatedExpansion(
+            expanded: _enableNotifications,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Divider(height: 24),
+                for (final prayer in PrayerAlertSettings.corePrayerNames)
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(_prayerName(prayer)),
+                    value: _alertSettings.isEnabledFor(prayer),
+                    onChanged: _saving
+                        ? null
+                        : (enabled) => setState(() {
+                            _alertSettings = _alertSettings.withPrayer(
+                              prayer,
+                              enabled,
+                            );
+                          }),
+                  ),
+                const Divider(height: 24),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('At prayer time'),
+                  value: _alertSettings.notifyAtPrayerTime,
+                  onChanged: _saving
+                      ? null
+                      : (enabled) => setState(() {
+                          _alertSettings = _alertSettings.copyWith(
+                            notifyAtPrayerTime: enabled,
+                          );
+                        }),
+                ),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Before prayer'),
+                  value: _alertSettings.notifyBeforePrayer,
+                  onChanged: _saving
+                      ? null
+                      : (enabled) => setState(() {
+                          _alertSettings = _alertSettings.copyWith(
+                            notifyBeforePrayer: enabled,
+                          );
+                        }),
+                ),
+                AnimatedExpansion(
+                  expanded: _alertSettings.notifyBeforePrayer,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 12),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final minutes in [5, 10, 15, 30])
+                          ChoiceChip(
+                            label: Text('$minutes min'),
+                            selected: _alertSettings.beforeMinutes == minutes,
+                            onSelected: _saving
+                                ? null
+                                : (_) => setState(() {
+                                    _alertSettings = _alertSettings.copyWith(
+                                      beforeMinutes: minutes,
+                                    );
+                                  }),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -592,11 +735,25 @@ class _OnboardingPageState extends State<OnboardingPage> {
           _SummaryRow(label: 'Location', value: _location.name),
           _SummaryRow(label: 'Method', value: _methodLabel(_method)),
           _SummaryRow(label: 'Asr', value: _madhabLabel(_madhab)),
-          _SummaryRow(label: 'Reading', value: _readingIntentLabel()),
+          _SummaryRow(
+            label: 'Translation',
+            value: _selectedTranslation?.displayEndonym ?? 'Off',
+          ),
+          _SummaryRow(
+            label: 'Reciter',
+            value: _selectedReciter?.name ?? 'Default reciter',
+          ),
+          if (_selectedTranslationVoice != null)
+            _SummaryRow(
+              label: 'Translation voice',
+              value: _selectedTranslationVoice!.name,
+            ),
           _SummaryRow(label: 'Arabic script', value: _script.label),
           _SummaryRow(
             label: 'Notifications',
-            value: _enableNotifications ? 'Requested on finish' : 'Off',
+            value: _enableNotifications && _notificationPermissionGranted
+                ? '${_alertSettings.activePrayerCount} prayers enabled'
+                : 'Off',
           ),
           const SizedBox(height: 14),
           FutureBuilder<DailyPrayerTimes>(
@@ -633,98 +790,133 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
-  bool get _canContinue => _step != 2 || _locationConfirmed;
-
-  Future<void> _chooseTranslation(QuranTranslationResource? selected) async {
-    if (_saving) return;
-    setState(() {
-      _saving = true;
-      _message = null;
-    });
-    try {
-      final resource = await showModalBottomSheet<QuranTranslationResource>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => QuranTranslationPicker(
-          repository: _translationRepository,
-          currentResource: selected,
-        ),
-      );
-      if (resource != null &&
-          mounted &&
-          await _ensureTranslationDownloaded(resource) &&
-          mounted) {
-        setState(() => _selectedTranslationId = resource.id);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(
-          () => _message = 'Could not prepare translation. Please try again.',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
+  bool get _canContinue =>
+      (_step != 2 || _locationConfirmed) &&
+      (_step != 1 || _selectedTranslation != null) &&
+      ((_step != 1 && _step != _stepCount - 1) ||
+          _translationSkipped ||
+          !_loadingReadingPreferences);
 
   Future<bool> _ensureTranslationDownloaded(
     QuranTranslationResource resource,
   ) async {
-    final available = await _translationRepository.hasFullTranslation(
-      resource.id,
-    );
+    if (_preparedTranslationId == resource.id &&
+        await _translationRepository.hasFullTranslation(resource.id)) {
+      return true;
+    }
     if (!mounted) return false;
-    if (available) return true;
-    return await showModalBottomSheet<bool>(
-          context: context,
-          isScrollControlled: true,
-          isDismissible: false,
-          enableDrag: false,
-          useSafeArea: true,
-          backgroundColor: Colors.transparent,
-          builder: (_) => QuranTranslationDownloadSheet(
-            repository: _translationRepository,
-            resource: resource,
-            activateOnComplete: false,
-          ),
-        ) ==
-        true;
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => QuranTranslationDownloadSheet(
+        repository: _translationRepository,
+        resource: resource,
+        activateOnComplete: false,
+        showContinueWhileDownloading: _step != 1,
+      ),
+    );
+    final quranReady =
+        result == true ||
+        await _translationRepository.hasFullTranslation(resource.id);
+    if (quranReady) _preparedTranslationId = resource.id;
+    return quranReady;
   }
 
   Future<bool> _prepareSelectedTranslation() async {
-    List<QuranTranslationLanguage> languages;
-    try {
-      languages = await _translationLanguagesFuture;
-    } catch (_) {
-      // Bundled English remains usable if the catalog is unavailable.
-      if (_selectedTranslationId == 0) return true;
-      rethrow;
-    }
-    if (!mounted) return false;
-    if (_selectedTranslationId == 0) return true;
-    for (final language in languages) {
-      for (final resource in language.availableResources) {
-        if (resource.id == _selectedTranslationId) {
-          return _ensureTranslationDownloaded(resource);
-        }
-      }
-    }
-    throw StateError('Selected translation is unavailable.');
+    final resource = _selectedTranslation;
+    if (resource == null) return true;
+    return _ensureTranslationDownloaded(resource);
   }
 
-  Future<void> _continue() async {
-    if (_saving) return;
+  Future<void> _saveReadingPreferences() async {
+    final translation = _selectedTranslation;
+    await _store.setQuranTranslationVisible(translation != null);
+    await _store.setLibraryTranslationEnabled(translation != null);
+    await _store.setHadithLanguageCode(translation?.resolvedLanguageCode ?? '');
+    await _store.setAzkarLanguageCode(translation?.resolvedLanguageCode ?? '');
+    if (translation == null) await _store.setAudioPlayTranslationEnabled(false);
+    await _store.setAudioMeaningLanguageCode(
+      translation?.resolvedLanguageCode ?? '',
+    );
+    await _store.setAudioTranslationReciterId(
+      _selectedTranslationVoice?.id ?? '',
+      languageCode: translation?.resolvedLanguageCode,
+    );
+    final previous = await _translationRepository.selectedTranslation();
+    if (previous?.id != translation?.id) {
+      await _translationRepository.setSelectedTranslation(translation?.id);
+    }
+    final reciter = _selectedReciter;
+    if (reciter != null) {
+      await _quranRepository.saveSelectedAudioReciterId(reciter.id);
+    }
+  }
+
+  void _skipTranslation() {
+    if (_saving || _leaving || _step != 1) return;
+    setState(() {
+      _selectedTranslation = null;
+      _selectedTranslationVoice = null;
+      _translationSkipped = true;
+      _preparedTranslationId = null;
+    });
+    unawaited(_continue(skipTranslation: true));
+  }
+
+  Future<void> _continue({bool skipTranslation = false}) async {
+    if (_saving || _leaving) return;
+    if (_step == 1 && !skipTranslation && !_canContinue) return;
+    FocusScope.of(context).unfocus();
     setState(() {
       _saving = true;
       _message = null;
     });
     try {
-      // Suggested and restored choices must be ready too, even without a picker tap.
+      // Quran text is required; optional downloads must not block setup.
       if ((_step == 1 || _step == _stepCount - 1) &&
           !await _prepareSelectedTranslation()) {
         return;
+      }
+      if (!mounted) return;
+      if (_step == 1 && !widget.editMode) {
+        await _saveReadingPreferences();
+        await _store.setContentLocaleSuggestionApplied(true);
+      }
+      if (!mounted) return;
+      if (_step >= 4 &&
+          _enableNotifications &&
+          _alertSettings.schedulesAnything &&
+          !_notificationPermissionGranted) {
+        if (getIt.isRegistered<PrayerAlertNotificationService>()) {
+          final allowed = await getIt<PrayerAlertNotificationService>()
+              .requestPermissions();
+          if (!mounted) return;
+          setState(() {
+            _notificationPermissionGranted = allowed;
+            if (!allowed) {
+              _enableNotifications = false;
+              _message =
+                  'Notifications were not allowed. You can enable them later in Settings.';
+            }
+          });
+        }
+      }
+      if (!mounted) return;
+      if (_step == 4) {
+        final alerts = _enableNotifications && _notificationPermissionGranted
+            ? _alertSettings
+            : PrayerAlertSettings.disabled();
+        await _store.setPrayerAlertSettings(
+          enabledPrayerNames: alerts.toStoredPrayerNames(),
+          notifyAtPrayerTime: alerts.notifyAtPrayerTime,
+          notifyBeforePrayer: alerts.notifyBeforePrayer,
+          beforeMinutes: alerts.beforeMinutes,
+          includeSunrise: alerts.includeSunrise,
+        );
       }
       if (!mounted) return;
       if (_step < _stepCount - 1) {
@@ -733,16 +925,23 @@ class _OnboardingPageState extends State<OnboardingPage> {
         if (!widget.editMode) {
           await _store.setOnboardingStep(next);
         }
-        if (mounted) setState(() => _step = next);
+        if (mounted) {
+          setState(() {
+            _movingForward = true;
+            _step = next;
+          });
+        }
         return;
       }
       await _finish();
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('Onboarding setup failed: $error\n$stack');
+      _leaving = false;
       if (mounted) {
         setState(() => _message = 'Could not prepare setup. Please try again.');
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted && !_leaving) setState(() => _saving = false);
     }
   }
 
@@ -757,68 +956,58 @@ class _OnboardingPageState extends State<OnboardingPage> {
     if (!widget.editMode) {
       unawaited(_store.setOnboardingStep(previous));
     }
-    setState(() => _step = previous);
+    setState(() {
+      _movingForward = false;
+      _step = previous;
+    });
   }
 
   Future<void> _finish() async {
-    setState(() => _saving = true);
     _scriptLookupRevision++;
     final themeCubit = context.read<QuranThemeCubit>();
-    try {
-      await _prayerRepository.saveLocation(_location);
-      await _prayerRepository.saveSettings(
-        PrayerCalculationSettings(method: _method, asrMadhab: _madhab),
-      );
-      await _translationRepository.setSelectedTranslation(
-        _selectedTranslationId == 0 ? null : _selectedTranslationId,
-      );
-      await _store.setReadingIntent(_readingIntent);
-      await themeCubit.setQuranArabicScript(
-        _script,
-        automatic: !_scriptChosenManually,
-      );
-      await _store.setContentLocaleSuggestionApplied(true);
-      await _store.setOnboardingLocationConfirmed(true);
+    final audioCubit = context.read<QuranAudioCubit>();
+    final router = GoRouter.of(context);
+    await _prayerRepository.saveLocation(_location);
+    await _prayerRepository.saveSettings(
+      PrayerCalculationSettings(method: _method, asrMadhab: _madhab),
+    );
+    await _saveReadingPreferences();
+    if (!mounted) return;
+    final reciter = _selectedReciter;
+    if (reciter != null) await audioCubit.changeReciter(reciter.id);
+    await audioCubit.synchronizeTranslationSelection();
+    await themeCubit.setQuranArabicScript(
+      _script,
+      automatic: !_scriptChosenManually,
+    );
+    await _store.setContentLocaleSuggestionApplied(true);
+    await _store.setOnboardingLocationConfirmed(true);
 
-      if (_enableNotifications &&
-          getIt.isRegistered<PrayerAlertNotificationService>()) {
-        final service = getIt<PrayerAlertNotificationService>();
-        final allowed = await service.requestPermissions();
-        if (allowed) {
-          await service.saveSettings(
-            PrayerAlertSettings.disabled().withAllCorePrayers(true),
-          );
-        } else {
-          await service.saveSettings(PrayerAlertSettings.disabled());
-        }
-      } else if (getIt.isRegistered<PrayerAlertNotificationService>()) {
-        await getIt<PrayerAlertNotificationService>().saveSettings(
-          PrayerAlertSettings.disabled(),
-        );
-      }
-
-      await _store.completeOnboarding();
-      if (!mounted) {
-        return;
-      }
-      context.go(AppRoutes.shell);
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _saving = false;
-          _message = 'Could not save setup. Please try again.';
-        });
-      }
+    if (getIt.isRegistered<PrayerAlertNotificationService>()) {
+      await getIt<PrayerAlertNotificationService>().saveSettings(
+        _enableNotifications && _notificationPermissionGranted
+            ? _alertSettings
+            : PrayerAlertSettings.disabled(),
+      );
     }
+
+    await _store.completeOnboarding();
+    if (!mounted) {
+      return;
+    }
+    _leaving = true;
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) router.go(AppRoutes.shell);
   }
 
-  String _readingIntentLabel() {
-    return switch (_readingIntent) {
-      'memorize' => 'Memorize',
-      'both' => 'Read and memorize',
-      _ => 'Read',
-    };
-  }
+  static String _prayerName(PrayerTimeName prayer) => switch (prayer) {
+    PrayerTimeName.fajr => 'Fajr',
+    PrayerTimeName.sunrise => 'Sunrise',
+    PrayerTimeName.dhuhr => 'Dhuhr',
+    PrayerTimeName.asr => 'Asr',
+    PrayerTimeName.maghrib => 'Maghrib',
+    PrayerTimeName.isha => 'Isha',
+  };
 
   Future<void> _chooseCity() async {
     final city = await showModalBottomSheet<OfflinePrayerCity>(
@@ -913,20 +1102,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
         position.latitude,
         position.longitude,
       );
-      final next = nearest?.toPrayerLocation();
       if (!mounted) {
         return;
       }
       _applyScriptSuggestion(nearest?.countryCode, 'location');
       setState(() {
-        _location =
-            next ??
-            PrayerLocation(
-              name: 'Current location',
-              latitude: position.latitude,
-              longitude: position.longitude,
-              timeZone: _location.timeZone,
-            );
+        _location = PrayerLocation(
+          name: nearest?.name ?? 'Current location',
+          latitude: position.latitude,
+          longitude: position.longitude,
+          timeZone: nearest?.timeZone ?? _location.timeZone,
+          usesDeviceLocation: true,
+        );
         _locationConfirmed = true;
       });
       if (!widget.editMode) {

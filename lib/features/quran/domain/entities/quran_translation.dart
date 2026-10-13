@@ -2,7 +2,18 @@ import 'dart:ui' show TextAlign, TextDirection;
 
 import 'package:equatable/equatable.dart';
 
+enum QuranTranslationProvider { quranCom, alQuranCloud, quranEnc }
+
 class QuranTranslationResource extends Equatable {
+  static const urduJalandhari = QuranTranslationResource(
+    id: 234,
+    languageName: 'urdu',
+    languageCode: 'ur',
+    name: 'Fatah Muhammad Jalandhari',
+    authorName: 'Fatah Muhammad Jalandhari',
+    slug: 'ur-fatah-muhammad-jalandhari',
+  );
+
   const QuranTranslationResource({
     required this.id,
     required this.languageName,
@@ -18,6 +29,8 @@ class QuranTranslationResource extends Equatable {
     this.sourceUrl = 'https://quran.com',
     this.checksum = '',
     this.supportsFootnotes = false,
+    this.provider = QuranTranslationProvider.quranCom,
+    this.providerKey = '',
   });
 
   factory QuranTranslationResource.fromJson(Map<dynamic, dynamic> json) {
@@ -45,6 +58,11 @@ class QuranTranslationResource extends Equatable {
           json['supportsFootnotes'] as bool? ??
           json['supports_footnotes'] as bool? ??
           false,
+      provider: QuranTranslationProvider.values.firstWhere(
+        (value) => value.name == json['provider'],
+        orElse: () => QuranTranslationProvider.quranCom,
+      ),
+      providerKey: _string(json['providerKey']),
     );
   }
 
@@ -62,6 +80,8 @@ class QuranTranslationResource extends Equatable {
   final String sourceUrl;
   final String checksum;
   final bool supportsFootnotes;
+  final QuranTranslationProvider provider;
+  final String providerKey;
 
   String get resolvedLanguageCode {
     if (languageCode.trim().isNotEmpty) {
@@ -85,6 +105,12 @@ class QuranTranslationResource extends Equatable {
   }
 
   String get translator => authorName.trim().isEmpty ? name : authorName;
+
+  bool get isUrdu => resolvedLanguageCode.split('-').first == 'ur';
+
+  // Urdu word glosses are not Jalandhari's narrated ayah translation.
+  String? get bookWordTranslationLanguageCode =>
+      isUrdu ? null : wordTranslationLanguageCode;
 
   bool get isRtl {
     final normalizedCode = resolvedLanguageCode.split('-').first;
@@ -154,6 +180,8 @@ class QuranTranslationResource extends Equatable {
       'sourceUrl': sourceUrl,
       'checksum': checksum,
       'supportsFootnotes': supportsFootnotes,
+      'provider': provider.name,
+      'providerKey': providerKey,
     };
   }
 
@@ -173,6 +201,8 @@ class QuranTranslationResource extends Equatable {
     sourceUrl,
     checksum,
     supportsFootnotes,
+    provider,
+    providerKey,
   ];
 }
 
@@ -332,6 +362,12 @@ class QuranTranslationDownloadProgress extends Equatable {
     required this.totalVerses,
     required this.failedChapters,
     this.isComplete = false,
+    this.contentLabel,
+    this.contentDetail,
+    this.contentProgress,
+    this.failedContent = false,
+    this.overallProgress,
+    this.quranTextReady = false,
   });
 
   final int completedChapters;
@@ -340,8 +376,18 @@ class QuranTranslationDownloadProgress extends Equatable {
   final int totalVerses;
   final int failedChapters;
   final bool isComplete;
+  final String? contentLabel;
+  final String? contentDetail;
+  final double? contentProgress;
+  final bool failedContent;
+  final double? overallProgress;
+  final bool quranTextReady;
 
   double get percent {
+    if (overallProgress != null) {
+      return overallProgress!.clamp(0, isComplete ? 1 : 0.99);
+    }
+    if (contentLabel != null) return (contentProgress ?? 0).clamp(0, 1);
     if (totalVerses <= 0) {
       return 0;
     }
@@ -349,13 +395,19 @@ class QuranTranslationDownloadProgress extends Equatable {
   }
 
   @override
-  List<Object> get props => [
+  List<Object?> get props => [
     completedChapters,
     totalChapters,
     completedVerses,
     totalVerses,
     failedChapters,
     isComplete,
+    contentLabel,
+    contentDetail,
+    contentProgress,
+    failedContent,
+    overallProgress,
+    quranTextReady,
   ];
 }
 

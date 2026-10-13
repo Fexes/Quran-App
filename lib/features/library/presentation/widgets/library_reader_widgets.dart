@@ -60,6 +60,7 @@ class LibraryTranslationBody extends StatelessWidget {
     return QuranTranslationText(
       text: text,
       resource: resource,
+      languageCode: languageCode,
       style: QuranTheme.translationStyle(
         Theme.of(context).textTheme.bodyMedium?.copyWith(
           fontSize: 15 * themeState.quranTranslationFontScale,

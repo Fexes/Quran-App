@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/daily_refresh.dart';
 import '../../../../core/widgets/animated_expansion.dart';
 import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,6 +12,7 @@ import 'package:hijri_calendar/hijri_calendar.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../app/di/injection.dart';
+import '../../../../core/storage/settings_store.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/adaptive_inset_area.dart';
@@ -83,64 +85,70 @@ class _PrayerView extends StatelessWidget {
           listener: (context, state) => _openQiblaFromShortcut(context),
         ),
       ],
-      child: PremiumSurfaceShadowScope(
-        style: PremiumSurfaceShadowStyle.none,
-        child: AdaptiveInsetArea(
-          top: true,
-          bottom: true,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-                child: ShellScreenHeader(
-                  icon: Icons.mosque_rounded,
-                  title: l10n.prayerTitle,
-                  subtitle: l10n.prayerSubtitle,
-                  actions: [
-                    ShellHeaderAction(
-                      icon: Icons.refresh_rounded,
-                      tooltip: l10n.commonRefresh,
-                      onTap: context.read<PrayerTimesCubit>().load,
-                    ),
-                    ShellHeaderAction(
-                      icon: Icons.tune_rounded,
-                      tooltip: 'Prayer settings',
-                      onTap: () => context.read<ShellCubit>().setDestination(
-                        ShellDestination.settings,
+      child: DailyRefresh(
+        onRefresh: context.read<PrayerTimesCubit>().load,
+        timeZone: () => getIt<SettingsStore>().prayerTimeZone,
+        builder: (context) => PremiumSurfaceShadowScope(
+          style: PremiumSurfaceShadowStyle.none,
+          child: AdaptiveInsetArea(
+            top: true,
+            bottom: true,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                  child: ShellScreenHeader(
+                    icon: Icons.mosque_rounded,
+                    title: l10n.prayerTitle,
+                    subtitle: l10n.prayerSubtitle,
+                    actions: [
+                      ShellHeaderAction(
+                        icon: Icons.refresh_rounded,
+                        tooltip: l10n.commonRefresh,
+                        onTap: context.read<PrayerTimesCubit>().load,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: context.read<PrayerTimesCubit>().load,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.only(
-                      bottom: QuranFloatingAudioPlayer.scrollInset(context),
-                    ),
-                    children: [
-                      const _PrayerTimesSection(),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 28, 20, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Your worship',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 14),
-                            _PrayerToolsGrid(calendarTitle: l10n.calendarTitle),
-                          ],
+                      ShellHeaderAction(
+                        icon: Icons.tune_rounded,
+                        tooltip: 'Prayer settings',
+                        onTap: () => context.read<ShellCubit>().setDestination(
+                          ShellDestination.settings,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: context.read<PrayerTimesCubit>().load,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(
+                        bottom: QuranFloatingAudioPlayer.scrollInset(context),
+                      ),
+                      children: [
+                        const _PrayerTimesSection(),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 28, 20, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'Your worship',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 14),
+                              _PrayerToolsGrid(
+                                calendarTitle: l10n.calendarTitle,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -683,13 +691,13 @@ class _PrayerLocationSheetState extends State<_PrayerLocationSheet> {
         return;
       }
       Navigator.of(context).pop(
-        nearest?.toPrayerLocation() ??
-            PrayerLocation(
-              name: 'Current Location',
-              latitude: position.latitude,
-              longitude: position.longitude,
-              timeZone: widget.currentLocation.timeZone,
-            ),
+        PrayerLocation(
+          name: nearest?.name ?? 'Current Location',
+          latitude: position.latitude,
+          longitude: position.longitude,
+          timeZone: nearest?.timeZone ?? widget.currentLocation.timeZone,
+          usesDeviceLocation: true,
+        ),
       );
     } catch (_) {
       if (!mounted) {

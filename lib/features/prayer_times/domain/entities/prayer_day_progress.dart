@@ -29,6 +29,7 @@ class PrayerDayProgress {
   static PrayerDayProgress calculate({
     required List<PrayerTimeEntry> entries,
     required DateTime now,
+    PrayerTimeEntry? nextDayFajr,
   }) {
     final coreEntries = entries
         .where((entry) => entry.name != PrayerTimeName.sunrise)
@@ -39,23 +40,12 @@ class PrayerDayProgress {
 
     final first = coreEntries.first;
     final last = coreEntries.last;
-    final nextPrayer = _nextPrayer(coreEntries, now);
+    final nextPrayer = _nextPrayer(coreEntries, now, nextDayFajr);
     final activePrayer = _activePrayer(coreEntries, now);
     final currentPrayer = _currentPrayer(entries, now);
     final progress = _progressBetween(first.time, last.time, now);
     final arcProgress = _prayerSlotProgress(coreEntries, now);
-    var remaining = nextPrayer.time.difference(now);
-    if (!remaining.isNegative && remaining != Duration.zero) {
-      return PrayerDayProgress(
-        progress: progress,
-        arcProgress: arcProgress,
-        nextPrayer: nextPrayer,
-        phasePrayer: activePrayer ?? nextPrayer,
-        currentPrayer: currentPrayer,
-        remaining: remaining,
-      );
-    }
-    remaining += const Duration(days: 1);
+    final remaining = nextPrayer.time.difference(now);
     return PrayerDayProgress(
       progress: progress,
       arcProgress: arcProgress,
@@ -69,13 +59,21 @@ class PrayerDayProgress {
   static PrayerTimeEntry _nextPrayer(
     List<PrayerTimeEntry> entries,
     DateTime now,
+    PrayerTimeEntry? nextDayFajr,
   ) {
     for (final entry in entries) {
       if (entry.time.isAfter(now)) {
         return entry;
       }
     }
-    return entries.first;
+    if (nextDayFajr != null && nextDayFajr.time.isAfter(now)) {
+      return nextDayFajr;
+    }
+    var nextTime = entries.first.time;
+    while (!nextTime.isAfter(now)) {
+      nextTime = nextTime.add(const Duration(days: 1));
+    }
+    return PrayerTimeEntry(name: entries.first.name, time: nextTime);
   }
 
   static PrayerTimeEntry? _activePrayer(

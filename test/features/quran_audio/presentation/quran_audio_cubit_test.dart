@@ -97,7 +97,7 @@ void main() {
           settingsStore: SettingsStore.memory({
             'audio_auto_cache_played_ayahs': false,
             'audio_play_translation_enabled': true,
-            'audio_translation_reciter_id': 'translation:english',
+            'audio_translation_reciter_id': 'alqurancloud:en.walk',
           }),
           wordTimingRepository: const _EmptyWordTimingRepository(),
         );
@@ -120,13 +120,13 @@ void main() {
           QuranAudioSegmentType.arabic,
           QuranAudioSegmentType.translation,
         ]);
-        expect(playbackPort.loadedItems[1].reciterId, 'translation:english');
+        expect(playbackPort.loadedItems[1].reciterId, 'alqurancloud:en.walk');
         expect(
           playbackPort.loadedItems[1].timingProvider,
           QuranAudioTimingProvider.none,
         );
         expect(cubit.state.playTranslationAudio, true);
-        expect(cubit.state.translationReciterId, 'translation:english');
+        expect(cubit.state.translationReciterId, 'alqurancloud:en.walk');
 
         await cubit.close();
       },
@@ -150,7 +150,7 @@ void main() {
           quranRepository: quranRepository,
           translationRepository: const _FakeTranslationRepository(
             selected: QuranTranslationResource(
-              id: 30,
+              id: 1001001,
               languageName: 'Portuguese',
               name: 'Portuguese translation',
               authorName: 'Author',
@@ -216,7 +216,7 @@ void main() {
           settingsStore: SettingsStore.memory({
             'audio_auto_cache_played_ayahs': false,
             'audio_play_translation_enabled': true,
-            'audio_translation_reciter_id': 'translation:english',
+            'audio_translation_reciter_id': 'alqurancloud:en.walk',
           }),
           wordTimingRepository: const _EmptyWordTimingRepository(),
         );
@@ -253,7 +253,7 @@ void main() {
           quranRepository: quranRepository,
           translationRepository: const _FakeTranslationRepository(
             selected: QuranTranslationResource(
-              id: 22,
+              id: 234,
               languageName: 'Urdu',
               name: 'Urdu translation',
               authorName: 'Author',
@@ -265,7 +265,7 @@ void main() {
           settingsStore: SettingsStore.memory({
             'audio_auto_cache_played_ayahs': false,
             'audio_play_translation_enabled': true,
-            'audio_translation_reciter_id': 'translation:english',
+            'audio_translation_reciter_id': 'alqurancloud:en.walk',
           }),
           wordTimingRepository: const _EmptyWordTimingRepository(),
         );
@@ -278,9 +278,9 @@ void main() {
 
         expect(playbackPort.loadedItems.map((item) => item.reciterId), [
           'test:alafasy',
-          'translation:urdu',
+          'alqurancloud:ur.khan',
         ]);
-        expect(cubit.state.translationReciterId, 'translation:urdu');
+        expect(cubit.state.translationReciterId, 'alqurancloud:ur.khan');
 
         await cubit.close();
       },
@@ -368,13 +368,13 @@ void main() {
       );
 
       playbackPort.emitDuration(const Duration(seconds: 2));
-      playbackPort.emitPosition(const Duration(milliseconds: 1950));
+      playbackPort.emitPosition(const Duration(seconds: 2));
       await pumpEventQueue();
 
       expect(playbackPort.seekedPositions, [Duration.zero]);
       expect(playbackPort.playCalls, 1);
 
-      playbackPort.emitPosition(const Duration(milliseconds: 1950));
+      playbackPort.emitPosition(const Duration(seconds: 2));
       await pumpEventQueue();
 
       expect(playbackPort.seekedPositions, [Duration.zero]);
@@ -461,8 +461,16 @@ void main() {
 
       playbackPort.emitPlayerCompleted();
       await pumpEventQueue();
+      final continued = cubit.stream
+          .firstWhere(
+            (state) =>
+                state.queue.length == 1 &&
+                state.currentItem?.verseKey == '1:3' &&
+                state.status == QuranAudioStatus.playing,
+          )
+          .timeout(const Duration(seconds: 5));
       playbackPort.emitPlayerCompleted();
-      await pumpEventQueue();
+      await continued;
 
       expect(playbackPort.stopCalls, 0);
       expect(playbackPort.loadCalls, 4);
@@ -761,7 +769,7 @@ class _FakeQuranRepository implements QuranRepository {
       timingRecitationId: 7,
     ),
     QuranAudioReciter(
-      id: 'translation:english',
+      id: 'alqurancloud:en.walk',
       name: 'English Voice',
       provider: QuranAudioProvider.alQuranCloud,
       identifier: 'en.walk',
@@ -769,7 +777,7 @@ class _FakeQuranRepository implements QuranRepository {
       isTranslation: true,
     ),
     QuranAudioReciter(
-      id: 'translation:urdu',
+      id: 'alqurancloud:ur.khan',
       name: 'Urdu Voice',
       provider: QuranAudioProvider.alQuranCloud,
       identifier: 'ur.khan',

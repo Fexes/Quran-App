@@ -93,6 +93,12 @@ class HadeethEncItem extends Equatable {
       arabic: hadithTextArabic,
       translation: hadithText,
       grade: grade,
+      grades: [
+        if (gradeArabic.trim().isNotEmpty)
+          {'grade': gradeArabic}
+        else if (grade.trim().isNotEmpty)
+          {'grade': grade},
+      ],
       reference: 'HadeethEnc $id',
       sourceId: 'hadeethenc',
       collectionName: 'HadeethEnc',

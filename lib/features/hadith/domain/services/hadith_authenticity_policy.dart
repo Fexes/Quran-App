@@ -87,6 +87,9 @@ class HadithAuthenticityPolicy {
   ];
 
   static const _acceptedGradeMarkers = [
+    'صحيح',
+    'حسن',
+    'متفق عليه',
     'sahih',
     'hasan',
     'authentic',
@@ -94,6 +97,10 @@ class HadithAuthenticityPolicy {
   ];
 
   static const _rejectedGradeMarkers = [
+    'ضعيف',
+    'موضوع',
+    'منكر',
+    'ليس بصحيح',
     'daif',
     'daeef',
     'weak',

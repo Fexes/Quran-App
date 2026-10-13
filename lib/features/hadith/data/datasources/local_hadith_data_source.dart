@@ -9,6 +9,7 @@ import '../../../../core/search/search_text_normalizer.dart';
 import '../../domain/entities/hadith_book.dart';
 import '../../domain/entities/hadith_chapter.dart';
 import '../../domain/entities/hadith_item.dart';
+import '../../domain/services/hadith_authenticity_policy.dart';
 
 class LocalHadithDataSource {
   LocalHadithDataSource({
@@ -21,7 +22,9 @@ class LocalHadithDataSource {
        _manualSources = sources,
        _manualBooks = books,
        _manualChapters = chapters,
-       _manualHadiths = hadiths;
+       _manualHadiths = hadiths
+           ?.where(HadithAuthenticityPolicy.shouldShow)
+           .toList();
 
   static const _manifestPath = 'assets/data/hadith/manifest.json';
   static const _sourcesPath =
@@ -40,6 +43,14 @@ class LocalHadithDataSource {
   Future<List<ContentSource>>? _sourcesFuture;
   Future<List<DeepSearchIndexRecord>>? _searchIndexFuture;
   Future<String>? _searchIndexSourceFuture;
+  Future<Map<String, dynamic>>? _visibilityFuture;
+
+  Future<Map<String, dynamic>> _visibility() => _visibilityFuture ??= () async {
+    final raw = await _assetBundle.loadString(
+      'assets/data/hadith/visibility.json',
+    );
+    return compute(_decodeJsonObject, raw);
+  }();
 
   Future<List<ContentSource>> getContentSources() {
     final manual = _manualSources;
@@ -97,8 +108,9 @@ class LocalHadithDataSource {
     if (languageCode.toLowerCase() != 'en') {
       return false;
     }
-    final first = await getHadiths(bookId: bookId, limit: 1);
-    return first.isNotEmpty && first.first.translation.trim().isNotEmpty;
+    final items = await getHadiths(bookId: bookId, limit: 100000);
+    return items.isNotEmpty &&
+        items.every((item) => item.translation.trim().isNotEmpty);
   }
 
   Future<List<HadithItem>> getHadiths({
@@ -190,9 +202,9 @@ class LocalHadithDataSource {
       matches.sort((a, b) => b.score.compareTo(a.score));
       return [for (final match in matches.take(limit)) match.item];
     }
-    final source = await _loadSearchIndexSource();
+    final records = await getSearchIndexRecords();
     targetIds = await compute(_searchIndexMatches, {
-      'source': source,
+      'records': records,
       'query': normalized,
       'limit': limit,
     });
@@ -216,7 +228,7 @@ class LocalHadithDataSource {
       return const [];
     }
     final asset = await _loadBookAsset(bookId);
-    return compute(_searchHadithBook, {
+    return compute(searchHadithBook, {
       'hadiths': asset.hadiths,
       'query': normalized,
       'limit': limit,
@@ -246,10 +258,18 @@ class LocalHadithDataSource {
     final raw = await _assetBundle.loadString(_manifestPath);
     final map = _decodeJsonObject(raw);
     final books = map['books'] as List? ?? const [];
+    final visibleBooks = (await _visibility())['books'] as Map;
     return [
-      for (final book in books.cast<Map<String, dynamic>>())
-        HadithBook.fromMap(book),
-    ]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+        for (final book in books.cast<Map<String, dynamic>>())
+          HadithBook.fromMap({
+            ...book,
+            if (visibleBooks[book['slug']] case final Map counts) ...{
+              'hadithCount': counts['hadithCount'],
+              'chapterCount': counts['chapterCount'],
+            },
+          }),
+      ].where((book) => book.hadithCount > 0).toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
 
   Future<_HadithBookAsset> _loadBookAsset(String bookId) async {
@@ -290,7 +310,11 @@ class LocalHadithDataSource {
 
   Future<List<DeepSearchIndexRecord>> _loadSearchIndex() async {
     final raw = await _loadSearchIndexSource();
-    return compute(_decodeSearchIndex, raw);
+    final visibility = await _visibility();
+    return compute(_decodeVisibleSearchIndex, {
+      'source': raw,
+      'visibility': visibility,
+    });
   }
 
   Future<String> _loadSearchIndexSource() {
@@ -340,7 +364,7 @@ class _HadithBookAsset {
     final hadiths = [
       for (final hadith in map['hadiths'] as List? ?? const [])
         HadithItem.fromMap(hadith as Map<String, dynamic>),
-    ];
+    ].where(HadithAuthenticityPolicy.shouldShow).toList();
     final populatedChapterIds = {
       for (final hadith in hadiths) hadith.chapterId,
     };
@@ -348,7 +372,12 @@ class _HadithBookAsset {
       chapters: [
         for (final chapter in map['chapters'] as List? ?? const [])
           if (populatedChapterIds.contains(chapter['id']))
-            HadithChapter.fromMap(chapter as Map<String, dynamic>),
+            HadithChapter.fromMap({
+              ...chapter as Map<String, dynamic>,
+              'hadithCount': hadiths
+                  .where((item) => item.chapterId == chapter['id'])
+                  .length,
+            }),
       ],
       hadiths: hadiths,
     );
@@ -424,20 +453,28 @@ List<DeepSearchIndexRecord> _decodeSearchIndex(String source) {
   ];
 }
 
+List<DeepSearchIndexRecord> _decodeVisibleSearchIndex(
+  Map<String, Object> args,
+) {
+  final books = (args['visibility'] as Map)['books'] as Map;
+  final ids = <String>{
+    for (final book in books.values) ...(book['ids'] as List).cast<String>(),
+  };
+  return _decodeSearchIndex(
+    args['source'] as String,
+  ).where((record) => ids.contains(record.targetId)).toList();
+}
+
 List<String> _searchIndexMatches(Map<String, Object> arguments) {
-  final source = arguments['source']! as String;
+  final records = arguments['records']! as List<DeepSearchIndexRecord>;
   final query = arguments['query']! as String;
   final limit = arguments['limit']! as int;
   final matches = <({String targetId, int score})>[];
-  for (final line in source.split('\n')) {
-    if (line.isEmpty) {
-      continue;
-    }
-    final map = jsonDecode(line) as Map<String, dynamic>;
-    final targetId = map['targetId'] as String? ?? '';
+  for (final record in records) {
+    final targetId = record.targetId;
     final score = _matchScore(
       query: query,
-      text: map['normalizedText'] as String? ?? '',
+      text: record.normalizedText,
       number: _hadithNumberFromId(targetId),
     );
     if (score > 0) {
@@ -448,7 +485,7 @@ List<String> _searchIndexMatches(Map<String, Object> arguments) {
   return [for (final match in matches.take(limit)) match.targetId];
 }
 
-List<HadithItem> _searchHadithBook(Map<String, Object> arguments) {
+List<HadithItem> searchHadithBook(Map<String, Object> arguments) {
   final hadiths = arguments['hadiths']! as List<HadithItem>;
   final query = arguments['query']! as String;
   final limit = arguments['limit']! as int;

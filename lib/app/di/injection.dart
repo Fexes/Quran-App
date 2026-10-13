@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:get_it/get_it.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../core/storage/settings_store.dart';
 import '../../features/backup/data/repositories/local_backup_repository.dart';
@@ -19,8 +22,10 @@ import '../../features/hifz/data/repositories/hifz_repository_impl.dart';
 import '../../features/hifz/data/stores/hifz_store.dart';
 import '../../features/hifz/domain/repositories/hifz_repository.dart';
 import '../../features/library/data/stores/library_user_data_store.dart';
+import '../../features/library/domain/services/library_language_download_service.dart';
 import '../../features/prayer/data/datasources/offline_prayer_city_data_source.dart';
 import '../../features/prayer/data/services/prayer_alert_notification_service.dart';
+import '../../features/prayer/data/services/prayer_location_refresh_service.dart';
 import '../../features/prayer_times/data/repositories/prayer_times_repository_impl.dart';
 import '../../features/prayer_times/data/services/adhan_prayer_calculation_service.dart';
 import '../../features/prayer_times/domain/repositories/prayer_times_repository.dart';
@@ -167,6 +172,7 @@ Future<void> configureDependencies({
       () => QuranTranslationRepositoryImpl(
         store: getIt(),
         settingsStore: getIt(),
+        libraryDownloads: getIt<LibraryLanguageDownloadService>(),
       ),
     );
   }
@@ -300,6 +306,11 @@ Future<void> configureDependencies({
         hifzStore: getIt(),
         prayerTrackingStore: getIt(),
         libraryUserDataStore: getIt(),
+        translationStore: getIt<QuranTranslationStore>(),
+        cancelPrayerAlerts: () =>
+            getIt<PrayerAlertNotificationService>().cancelScheduledAlerts(),
+        refreshPrayerAlerts: () =>
+            getIt<PrayerAlertNotificationService>().syncUpcomingAlerts(),
       ),
     );
   }
@@ -314,6 +325,15 @@ Future<void> configureDependencies({
     );
   }
 
+  if (!getIt.isRegistered<LibraryLanguageDownloadService>()) {
+    getIt.registerLazySingleton<LibraryLanguageDownloadService>(
+      () => LibraryLanguageDownloadService(
+        hadithRepository: getIt(),
+        azkarRepository: getIt(),
+      ),
+    );
+  }
+
   if (!getIt.isRegistered<DeepSearchRepository>()) {
     getIt.registerFactory<DeepSearchRepository>(
       () => LocalDeepSearchRepository(
@@ -323,6 +343,7 @@ Future<void> configureDependencies({
         userDataStore: getIt(),
         hadithRepository: getIt(),
         azkarRepository: getIt(),
+        libraryUserDataStore: getIt(),
       ),
     );
   }
@@ -339,11 +360,18 @@ Future<void> configureDependencies({
     );
   }
 
+  if (!getIt.isRegistered<PrayerLocationRefreshService>()) {
+    getIt.registerLazySingleton<PrayerLocationRefreshService>(
+      () => PrayerLocationRefreshService(getIt(), getIt()),
+    );
+  }
+
   if (!getIt.isRegistered<PrayerTimesRepository>()) {
     getIt.registerLazySingleton<PrayerTimesRepository>(
       () => PrayerTimesRepositoryImpl(
         calculationService: getIt(),
         settingsStore: getIt(),
+        locationRefreshService: settingsStore == null ? getIt() : null,
       ),
     );
   }
@@ -354,13 +382,16 @@ Future<void> configureDependencies({
       prayerTimesRepository: getIt(),
       prayerTrackingStore: getIt(),
     );
-    if (initializePrayerAlerts) {
-      final initialized = await service.initialize();
-      if (initialized && service.loadSettings().schedulesAnything) {
-        await service.syncUpcomingAlerts();
-      }
-    }
     getIt.registerSingleton<PrayerAlertNotificationService>(service);
+    if (initializePrayerAlerts) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(
+          service.syncUpcomingAlerts().catchError((Object error) {
+            debugPrint('Could not renew prayer alerts after startup: $error');
+          }),
+        );
+      });
+    }
   }
 
   if (!getIt.isRegistered<QiblaCalculationService>()) {
@@ -374,6 +405,7 @@ Future<void> configureDependencies({
       () => QiblaRepositoryImpl(
         calculationService: getIt(),
         settingsStore: getIt(),
+        locationRefreshService: settingsStore == null ? getIt() : null,
       ),
     );
   }

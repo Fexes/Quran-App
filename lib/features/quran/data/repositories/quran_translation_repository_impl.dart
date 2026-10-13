@@ -1,16 +1,20 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../../../../core/content/content_cache_policy.dart';
 import '../../../../core/storage/settings_store.dart';
+import '../../../library/domain/services/library_language_download_service.dart';
 import '../../domain/entities/quran_translation.dart';
 import '../../domain/repositories/quran_translation_repository.dart';
+import '../../domain/services/quran_translation_audio_pairings.dart';
 import '../stores/quran_translation_store.dart';
 
 typedef QuranTranslationResourcesFetcher =
     Future<Map<String, Object?>> Function();
 
-// Quran.com locale defaults where available; Urdu is the requested Jalandhari edition.
+// Text-only language defaults. Verified audio-linked editions take priority below.
 const _recommendedTranslationIds = {
   'ur': 234,
   'en': 85,
@@ -42,16 +46,20 @@ class QuranTranslationRepositoryImpl
     implements
         QuranTranslationRepository,
         QuranTranslationCacheMetadataRepository,
-        QuranMultiTranslationRepository {
+        QuranMultiTranslationRepository,
+        QuranTranslationSelectionObservable,
+        QuranReadingLanguageDownloadRepository {
   QuranTranslationRepositoryImpl({
     required QuranTranslationStore store,
     SettingsStore? settingsStore,
+    LibraryLanguageDownloadService? libraryDownloads,
     QuranTranslationResourcesFetcher? resourcesFetcher,
     QuranChapterTranslationFetcher? chapterTranslationFetcher,
     int totalChaptersForDownload = 114,
     int totalVersesForDownload = 6236,
   }) : _store = store,
        _settingsStore = settingsStore,
+       _libraryDownloads = libraryDownloads,
        _resourcesFetcher = resourcesFetcher ?? _fetchResourcesJson,
        _chapterTranslationFetcher =
            chapterTranslationFetcher ?? _fetchChapterTranslationJson,
@@ -63,10 +71,24 @@ class QuranTranslationRepositoryImpl
 
   final QuranTranslationStore _store;
   final SettingsStore? _settingsStore;
+  final LibraryLanguageDownloadService? _libraryDownloads;
+
+  @override
+  Future<bool> hasFullReadingLanguage(int resourceId) async {
+    if (!await hasFullTranslation(resourceId)) return false;
+    final downloads = _libraryDownloads;
+    if (downloads == null) return true;
+    final resource = await _resourceForId(resourceId);
+    return resource != null && await downloads.isReady(resource);
+  }
+
   final QuranTranslationResourcesFetcher _resourcesFetcher;
   final QuranChapterTranslationFetcher _chapterTranslationFetcher;
   final int _totalChaptersForDownload;
   final int _totalVersesForDownload;
+
+  @override
+  Listenable get selectionChanges => _store.selectionChanges;
 
   @override
   Future<List<QuranTranslationLanguage>> translationLanguages() async {
@@ -82,31 +104,24 @@ class QuranTranslationRepositoryImpl
   @override
   Future<void> setSelectedTranslation(int? resourceId) async {
     if (resourceId == null) {
-      await _store.saveSelectedResource(null);
+      await _saveAudioEditionPreference(null);
       await _store.saveSelectedResources(const []);
-      await _settingsStore?.setAudioMeaningLanguageCode('');
+      await _store.saveSelectedResource(null);
       return;
     }
-    final resources = await _resources();
-    final selected = resources.cast<QuranTranslationResource?>().firstWhere(
-      (resource) => resource?.id == resourceId,
-      orElse: () => null,
-    );
+    final selected = await _resourceForId(resourceId);
     if (selected != null) {
-      await _store.saveSelectedResource(selected);
-      await _store.saveSelectedResources([
-        selected,
-        ..._store.selectedResources().where((item) => item.id != selected.id),
-      ]);
-      await _settingsStore?.setAudioMeaningLanguageCode(
-        selected.resolvedLanguageCode,
-      );
+      final resource = selected;
+      await _saveAudioEditionPreference(resource);
+      await _store.saveSelectedResources([resource]);
+      await _store.saveSelectedResource(resource);
     }
   }
 
   @override
   Future<List<QuranTranslationResource>> selectedTranslations() async {
-    return _store.selectedResources();
+    final primary = await selectedTranslation();
+    return _readerSelection([?primary, ..._store.selectedResources()]);
   }
 
   @override
@@ -120,11 +135,44 @@ class QuranTranslationRepositoryImpl
         selected.add(resource);
       }
     }
-    await _store.saveSelectedResources(selected);
-    await _store.saveSelectedResource(selected.firstOrNull);
-    await _settingsStore?.setAudioMeaningLanguageCode(
-      selected.firstOrNull?.resolvedLanguageCode ?? '',
+    final normalized = _readerSelection(selected);
+    await _saveAudioEditionPreference(normalized.firstOrNull);
+    await _store.saveSelectedResources(normalized);
+    await _store.saveSelectedResource(normalized.firstOrNull);
+  }
+
+  Future<void> _saveAudioEditionPreference(
+    QuranTranslationResource? resource,
+  ) async {
+    final settings = _settingsStore;
+    if (settings == null) return;
+    await settings.setAudioMeaningLanguageCode(
+      resource?.resolvedLanguageCode ?? '',
     );
+    final pair = resource == null
+        ? null
+        : quranTranslationPairForResource(resource.id);
+    if (pair == null) {
+      await settings.setAudioTranslationReciterId('');
+      await settings.setAudioPlayTranslationEnabled(false);
+    } else if (!pair.voiceIds.contains(settings.audioTranslationReciterId)) {
+      await settings.setAudioTranslationReciterId(
+        pair.voiceIds.first,
+        languageCode: resource!.resolvedLanguageCode,
+      );
+    }
+  }
+
+  static List<QuranTranslationResource> _readerSelection(
+    Iterable<QuranTranslationResource> resources,
+  ) {
+    final unique = <int, QuranTranslationResource>{};
+    for (final resource in resources) {
+      unique.putIfAbsent(resource.id, () => resource);
+    }
+    final primary = unique.values.firstOrNull;
+    if (primary?.isUrdu == true) return [primary!];
+    return unique.values.take(3).toList(growable: false);
   }
 
   @override
@@ -325,12 +373,17 @@ class QuranTranslationRepositoryImpl
               .length,
     );
     var failedChapters = 0;
+    final downloads = _libraryDownloads;
+    double? quranProgress() => downloads == null
+        ? null
+        : (completedVerses / _totalVersesForDownload).clamp(0, 1) * 0.5;
     yield QuranTranslationDownloadProgress(
       completedChapters: completedChapters,
       totalChapters: _totalChaptersForDownload,
       completedVerses: completedVerses,
       totalVerses: _totalVersesForDownload,
       failedChapters: failedChapters,
+      overallProgress: quranProgress(),
     );
 
     for (var chapter = 1; chapter <= _totalChaptersForDownload; chapter++) {
@@ -370,17 +423,52 @@ class QuranTranslationRepositoryImpl
         completedVerses: completedVerses,
         totalVerses: _totalVersesForDownload,
         failedChapters: failedChapters,
+        overallProgress: quranProgress(),
       );
     }
 
     final complete =
         failedChapters == 0 && completedVerses >= _totalVersesForDownload;
+    String? notice;
     if (complete) {
       await _store.markFullTranslationComplete(
         resource: resource,
         version: currentCacheVersion,
         verseCount: _totalVersesForDownload,
       );
+      if (downloads != null) {
+        yield QuranTranslationDownloadProgress(
+          completedChapters: completedChapters,
+          totalChapters: _totalChaptersForDownload,
+          completedVerses: completedVerses,
+          totalVerses: _totalVersesForDownload,
+          failedChapters: failedChapters,
+          quranTextReady: true,
+          contentLabel: 'Starting Hadith downloads',
+          contentProgress: 0,
+          overallProgress: 0.5,
+        );
+        await for (final progress in downloads.download(resource)) {
+          if (progress.isComplete) {
+            notice = progress.detail;
+            break;
+          }
+          yield QuranTranslationDownloadProgress(
+            completedChapters: completedChapters,
+            totalChapters: _totalChaptersForDownload,
+            completedVerses: completedVerses,
+            totalVerses: _totalVersesForDownload,
+            failedChapters: failedChapters,
+            contentLabel: progress.label,
+            contentDetail: progress.detail,
+            contentProgress: progress.percent,
+            failedContent: progress.hasFailed,
+            quranTextReady: true,
+            overallProgress: 0.5 + (progress.percent ?? 0) * 0.5,
+          );
+          if (progress.hasFailed) return;
+        }
+      }
     }
     yield QuranTranslationDownloadProgress(
       completedChapters: completedChapters,
@@ -389,6 +477,13 @@ class QuranTranslationRepositoryImpl
       totalVerses: _totalVersesForDownload,
       failedChapters: failedChapters,
       isComplete: complete,
+      quranTextReady: complete,
+      overallProgress: downloads == null
+          ? null
+          : complete
+          ? 1
+          : quranProgress(),
+      contentDetail: notice,
     );
   }
 
@@ -417,6 +512,8 @@ class QuranTranslationRepositoryImpl
   }
 
   Future<QuranTranslationResource?> _resourceForId(int resourceId) async {
+    final paired = quranTranslationPairForResource(resourceId)?.resource;
+    if (paired != null) return paired;
     final resources = await _resources();
     return resources.cast<QuranTranslationResource?>().firstWhere(
       (resource) => resource?.id == resourceId,
@@ -428,19 +525,34 @@ class QuranTranslationRepositoryImpl
     await _store.purgeExpired(cachePolicy: contentCachePolicy);
     final cached = _store.catalog(cachePolicy: contentCachePolicy);
     if (cached.isNotEmpty) {
-      return cached;
+      return _withPairedEditions(cached);
     }
     try {
       final json = await _resourcesFetcher();
       final resources = parseResources(json);
       if (resources.isNotEmpty) {
         await _store.saveCatalog(resources);
-        return resources;
+        return _withPairedEditions(resources);
       }
     } catch (_) {
       // Use bundled fallback below.
     }
-    return fallbackTranslationResources;
+    return _withPairedEditions(fallbackTranslationResources);
+  }
+
+  static List<QuranTranslationResource> _withPairedEditions(
+    List<QuranTranslationResource> resources,
+  ) {
+    return {
+      for (final resource in resources) resource.id: resource,
+      for (final pair in quranTranslationAudioPairs)
+        if (resources.any(
+          (resource) =>
+              resource.resolvedLanguageCode ==
+              pair.resource.resolvedLanguageCode,
+        ))
+          pair.resource.id: pair.resource,
+    }.values.toList(growable: false);
   }
 
   static List<QuranTranslationResource> parseResources(
@@ -462,6 +574,29 @@ class QuranTranslationRepositoryImpl
     required Map<dynamic, dynamic> json,
     required int resourceId,
   }) {
+    if (json['result'] is List) {
+      return {
+        for (final verse in json['result'] as List)
+          if (verse is Map &&
+              _int(verse['sura']) > 0 &&
+              _int(verse['aya']) > 0 &&
+              _cleanTranslation(_string(verse['translation'])).isNotEmpty)
+            '${_int(verse['sura'])}:${_int(verse['aya'])}': _cleanTranslation(
+              _string(verse['translation']),
+            ),
+      };
+    }
+    final data = json['data'];
+    if (data is Map && data['ayahs'] is List && _int(data['number']) > 0) {
+      return {
+        for (final verse in data['ayahs'] as List)
+          if (verse is Map &&
+              _int(verse['numberInSurah']) > 0 &&
+              _cleanTranslation(_string(verse['text'])).isNotEmpty)
+            '${_int(data['number'])}:${_int(verse['numberInSurah'])}':
+                _cleanTranslation(_string(verse['text'])),
+      };
+    }
     final verses = json['verses'];
     if (verses is! List) {
       return const {};
@@ -501,7 +636,19 @@ class QuranTranslationRepositoryImpl
   ) {
     final grouped = <String, List<QuranTranslationResource>>{};
     for (final resource in resources) {
-      grouped.putIfAbsent(resource.languageName, () => []).add(resource);
+      final editions = grouped.putIfAbsent(resource.languageName, () => []);
+      if (!editions.any((item) => item.id == resource.id)) {
+        editions.add(resource);
+      }
+    }
+    for (final editions in grouped.values) {
+      final code = editions.first.resolvedLanguageCode;
+      for (final pair in quranTranslationAudioPairs) {
+        if (pair.resource.resolvedLanguageCode == code &&
+            !editions.any((resource) => resource.id == pair.resource.id)) {
+          editions.add(pair.resource);
+        }
+      }
     }
     final languages = [
       for (final entry in grouped.entries)
@@ -530,6 +677,7 @@ class QuranTranslationRepositoryImpl
         .firstOrNull;
     for (final id in [
       preferredId,
+      quranDefaultPairedTranslation(resources.first.resolvedLanguageCode)?.id,
       _recommendedTranslationIds[resources.first.resolvedLanguageCode],
       bundled?.id,
     ]) {
@@ -553,6 +701,30 @@ class QuranTranslationRepositoryImpl
     required int chapterNumber,
     required int resourceId,
   }) async {
+    final resource = quranTranslationPairForResource(resourceId)?.resource;
+    if (resource?.provider == QuranTranslationProvider.quranEnc) {
+      return _getJson(
+        Uri.https(
+          'quranenc.com',
+          '/api/v1/translation/sura/${resource!.providerKey}/$chapterNumber',
+        ),
+      );
+    }
+    if (resource?.provider == QuranTranslationProvider.alQuranCloud) {
+      final json = await _getJson(
+        Uri.https(
+          'api.alquran.cloud',
+          '/v1/surah/$chapterNumber/${resource!.providerKey}',
+        ),
+      );
+      final data = json['data'];
+      if (data is! Map ||
+          data['edition'] is! Map ||
+          (data['edition'] as Map)['identifier'] != resource.providerKey) {
+        throw const FormatException('Translation edition did not match.');
+      }
+      return json;
+    }
     final uri = Uri.https(
       'api.quran.com',
       '/api/v4/verses/by_chapter/$chapterNumber',
@@ -564,10 +736,17 @@ class QuranTranslationRepositoryImpl
   static Future<Map<String, Object?>> _getJson(Uri uri) async {
     final client = HttpClient();
     try {
-      final request = await client.getUrl(uri);
+      client.connectionTimeout = const Duration(seconds: 20);
+      final request = await client
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 25));
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      final response = await request.close();
-      final body = await utf8.decodeStream(response);
+      final response = await request.close().timeout(
+        const Duration(seconds: 25),
+      );
+      final body = await utf8
+          .decodeStream(response)
+          .timeout(const Duration(seconds: 30));
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw const HttpException('Failed to fetch Quran translation data');
       }
@@ -1050,13 +1229,7 @@ const fallbackTranslationResources = <QuranTranslationResource>[
     authorName: "Dr. Mikhailo Yaqubovic",
     slug: "",
   ),
-  QuranTranslationResource(
-    id: 234,
-    languageName: "urdu",
-    name: "Fatah Muhammad Jalandhari",
-    authorName: "Fatah Muhammad Jalandhari",
-    slug: "ur-fatah-muhammad-jalandhari",
-  ),
+  QuranTranslationResource.urduJalandhari,
   QuranTranslationResource(
     id: 55,
     languageName: "uzbek",

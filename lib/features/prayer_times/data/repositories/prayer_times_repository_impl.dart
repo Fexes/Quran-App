@@ -1,19 +1,29 @@
+import 'dart:async';
+
 import '../../../../core/storage/settings_store.dart';
+import 'package:flutter/foundation.dart';
+import '../../../prayer/data/services/prayer_location_refresh_service.dart';
 import '../../domain/entities/daily_prayer_times.dart';
 import '../../domain/entities/prayer_calculation_settings.dart';
 import '../../domain/entities/prayer_location.dart';
 import '../../domain/repositories/prayer_times_repository.dart';
 import '../services/adhan_prayer_calculation_service.dart';
 
-class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
+class PrayerTimesRepositoryImpl
+    implements PrayerTimesRepository, PrayerLocationObservable {
   const PrayerTimesRepositoryImpl({
     required AdhanPrayerCalculationService calculationService,
     required SettingsStore settingsStore,
+    PrayerLocationRefreshService? locationRefreshService,
   }) : _calculationService = calculationService,
-       _settingsStore = settingsStore;
+       _settingsStore = settingsStore,
+       _locationRefreshService = locationRefreshService;
 
   final AdhanPrayerCalculationService _calculationService;
   final SettingsStore _settingsStore;
+  final PrayerLocationRefreshService? _locationRefreshService;
+  @override
+  Listenable get locationChanges => _settingsStore.prayerLocationChanges;
 
   static const defaultLocation = PrayerLocation(
     name: 'Karachi',
@@ -28,6 +38,9 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
     PrayerLocation? location,
     PrayerCalculationSettings? settings,
   }) async {
+    // Show the saved schedule immediately; locationChanges refreshes readers
+    // once an already-authorized location fix is available.
+    if (location == null) unawaited(_locationRefreshService?.refresh());
     return _calculationService.calculate(
       date: date,
       location: location ?? _savedLocation(),
@@ -48,6 +61,7 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
       latitude: location.latitude,
       longitude: location.longitude,
       timeZone: location.timeZone,
+      usesDeviceLocation: location.usesDeviceLocation,
     );
   }
 
@@ -57,6 +71,7 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
       latitude: _settingsStore.prayerLatitude,
       longitude: _settingsStore.prayerLongitude,
       timeZone: _settingsStore.prayerTimeZone,
+      usesDeviceLocation: _settingsStore.prayerLocationUsesDevice,
     );
   }
 

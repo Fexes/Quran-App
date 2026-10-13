@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import workmanager_apple
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -11,6 +12,15 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    WorkmanagerPlugin.setPluginRegistrantCallback { registry in
+      GeneratedPluginRegistrant.register(with: registry)
+    }
+    // iOS requires every permitted task to be registered before launch ends.
+    WorkmanagerPlugin.registerPeriodicTask(
+      withIdentifier: "tech.coreinfinite.quran.prayer-alert-renewal",
+      earliestBeginInSeconds: NSNumber(value: 12 * 60 * 60)
+    )
+    WorkmanagerPlugin.registerLaunchHandlers()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

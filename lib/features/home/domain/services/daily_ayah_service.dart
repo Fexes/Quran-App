@@ -2,6 +2,7 @@ import '../../../quran/domain/entities/quran_surah.dart';
 import '../../../quran/domain/repositories/quran_repository.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
 import '../entities/daily_ayah.dart';
+import '../entities/daily_ayah_catalog.dart';
 
 class DailyAyahReference {
   const DailyAyahReference({
@@ -68,31 +69,29 @@ DailyAyahReference dailyAyahReferenceForDate(
   if (surahs.isEmpty) {
     throw StateError('No Quran metadata is available.');
   }
-  final totalAyahs = surahs.fold<int>(0, (sum, item) => sum + item.ayahCount);
-  if (totalAyahs <= 0) {
-    throw StateError('Quran metadata does not contain any ayahs.');
+  final ayahCounts = {
+    for (final surah in surahs) surah.number: surah.ayahCount,
+  };
+  final references = [
+    for (final group in dailyAyahCatalog.values)
+      for (final reference in group)
+        if ((ayahCounts[reference.surahNumber] ?? 0) >= reference.ayahNumber)
+          reference,
+  ];
+  if (references.isEmpty) {
+    throw StateError('No curated daily ayahs are available in the Quran data.');
   }
 
   final localCalendarDay = DateTime.utc(date.year, date.month, date.day);
   final daysSinceEpoch =
       localCalendarDay.millisecondsSinceEpoch ~/ Duration.millisecondsPerDay;
-  const dayStep = 7919;
+  // Coprime with 365, so a full catalog visits every verse before repeating.
+  const dayStep = 19;
   const seed = 104729;
-  var remaining = (((daysSinceEpoch * dayStep) + seed) % totalAyahs) + 1;
-
-  for (final surah in surahs) {
-    if (remaining <= surah.ayahCount) {
-      return DailyAyahReference(
-        surahNumber: surah.number,
-        ayahNumber: remaining,
-      );
-    }
-    remaining -= surah.ayahCount;
-  }
-
-  final last = surahs.last;
+  final reference =
+      references[((daysSinceEpoch * dayStep) + seed) % references.length];
   return DailyAyahReference(
-    surahNumber: last.number,
-    ayahNumber: last.ayahCount,
+    surahNumber: reference.surahNumber,
+    ayahNumber: reference.ayahNumber,
   );
 }

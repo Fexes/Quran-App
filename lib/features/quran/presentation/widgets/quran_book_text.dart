@@ -8,6 +8,7 @@ import '../../domain/entities/quran_ayah.dart';
 import '../../domain/entities/quran_surah.dart';
 import '../../domain/entities/quran_translation.dart';
 import '../../domain/entities/quran_word.dart';
+import '../../domain/services/quran_translation_audio_pairings.dart';
 import 'quran_translation_text.dart';
 
 bool hasNextSurah(QuranSurah? surah) {
@@ -143,7 +144,12 @@ class _CombinedPageTextState extends State<CombinedPageText> {
       fontWeight: FontWeight.w700,
     );
     if (widget.showTranslation) {
-      if (widget.pageWords.isNotEmpty) {
+      if (widget.pageWords.isNotEmpty &&
+          widget.selectedTranslation?.isUrdu != true &&
+          quranTranslationPairForResource(
+                widget.selectedTranslation?.id ?? -1,
+              ) ==
+              null) {
         return InterlinearBookPageText(
           key: ValueKey(widget.arabicScript),
           arabicScript: widget.arabicScript,
@@ -816,8 +822,9 @@ class _FallbackBookLineViewState extends State<_FallbackBookLineView> {
     }
     return endingAyahs.values
         .map((ayah) {
-          final text =
-              widget.translationsByVerse[ayah.verseKey] ?? ayah.translation;
+          final text = widget.translationResource == null
+              ? ayah.translation
+              : widget.translationsByVerse[ayah.verseKey] ?? '';
           return _cleanTranslationText(text);
         })
         .where((text) => text.isNotEmpty)

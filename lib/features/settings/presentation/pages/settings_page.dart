@@ -12,6 +12,7 @@ import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme_cubit.dart';
 import '../../../../core/theme/quran_theme_state.dart';
 import '../../../../core/widgets/adaptive_inset_area.dart';
+import '../../../../core/widgets/animated_expansion.dart';
 import '../../../../core/widgets/app_sheet.dart';
 import '../../../../core/widgets/section_header.dart';
 import '../../../../core/widgets/shell_screen_header.dart';
@@ -81,19 +82,22 @@ class SettingsPage extends StatelessWidget {
                 SectionHeader(title: l10n.readingPreferencesTitle),
                 const _LanguageSelector(),
                 const _ArabicScriptSetting(),
+                const _ReadingListeningSetting(),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const AppIcon(Icons.translate_rounded),
-                  title: Text(l10n.contentLanguagesTitle),
-                  subtitle: Text(l10n.readingLanguagesSubtitle),
+                  title: const Text('More reading preferences'),
+                  subtitle: const Text(
+                    'Tafsir, word meanings, Hadith and Azkar',
+                  ),
                   trailing: const AppIcon(Icons.chevron_right_rounded),
                   onTap: () => showModalBottomSheet<void>(
                     context: context,
                     isScrollControlled: true,
                     useSafeArea: true,
                     builder: (_) => AppSheet(
-                      title: l10n.contentLanguagesTitle,
-                      child: const _ContentLanguageSettings(),
+                      title: 'More reading preferences',
+                      child: const _ReadingDetailSettings(),
                     ),
                   ),
                 ),
@@ -109,13 +113,6 @@ class SettingsPage extends StatelessWidget {
                   subtitle: Text(l10n.offlineDownloadsSubtitle),
                   trailing: const AppIcon(Icons.chevron_right_rounded),
                   onTap: () => context.push(AppRoutes.quranDownloadsPath()),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const AppIcon(Icons.library_books_outlined),
-                  title: Text(l10n.translationManageAction),
-                  trailing: const AppIcon(Icons.chevron_right_rounded),
-                  onTap: () => context.push(AppRoutes.quranTranslationsPath()),
                 ),
                 const _BackupSettingsTile(),
                 ListTile(
@@ -251,31 +248,88 @@ class _ArabicScriptSetting extends StatelessWidget {
   }
 }
 
-class _ContentLanguageOptions {
-  const _ContentLanguageOptions({
-    required this.selectedTranslation,
+class _ReadingListeningSetting extends StatefulWidget {
+  const _ReadingListeningSetting();
+
+  @override
+  State<_ReadingListeningSetting> createState() =>
+      _ReadingListeningSettingState();
+}
+
+class _ReadingListeningSettingState extends State<_ReadingListeningSetting> {
+  late final QuranTranslationRepository _repository;
+  late Future<QuranTranslationResource?> _selection;
+  Listenable? _selectionChanges;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = getIt<QuranTranslationRepository>();
+    _selection = _repository.selectedTranslation();
+    if (_repository is QuranTranslationSelectionObservable) {
+      _selectionChanges =
+          (_repository as QuranTranslationSelectionObservable).selectionChanges;
+      _selectionChanges!.addListener(_refresh);
+    }
+  }
+
+  void _refresh() {
+    if (mounted) {
+      setState(() => _selection = _repository.selectedTranslation());
+    }
+  }
+
+  @override
+  void dispose() {
+    _selectionChanges?.removeListener(_refresh);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<QuranTranslationResource?>(
+      future: _selection,
+      builder: (context, snapshot) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const AppIcon(Icons.headphones_rounded),
+        title: const Text('Reading & listening'),
+        subtitle: Text(
+          snapshot.connectionState != ConnectionState.done || snapshot.hasError
+              ? 'Translation language and reciter'
+              : snapshot.data == null
+              ? 'Bundled English translation and reciter'
+              : '${snapshot.data!.displayLanguage} translation and reciter',
+        ),
+        trailing: const AppIcon(Icons.chevron_right_rounded),
+        onTap: () async {
+          await context.push(AppRoutes.quranTranslationsPath());
+          _refresh();
+        },
+      ),
+    );
+  }
+}
+
+class _ReadingDetailOptions {
+  const _ReadingDetailOptions({
     required this.tafsirResources,
-    required this.audioLanguageCodes,
     required this.azkarLanguageCodes,
   });
 
-  final QuranTranslationResource? selectedTranslation;
   final List<QuranTafsirResource> tafsirResources;
-  final List<String> audioLanguageCodes;
   final List<String> azkarLanguageCodes;
 }
 
-class _ContentLanguageSettings extends StatefulWidget {
-  const _ContentLanguageSettings();
+class _ReadingDetailSettings extends StatefulWidget {
+  const _ReadingDetailSettings();
 
   @override
-  State<_ContentLanguageSettings> createState() =>
-      _ContentLanguageSettingsState();
+  State<_ReadingDetailSettings> createState() => _ReadingDetailSettingsState();
 }
 
-class _ContentLanguageSettingsState extends State<_ContentLanguageSettings> {
+class _ReadingDetailSettingsState extends State<_ReadingDetailSettings> {
   late final SettingsStore _store;
-  late Future<_ContentLanguageOptions> _optionsFuture;
+  late Future<_ReadingDetailOptions> _optionsFuture;
 
   @override
   void initState() {
@@ -284,20 +338,10 @@ class _ContentLanguageSettingsState extends State<_ContentLanguageSettings> {
     _optionsFuture = _loadOptions();
   }
 
-  Future<_ContentLanguageOptions> _loadOptions() async {
-    final translationRepository = getIt<QuranTranslationRepository>();
-    final selectedTranslation = await translationRepository
-        .selectedTranslation();
+  Future<_ReadingDetailOptions> _loadOptions() async {
     final tafsirResources = getIt.isRegistered<QuranTafsirRepository>()
         ? await getIt<QuranTafsirRepository>().tafsirResources()
         : const <QuranTafsirResource>[];
-
-    final reciters = await getIt<QuranRepository>().getAudioReciters();
-    final audioCodes = {
-      for (final reciter in reciters)
-        if (reciter.isTranslation) reciter.languageCode.toLowerCase(),
-      _store.audioMeaningLanguageCode,
-    }.toList()..sort();
 
     final azkarCodes = <String>{'en', _store.azkarLanguageCode};
     if (getIt.isRegistered<AzkarRepository>()) {
@@ -306,17 +350,15 @@ class _ContentLanguageSettingsState extends State<_ContentLanguageSettings> {
       );
     }
 
-    return _ContentLanguageOptions(
-      selectedTranslation: selectedTranslation,
+    return _ReadingDetailOptions(
       tafsirResources: tafsirResources,
-      audioLanguageCodes: audioCodes,
       azkarLanguageCodes: azkarCodes.toList()..sort(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_ContentLanguageOptions>(
+    return FutureBuilder<_ReadingDetailOptions>(
       future: _optionsFuture,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -351,22 +393,6 @@ class _ContentLanguageSettingsState extends State<_ContentLanguageSettings> {
           children: [
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const AppIcon(Icons.translate_rounded),
-              title: const Text('Quran translation'),
-              subtitle: Text(
-                options.selectedTranslation?.displayLanguage ??
-                    'Select language',
-              ),
-              trailing: const AppIcon(Icons.chevron_right_rounded),
-              onTap: () async {
-                await context.push(
-                  AppRoutes.quranDownloadsPath(showTranslations: true),
-                );
-                if (mounted) setState(() => _optionsFuture = _loadOptions());
-              },
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
               leading: const AppIcon(Icons.menu_book_outlined),
               title: const Text('Tafsir edition'),
               subtitle: Text(
@@ -388,15 +414,6 @@ class _ContentLanguageSettingsState extends State<_ContentLanguageSettings> {
               value: _store.wordMeaningLanguageCode,
               values: const ['en', 'fa', 'tr', 'ur'],
               onChanged: _store.setWordMeaningLanguageCode,
-            ),
-            _languageRow(
-              label: 'Audio meaning',
-              icon: Icons.record_voice_over_outlined,
-              value: _store.audioMeaningLanguageCode,
-              values: options.audioLanguageCodes,
-              onChanged: (code) async {
-                await _store.setAudioMeaningLanguageCode(code);
-              },
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -438,7 +455,7 @@ class _ContentLanguageSettingsState extends State<_ContentLanguageSettings> {
   }
 
   Future<void> _chooseTafsir(
-    _ContentLanguageOptions options,
+    _ReadingDetailOptions options,
     int selectedId,
   ) async {
     final resource = await showModalBottomSheet<QuranTafsirResource>(
@@ -608,17 +625,23 @@ class _FontControlsState extends State<_FontControls> {
           onChanged: (value) => setState(() => _weight = value),
           onChangeEnd: themeCubit.setFontWeightScale,
         ),
-        const SizedBox(height: 8),
-        TextButton.icon(
-          onPressed: () {
-            setState(() {
-              _scale = 1.0;
-              _weight = 0.88;
-            });
-            themeCubit.resetTextAppearance();
-          },
-          icon: const AppIcon(Icons.restart_alt_rounded, size: 18),
-          label: const Text('Reset to default'),
+        AnimatedExpansion(
+          expanded:
+              (_scale - 1.0).abs() > 0.0001 || (_weight - 0.88).abs() > 0.0001,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _scale = 1.0;
+                  _weight = 0.88;
+                });
+                themeCubit.resetTextAppearance();
+              },
+              icon: const AppIcon(Icons.restart_alt_rounded, size: 18),
+              label: const Text('Reset to default'),
+            ),
+          ),
         ),
       ],
     );

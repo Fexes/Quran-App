@@ -215,9 +215,15 @@ class _RamadanPageState extends State<RamadanPage> {
   }
 
   Future<void> _logFast(FastStatus status) async {
+    final date = DateTime.now();
+    final existing = (await _trackingRepository.dashboard(date)).fast;
     await _trackingRepository.saveFast(
-      date: DateTime.now(),
-      type: FastType.ramadan,
+      date: date,
+      type:
+          existing?.type ??
+          (HijriCalendarConfig.fromGregorian(date).hMonth == 9
+              ? FastType.ramadan
+              : FastType.voluntary),
       status: status,
     );
     await _refresh();
