@@ -1,9 +1,11 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -37,7 +39,8 @@ class _TasbiehView extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<TasbiehCubit, TasbiehState>(
       builder: (context, state) => Scaffold(
-        appBar: AppBar(
+        appBar: AppPageAppBar(
+          flexibleSpace: const HeaderPatternBackdrop(),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

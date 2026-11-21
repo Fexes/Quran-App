@@ -94,7 +94,7 @@ class DailyLibraryContentService {
   static bool _eligibleDailyHadith(HadithItem item) =>
       item.arabic.trim().isNotEmpty &&
       item.translation.trim().isNotEmpty &&
-      HadithAuthenticityPolicy.shouldShow(item);
+      HadithAuthenticityPolicy.hasAcceptedAuthenticity(item);
 
   static List<HadithItem> _translatedDailyHadiths(List<HadithItem> items) =>
       items.where(_eligibleDailyHadith).toList(growable: false);

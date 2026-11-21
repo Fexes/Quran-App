@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,7 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../domain/entities/backup_models.dart';
 import '../../domain/repositories/backup_repository.dart';
@@ -31,9 +32,9 @@ class _BackupPageState extends State<BackupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppPageAppBar(
         title: Text(AppLocalizations.of(context).backupPrivacyTitle),
-        flexibleSpace: const ArchitecturalBackdrop(),
+        flexibleSpace: const HeaderPatternBackdrop(),
       ),
       body: Stack(
         children: [

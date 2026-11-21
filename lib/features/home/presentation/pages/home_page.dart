@@ -91,8 +91,8 @@ class _HomeView extends StatelessWidget {
                     actions: [
                       ShellHeaderAction(
                         icon: Icons.search_rounded,
-                        tooltip: 'Search Quran',
-                        onTap: () => context.push(AppRoutes.quranSearchPath()),
+                        tooltip: 'Search everything',
+                        onTap: () => context.push(AppRoutes.searchPath()),
                       ),
                     ],
                   ),
@@ -442,88 +442,122 @@ class _ContinueReadingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return PremiumSurface(
-      borderColor: QuranTheme.outline(context).withValues(alpha: 0.75),
-      borderWidth: 0.6,
+      borderColor: Color.lerp(
+        QuranTheme.outline(context),
+        QuranTheme.text(context),
+        0.12,
+      ),
+      borderWidth: 0.8,
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: EdgeInsets.zero,
       color: QuranTheme.surfaceVariant(context).withValues(alpha: 0.45),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  SurahImageCatalog.fallbackAssetPathFor(surahNumber),
-                  width: 68,
-                  height: 84,
-                  fit: BoxFit.cover,
-                  cacheWidth: 240,
-                  excludeFromSemantics: true,
-                  errorBuilder: (_, _, _) => const SizedBox(
-                    width: 68,
-                    height: 84,
-                    child: AppIcon(Icons.menu_book_outlined, size: 36),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'Continue Reading',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: QuranTheme.subText(context),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'Continue Reading',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: QuranTheme.subText(context),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(title, style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 5),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: QuranTheme.subText(context),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      flex: 3,
+                      child: Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          children: [
+                            Text(
+                              progressLabel,
+                              style: theme.textTheme.labelSmall,
+                            ),
+                            TextButton.icon(
+                              onPressed: onTap,
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(44, 44),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              iconAlignment: IconAlignment.end,
+                              label: Text(buttonLabel),
+                              icon: const AppIcon(
+                                Icons.arrow_forward_rounded,
+                                size: 18,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          LinearProgressIndicator(
-            value: progress,
-            minHeight: 3,
-            borderRadius: BorderRadius.circular(8),
-            backgroundColor: QuranTheme.outline(context),
-          ),
-          const SizedBox(height: 2),
-          Wrap(
-            alignment: WrapAlignment.end,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            children: [
-              Text(
-                progressLabel,
-                style: Theme.of(context).textTheme.labelSmall,
-              ),
-              TextButton.icon(
-                onPressed: onTap,
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(44, 44),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        SurahImageCatalog.fallbackAssetPathFor(surahNumber),
+                        width: 68,
+                        height: 84,
+                        fit: BoxFit.cover,
+                        cacheWidth: 240,
+                        excludeFromSemantics: true,
+                        errorBuilder: (_, _, _) => const SizedBox(
+                          width: 68,
+                          height: 84,
+                          child: AppIcon(Icons.menu_book_outlined, size: 36),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, style: theme.textTheme.titleLarge),
+                          const SizedBox(height: 5),
+                          Text(
+                            subtitle,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: QuranTheme.subText(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                iconAlignment: IconAlignment.end,
-                label: Text(buttonLabel),
-                icon: const AppIcon(Icons.arrow_forward_rounded, size: 18),
-              ),
-            ],
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              borderRadius: BorderRadius.circular(4),
+              backgroundColor: QuranTheme.outline(context),
+            ),
           ),
         ],
       ),
@@ -551,8 +585,8 @@ class _HomeDestinationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PremiumSurface(
-      borderColor: QuranTheme.outline(context).withValues(alpha: 0.75),
-      borderWidth: 0.6,
+      borderColor: QuranTheme.outline(context),
+      borderWidth: 0.8,
       onTap: onTap,
       padding: EdgeInsets.zero,
       child: Column(

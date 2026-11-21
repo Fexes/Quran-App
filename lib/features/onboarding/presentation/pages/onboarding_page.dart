@@ -15,6 +15,7 @@ import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/theme/quran_theme_cubit.dart';
 import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../core/widgets/app_sheet.dart';
 import '../../../../core/widgets/animated_expansion.dart';
 import '../../../prayer/data/datasources/offline_prayer_city_data_source.dart';
@@ -236,7 +237,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 )
               : null,
           title: Text(widget.editMode ? 'Setup preferences' : 'Welcome'),
-          flexibleSpace: const ArchitecturalBackdrop(),
+          flexibleSpace: const HeaderPatternBackdrop(),
           actions: [
             if (widget.editMode)
               IconButton(

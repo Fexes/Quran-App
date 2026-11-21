@@ -21,6 +21,14 @@ class LibraryUserDataStore {
         key.substring(5): _read(key)?.toString() ?? '',
   };
 
+  Iterable<String> get bookmarkedItemKeys sync* {
+    for (final key in _keys()) {
+      if (key.startsWith('bookmark:') && _read(key) == true) {
+        yield key.substring('bookmark:'.length);
+      }
+    }
+  }
+
   static Future<LibraryUserDataStore> open() async {
     await Hive.initFlutter();
     final box = await Hive.openBox<dynamic>(boxName);
@@ -165,7 +173,11 @@ class LibraryUserDataStore {
     } else {
       _memory?.addAll(values);
     }
-    if (key.startsWith('note:')) LocalSearchRevision.changed();
+    if (key.startsWith('note:') ||
+        key.startsWith('bookmark:') ||
+        key.startsWith('last_read:')) {
+      LocalSearchRevision.changed(source: 'library-user');
+    }
   }
 
   Future<void> _delete(String key, {bool recordModification = true}) async {
@@ -186,7 +198,11 @@ class LibraryUserDataStore {
       }
       _memory?.remove(key);
     }
-    if (key.startsWith('note:')) LocalSearchRevision.changed();
+    if (key.startsWith('note:') ||
+        key.startsWith('bookmark:') ||
+        key.startsWith('last_read:')) {
+      LocalSearchRevision.changed(source: 'library-user');
+    }
   }
 
   Iterable<String> _keys() {
@@ -204,7 +220,7 @@ class LibraryUserDataStore {
     } else {
       _memory?.clear();
     }
-    LocalSearchRevision.changed();
+    LocalSearchRevision.changed(source: 'library-user');
   }
 
   static String _bookmarkKey(String itemKey) => 'bookmark:$itemKey';

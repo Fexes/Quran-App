@@ -94,25 +94,25 @@ class QiblaCompass extends StatelessWidget {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  AppIcon(
-                                    aligned
-                                        ? Icons.check_rounded
-                                        : unavailable
-                                        ? Icons.explore_off_outlined
-                                        : !hasHeading || recovering
-                                        ? Icons.explore_outlined
-                                        : !reliable
-                                        ? Icons.warning_amber_rounded
-                                        : settling
-                                        ? Icons.my_location_rounded
-                                        : relative > 0
-                                        ? Icons.rotate_right_rounded
-                                        : Icons.rotate_left_rounded,
-                                    size: aligned ? 40 : 24,
-                                    color: accent,
-                                    textDirection: TextDirection.ltr,
-                                  ),
-                                  const SizedBox(height: 4),
+                                  if (aligned ||
+                                      unavailable ||
+                                      !hasHeading ||
+                                      recovering ||
+                                      !reliable) ...[
+                                    AppIcon(
+                                      aligned
+                                          ? Icons.check_rounded
+                                          : unavailable
+                                          ? Icons.explore_off_outlined
+                                          : !hasHeading || recovering
+                                          ? Icons.explore_outlined
+                                          : Icons.warning_amber_rounded,
+                                      size: aligned ? 40 : 24,
+                                      color: accent,
+                                      textDirection: TextDirection.ltr,
+                                    ),
+                                    const SizedBox(height: 4),
+                                  ],
                                   if (!aligned)
                                     Text(
                                       hasHeading

@@ -221,10 +221,12 @@ class QuranTheme {
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
-        scrolledUnderElevation: 0,
+        scrolledUnderElevation: 1,
         backgroundColor: preset.background,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
+        shadowColor: Colors.black.withValues(
+          alpha: brightness == Brightness.dark ? 0.28 : 0.12,
+        ),
         foregroundColor: preset.text,
         titleTextStyle: textTheme.titleLarge?.copyWith(
           fontWeight: weight(FontWeight.w600, fontWeightScale),

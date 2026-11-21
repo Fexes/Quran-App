@@ -1,0 +1,147 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:onnxruntime_plus/onnxruntime_plus.dart';
+
+import '../../../../core/search/e5_tokenizer.dart';
+
+/// CPU inference owned exclusively by the persistent search isolate.
+class E5Embedder {
+  E5Embedder({
+    required String modelPath,
+    required String tokenizerPath,
+    int threads = 2,
+  }) : _tokenizer = E5Tokenizer.fromFile(tokenizerPath) {
+    final options = OrtSessionOptions();
+    try {
+      options
+        ..setIntraOpNumThreads(threads)
+        ..setInterOpNumThreads(1)
+        ..setSessionGraphOptimizationLevel(GraphOptimizationLevel.ortEnableAll);
+      _session = OrtSession.fromFile(File(modelPath), options);
+      if (!_session.inputNames.contains('input_ids') ||
+          !_session.inputNames.contains('attention_mask') ||
+          !_session.outputNames.contains('last_hidden_state')) {
+        _session.release();
+        throw const FormatException('Unsupported embedding model interface.');
+      }
+    } finally {
+      options.release();
+    }
+  }
+
+  static const dimensions = 384;
+  final E5Tokenizer _tokenizer;
+  late final OrtSession _session;
+  bool _disposed = false;
+
+  void verifyTokenizerParity(String path) {
+    final fixture =
+        jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>;
+    if (fixture['model_id'] != 'intfloat/multilingual-e5-small' ||
+        fixture['max_length'] != 512) {
+      throw const FormatException('Unsupported tokenizer verification file.');
+    }
+    final cases = fixture['cases'] as List;
+    if (cases.isEmpty) {
+      throw const FormatException('Missing tokenizer verification cases.');
+    }
+    for (final item in cases) {
+      final value = item as Map;
+      final encoding = value['kind'] == 'query'
+          ? _tokenizer.encodeQuery(value['input'] as String)
+          : _tokenizer.encodePassage(value['input'] as String);
+      final expected = value['input_ids'] as List;
+      if (encoding.length != expected.length) {
+        throw const FormatException('Tokenizer verification failed.');
+      }
+      for (var i = 0; i < encoding.length; i++) {
+        if (encoding.inputIds[i] != expected[i] ||
+            encoding.attentionMask[i] != (value['attention_mask'] as List)[i] ||
+            encoding.tokenTypeIds[i] != (value['token_type_ids'] as List)[i]) {
+          throw const FormatException('Tokenizer verification failed.');
+        }
+      }
+    }
+  }
+
+  Float32List embedQuery(String query) {
+    return embedEncoding(_tokenizer.encodeQuery(query));
+  }
+
+  Iterable<E5Encoding> passageChunks(String text) =>
+      _tokenizer.encodePassageChunks(text);
+
+  Float32List embedEncoding(E5Encoding encoding) {
+    if (_disposed) throw StateError('Embedding session closed.');
+    final shape = [1, encoding.length];
+    final inputs = <String, OrtValue>{};
+    final options = OrtRunOptions();
+    List<OrtValue?>? outputs;
+    try {
+      inputs['input_ids'] = OrtValueTensor.createTensorWithDataList(
+        encoding.inputIds,
+        shape,
+      );
+      inputs['attention_mask'] = OrtValueTensor.createTensorWithDataList(
+        encoding.attentionMask,
+        shape,
+      );
+      if (_session.inputNames.contains('token_type_ids')) {
+        inputs['token_type_ids'] = OrtValueTensor.createTensorWithDataList(
+          encoding.tokenTypeIds,
+          shape,
+        );
+      }
+      outputs = _session.run(options, inputs, ['last_hidden_state']);
+      final output = outputs.single?.value;
+      if (output is! List || output.length != 1 || output.first is! List) {
+        throw const FormatException('Invalid embedding output shape.');
+      }
+      final tokens = output.first as List;
+      if (tokens.length != encoding.length) {
+        throw const FormatException('Invalid embedding sequence length.');
+      }
+      final pooled = Float64List(dimensions);
+      var attended = 0;
+      for (var i = 0; i < tokens.length; i++) {
+        if (encoding.attentionMask[i] == 0) continue;
+        final token = tokens[i];
+        if (token is! List || token.length != dimensions) {
+          throw const FormatException('Invalid embedding dimension.');
+        }
+        attended++;
+        for (var j = 0; j < dimensions; j++) {
+          pooled[j] += (token[j] as num).toDouble();
+        }
+      }
+      if (attended == 0) throw const FormatException('Empty attention mask.');
+      var squaredNorm = 0.0;
+      for (var i = 0; i < dimensions; i++) {
+        pooled[i] /= attended;
+        squaredNorm += pooled[i] * pooled[i];
+      }
+      final norm = math.sqrt(squaredNorm);
+      if (!norm.isFinite || norm <= 1e-12) {
+        throw const FormatException('Invalid embedding values.');
+      }
+      return Float32List.fromList([for (final value in pooled) value / norm]);
+    } finally {
+      for (final input in inputs.values) {
+        input.release();
+      }
+      for (final output in outputs ?? <OrtValue?>[]) {
+        output?.release();
+      }
+      options.release();
+    }
+  }
+
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _session.release();
+  }
+}

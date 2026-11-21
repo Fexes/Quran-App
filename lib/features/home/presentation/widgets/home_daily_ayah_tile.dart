@@ -18,6 +18,9 @@ import '../../../../core/widgets/app_sheet.dart';
 import '../../../../core/widgets/premium_surface.dart';
 import '../../../azkar/domain/repositories/azkar_repository.dart';
 import '../../../hadith/domain/repositories/hadith_repository.dart';
+import '../../../hadith/domain/services/hadith_authenticity_policy.dart';
+import '../../../hadith/domain/services/hadith_grading.dart';
+import '../../../hadith/presentation/widgets/hadith_grading_panel.dart';
 import '../../../library/data/stores/library_user_data_store.dart';
 import '../../../library/presentation/widgets/library_share_sheet.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
@@ -269,7 +272,12 @@ class _HomeDailyAyahTileState extends State<HomeDailyAyahTile> {
     });
     try {
       if (kind == _DailyKind.hadith) {
-        final value = await _library.loadHadith(date);
+        final loaded = await _library.loadHadith(date);
+        final value =
+            loaded != null &&
+                HadithAuthenticityPolicy.hasAcceptedAuthenticity(loaded.item)
+            ? loaded
+            : null;
         if (!mounted || revision != _libraryRevision) return;
         final moveToDua = value == null && _kind == _DailyKind.hadith;
         final changedVisibility = _hadithUnavailable != (value == null);
@@ -450,7 +458,7 @@ class _HomeDailyAyahTileState extends State<HomeDailyAyahTile> {
                       setState(() => _cardHeights[kind] = height);
                     },
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 1),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: _buildCard(context, kind),
                     ),
                   ),
@@ -508,6 +516,9 @@ class _HomeDailyAyahTileState extends State<HomeDailyAyahTile> {
     final themeState = context.watch<QuranThemeCubit>().state;
     final accent = QuranTheme.wordHighlight(context);
     final passage = _passageFor(kind);
+    final grading = kind == _DailyKind.hadith && _hadith != null
+        ? HadithGrading.fromHadith(_hadith!.item)
+        : null;
     final expanded = _expanded.contains(kind);
     final saved = passage != null && _saved[passage.id] == true;
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
@@ -534,8 +545,8 @@ class _HomeDailyAyahTileState extends State<HomeDailyAyahTile> {
       ],
     );
     return PremiumSurface(
-      borderColor: QuranTheme.outline(context).withValues(alpha: 0.75),
-      borderWidth: 0.6,
+      borderColor: QuranTheme.outline(context),
+      borderWidth: 0.8,
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
       color: QuranTheme.surface(context),
       child: Column(
@@ -564,6 +575,10 @@ class _HomeDailyAyahTileState extends State<HomeDailyAyahTile> {
           ),
           if (largeText)
             Align(alignment: AlignmentDirectional.centerEnd, child: actions),
+          if (grading != null && grading.requiresCaution) ...[
+            const SizedBox(height: 8),
+            HadithGradingPanel(grading: grading, compact: true),
+          ],
           const SizedBox(height: 18),
           if (passage == null)
             _DailyContentStatus(
@@ -809,8 +824,11 @@ class _HomeDailyAyahTileState extends State<HomeDailyAyahTile> {
                         ],
                         TextButton.icon(
                           onPressed: () async {
+                            final hadith = _hadith?.item;
                             if (kind == _DailyKind.hadith &&
-                                _hadith?.item.bookId == 'hadeethenc') {
+                                hadith != null &&
+                                hadith.bookId == 'hadeethenc') {
+                              final grading = HadithGrading.fromHadith(hadith);
                               await showModalBottomSheet<void>(
                                 context: context,
                                 isScrollControlled: true,
@@ -823,6 +841,13 @@ class _HomeDailyAyahTileState extends State<HomeDailyAyahTile> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
+                                      if (grading.requiresCaution) ...[
+                                        HadithGradingPanel(
+                                          grading: grading,
+                                          compact: true,
+                                        ),
+                                        const SizedBox(height: 8),
+                                      ],
                                       Text(
                                         passage.arabic,
                                         textDirection: TextDirection.rtl,

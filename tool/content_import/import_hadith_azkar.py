@@ -149,9 +149,20 @@ def grade_text(grades):
     pieces = []
     for grade in grades:
         if isinstance(grade, dict):
-            name = grade.get("name") or grade.get("grade") or ""
-            graded_by = grade.get("graded_by") or grade.get("scholar") or ""
-            text = " ".join(part for part in [name, graded_by] if part)
+            assessment = clean_text(grade.get("grade"))
+            graded_by = clean_text(grade.get("graded_by") or grade.get("scholar"))
+            name = clean_text(grade.get("name"))
+            # Fawaz editions use `name` for the scholar and `grade` for the
+            # assessment. Also retain the name/graded_by legacy shape.
+            if assessment:
+                graded_by = graded_by or name
+            else:
+                assessment = name
+            text = (
+                f"{graded_by}: {assessment}"
+                if graded_by and assessment
+                else assessment or graded_by
+            )
             if text:
                 pieces.append(text)
         elif grade:
@@ -237,9 +248,8 @@ def import_hadith():
             arabic = arabic_by_number.get(number, {})
             ref = item.get("reference") or {}
             book_number = int(ref.get("book") or 0)
-            local_hadith = number_text(ref.get("hadith") or number)
             chapter_id = f"{book_slug}_{book_number or 0}"
-            reference = f"{book_name} {local_hadith}"
+            reference = f"{book_name} {number}"
             grades = item.get("grades") or []
             grade = grade_text(grades)
             arabic_text = clean_text(arabic.get("text"))
@@ -260,6 +270,7 @@ def import_hadith():
                 "grades": grades,
                 "reference": reference,
                 "cleanReference": reference,
+                "sourceEditionReference": ref,
                 "collectionName": book_name,
                 "englishEdition": english_edition["name"],
                 "arabicEdition": arabic_edition["name"],
@@ -287,6 +298,8 @@ def import_hadith():
                     "targetType": "hadith",
                     "targetId": hadith["id"],
                     "bookId": book_slug,
+                    "sourceId": source_id,
+                    "grades": grades,
                 }
             )
 
@@ -343,6 +356,9 @@ def import_hadith():
         + "\n",
         encoding="utf-8",
     )
+    from build_compact_hadith_search_index import main as build_compact_index
+
+    build_compact_index()
 
 
 def import_azkar():

@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/search/local_search_revision.dart';
 
 import '../../../../core/content/content_cache_policy.dart';
 import '../../domain/entities/quran_word.dart';
@@ -144,6 +145,58 @@ class QuranInterlinearWordsStore {
     }
   }
 
+  Iterable<({String language, int page, List<QuranWord> words})>
+  cachedSearchPages() sync* {
+    for (final key in _keys().toList(growable: false)) {
+      final parts = key.split(':');
+      if (parts.length != 4 ||
+          parts.first != 'interlinear_words' ||
+          parts[2] != 'page') {
+        continue;
+      }
+      final page = int.tryParse(parts[3]);
+      if (page == null) continue;
+      final words = pageWords(
+        pageNumber: page,
+        language: parts[1],
+        cachePolicy: ContentCachePolicy.quranFoundation,
+      );
+      if (words.isNotEmpty) {
+        yield (language: parts[1], page: page, words: words);
+      }
+    }
+  }
+
+  DateTime? get nextSearchExpiry {
+    final now = DateTime.now();
+    DateTime? earliest;
+    for (final key in _keys()) {
+      if (!key.contains(':page:')) continue;
+      final raw = _read(key);
+      if (raw is! Map) continue;
+      final expiry = ContentCachePolicy.quranFoundation.expiresAt(
+        _date(raw['fetchedAt']),
+      );
+      if (expiry != null &&
+          !expiry.isBefore(now) &&
+          (earliest == null || expiry.isBefore(earliest))) {
+        earliest = expiry.add(const Duration(milliseconds: 1));
+      }
+    }
+    return earliest;
+  }
+
+  Map<String, Object?> searchSnapshot() => {
+    for (final key in _keys())
+      if (key.startsWith('interlinear_words:') && key.contains(':page:'))
+        if (_read(key) case final Map raw)
+          if (_isFresh(
+            fetchedAt: _date(raw['fetchedAt']),
+            cachePolicy: ContentCachePolicy.quranFoundation,
+          ))
+            key: raw['words'],
+  };
+
   Object? _read(String key) {
     final box = _box;
     if (box != null) {
@@ -156,18 +209,20 @@ class QuranInterlinearWordsStore {
     final box = _box;
     if (box != null) {
       await box.put(key, value);
-      return;
+    } else {
+      _memory?[key] = value;
     }
-    _memory?[key] = value;
+    LocalSearchRevision.changed(source: 'interlinear');
   }
 
   Future<void> _delete(String key) async {
     final box = _box;
     if (box != null) {
       await box.delete(key);
-      return;
+    } else {
+      _memory?.remove(key);
     }
-    _memory?.remove(key);
+    LocalSearchRevision.changed(source: 'interlinear');
   }
 
   Iterable<String> _keys() {

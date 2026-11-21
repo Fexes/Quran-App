@@ -25,7 +25,7 @@ Use a local-first data strategy:
 | Prayer times | Local calculation package, with AlAdhan as reference/validation | Prayer times should work offline once location/settings are known | Cache monthly timetable |
 | Islamic calendar | Local Hijri/Umm al-Qura package or AlAdhan calendar endpoint | Date changes over time and region settings matter | Cache monthly result, allow Hijri offset |
 | Qibla | Device location + Kaaba bearing formula + compass sensor | No external content database needed | Cache last location only |
-| Mosque locations | OpenStreetMap Overpass query for `amenity=place_of_worship` and `religion=muslim` | No key/cost for MVP; open data | Cache recent nearby search results |
+| Mosque locations | External Google Maps search, then Apple Maps, then browser | No in-app places provider or API key | Maps app manages its own nearby results |
 
 ## Source Candidates
 
@@ -85,11 +85,11 @@ Recommendation:
 
 ### Mosque Locations
 
-Recommendation:
+Current implementation:
 
-1. Use OpenStreetMap/Overpass for MVP.
-2. Query nodes, ways, and relations around the user location using `amenity=place_of_worship` and `religion=muslim`.
-3. Open directions through platform map links instead of embedding a full map in the first version.
+1. Tapping Nearby Mosques opens an external search directly.
+2. Prefer installed Google Maps. On iOS, try Apple Maps next using an app-only map link; otherwise open Google Maps search in the browser.
+3. The external maps app handles the person's location and search results. The app does not request mosque-search location permission, query Overpass, choose a radius, or maintain a mosque-result cache.
 
 ## Target Data Architecture
 

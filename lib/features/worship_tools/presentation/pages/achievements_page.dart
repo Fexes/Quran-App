@@ -1,10 +1,11 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icon.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
-import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../hifz/domain/entities/hifz_models.dart';
 import '../../../hifz/domain/repositories/hifz_repository.dart';
@@ -66,9 +67,9 @@ class _AchievementsPageState extends State<AchievementsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppPageAppBar(
         title: Text(AppLocalizations.of(context).achievementsTitle),
-        flexibleSpace: const ArchitecturalBackdrop(),
+        flexibleSpace: const HeaderPatternBackdrop(),
       ),
       body: FutureBuilder<_AchievementStats>(
         future: _future,

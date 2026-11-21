@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +10,7 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
-import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../domain/entities/quran_surah.dart';
 import '../../domain/entities/quran_translation.dart';
@@ -100,9 +101,9 @@ class _QuranTranslationManagerPageState
             if (!didPop && !_saving) _confirmExit();
           },
           child: Scaffold(
-            appBar: AppBar(
+            appBar: AppPageAppBar(
               title: const Text('Reading & listening'),
-              flexibleSpace: const ArchitecturalBackdrop(),
+              flexibleSpace: const HeaderPatternBackdrop(),
               actions: [
                 IconButton(
                   tooltip: 'Translation library',
@@ -417,9 +418,9 @@ class _QuranTranslationLibraryPageState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppPageAppBar(
         title: Text(l10n.quranTranslationsTitle),
-        flexibleSpace: const ArchitecturalBackdrop(),
+        flexibleSpace: const HeaderPatternBackdrop(),
       ),
       body: FutureBuilder<_ManagerData>(
         future: _future,

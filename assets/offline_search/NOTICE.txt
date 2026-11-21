@@ -1,0 +1,12 @@
+Embedding model and tokenizer: intfloat/multilingual-e5-small
+License declared by upstream: MIT
+Source: https://huggingface.co/intfloat/multilingual-e5-small
+Pinned revision: 614241f622f53c4eeff9890bdc4f31cfecc418b3
+Official ONNX artifact: onnx/model_qint8_avx512_vnni.onnx
+No model conversion was necessary. This artifact uses portable standard ONNX
+opset 11 operators, including DynamicQuantizeLinear and MatMulInteger. The
+upstream filename identifies its export quantization preset.
+
+Source texts retain the app's existing content provenance and attribution.
+See assets/data/content_sources/ and docs/offline_search_data.md.
+The model license does not grant rights over Quran translation or Hadith editions.

@@ -1,0 +1,563 @@
+{
+  "date": "2026-10-21",
+  "guides": 14,
+  "chapters": 48,
+  "placements": [
+    {
+      "guide": "congregation",
+      "placement": "cover",
+      "image": "assets/images/learn/congregation_faceless.webp"
+    },
+    {
+      "guide": "congregation",
+      "placement": "congregation-follow",
+      "image": "assets/images/learn/congregation_faceless.webp"
+    },
+    {
+      "guide": "congregation",
+      "placement": "congregation-join",
+      "image": "assets/images/learn/congregation_faceless.webp"
+    },
+    {
+      "guide": "congregation",
+      "placement": "congregation-complete",
+      "image": "assets/images/learn/congregation_complete.webp"
+    },
+    {
+      "guide": "eid",
+      "placement": "cover",
+      "image": "assets/images/learn/eid_faceless.webp"
+    },
+    {
+      "guide": "eid",
+      "placement": "eid-prepare",
+      "image": "assets/images/learn/eid_faceless.webp"
+    },
+    {
+      "guide": "eid",
+      "placement": "eid-pray",
+      "image": "assets/images/learn/eid_faceless.webp"
+    },
+    {
+      "guide": "fasting",
+      "placement": "cover",
+      "image": "assets/images/learn/fasting.webp"
+    },
+    {
+      "guide": "fasting",
+      "placement": "fasting-prepare",
+      "image": "assets/images/learn/fasting_suhoor.webp"
+    },
+    {
+      "guide": "fasting",
+      "placement": "fasting-day",
+      "image": "assets/images/learn/fasting_day.webp"
+    },
+    {
+      "guide": "fasting",
+      "placement": "fasting-exemptions",
+      "image": "assets/images/learn/fasting_makeup.webp"
+    },
+    {
+      "guide": "ghusl",
+      "placement": "cover",
+      "image": "assets/images/learn/ghusl_preparation.webp"
+    },
+    {
+      "guide": "ghusl",
+      "placement": "ghusl-when",
+      "image": "assets/images/learn/ghusl_preparation.webp"
+    },
+    {
+      "guide": "ghusl",
+      "placement": "ghusl-wash",
+      "image": "assets/images/learn/ghusl_wash.webp"
+    },
+    {
+      "guide": "ghusl",
+      "placement": "ghusl-finish",
+      "image": "assets/images/learn/ghusl_preparation.webp"
+    },
+    {
+      "guide": "hajj",
+      "placement": "cover",
+      "image": "assets/images/learn/hajj_arafat_faceless.webp"
+    },
+    {
+      "guide": "hajj",
+      "placement": "hajj-tamattu",
+      "image": "assets/images/learn/umrah_ihram_faceless.webp"
+    },
+    {
+      "guide": "hajj",
+      "placement": "hajj-arafat",
+      "image": "assets/images/learn/hajj_arafat_faceless.webp"
+    },
+    {
+      "guide": "hajj",
+      "placement": "hajj-tenth",
+      "image": "assets/images/learn/hajj_muzdalifah.webp"
+    },
+    {
+      "guide": "hajj",
+      "placement": "hajj-ifadah",
+      "image": "assets/images/learn/umrah_tawaf_faceless.webp"
+    },
+    {
+      "guide": "hajj",
+      "placement": "hajj-farewell",
+      "image": "assets/images/learn/hajj_jamarat_faceless.webp"
+    },
+    {
+      "guide": "janazah",
+      "placement": "cover",
+      "image": "assets/images/learn/janazah_faceless.webp"
+    },
+    {
+      "guide": "janazah",
+      "placement": "janazah-prepare",
+      "image": "assets/images/learn/janazah_faceless.webp"
+    },
+    {
+      "guide": "janazah",
+      "placement": "janazah-first",
+      "image": "assets/images/learn/janazah_faceless.webp"
+    },
+    {
+      "guide": "janazah",
+      "placement": "janazah-finish",
+      "image": "assets/images/learn/janazah_faceless.webp"
+    },
+    {
+      "guide": "jumuah",
+      "placement": "cover",
+      "image": "assets/images/learn/jumuah_faceless.webp"
+    },
+    {
+      "guide": "jumuah",
+      "placement": "jumuah-prepare",
+      "image": "assets/images/learn/jumuah_faceless.webp"
+    },
+    {
+      "guide": "jumuah",
+      "placement": "jumuah-pray",
+      "image": "assets/images/learn/jumuah_prayer.webp"
+    },
+    {
+      "guide": "prayer",
+      "placement": "cover",
+      "image": "assets/images/learn/prayer_standing_faceless_mat.webp"
+    },
+    {
+      "guide": "prayer",
+      "placement": "prayer-prepare",
+      "image": "assets/images/learn/prayer_standing_faceless_mat.webp"
+    },
+    {
+      "guide": "prayer",
+      "placement": "prayer-stand",
+      "image": "assets/images/learn/prayer_standing_faceless_mat.webp"
+    },
+    {
+      "guide": "prayer",
+      "placement": "prayer-bow",
+      "image": "assets/images/learn/prayer_bowing_faceless_mat.webp"
+    },
+    {
+      "guide": "prayer",
+      "placement": "prayer-prostrate",
+      "image": "assets/images/learn/prayer_prostration_faceless_mat.webp"
+    },
+    {
+      "guide": "prayer",
+      "placement": "prayer-finish",
+      "image": "assets/images/learn/prayer_seated_faceless_mat.webp"
+    },
+    {
+      "guide": "prayer_mistakes",
+      "placement": "cover",
+      "image": "assets/images/learn/prayer_prostration_faceless_mat.webp"
+    },
+    {
+      "guide": "prayer_mistakes",
+      "placement": "mistakes-identify",
+      "image": "assets/images/learn/prayer_seated_faceless_mat.webp"
+    },
+    {
+      "guide": "prayer_mistakes",
+      "placement": "mistakes-hanafi",
+      "image": "assets/images/learn/prayer_prostration_faceless_mat.webp"
+    },
+    {
+      "guide": "prayer_mistakes",
+      "placement": "mistakes-doubts",
+      "image": "assets/images/learn/prayer_seated_faceless_mat.webp"
+    },
+    {
+      "guide": "tayammum",
+      "placement": "cover",
+      "image": "assets/images/learn/tayammum_faceless.webp"
+    },
+    {
+      "guide": "tayammum",
+      "placement": "tayammum-when",
+      "image": "assets/images/learn/tayammum_faceless.webp"
+    },
+    {
+      "guide": "tayammum",
+      "placement": "tayammum-method",
+      "image": "assets/images/learn/tayammum_arms.webp"
+    },
+    {
+      "guide": "tayammum",
+      "placement": "tayammum-after",
+      "image": "assets/images/learn/tayammum_prayer.webp"
+    },
+    {
+      "guide": "travel_illness",
+      "placement": "cover",
+      "image": "assets/images/learn/prayer_travel_faceless_mat.webp"
+    },
+    {
+      "guide": "travel_illness",
+      "placement": "travel-shorten",
+      "image": "assets/images/learn/prayer_travel_faceless_mat.webp"
+    },
+    {
+      "guide": "travel_illness",
+      "placement": "travel-combine",
+      "image": "assets/images/learn/prayer_travel_faceless_mat.webp"
+    },
+    {
+      "guide": "travel_illness",
+      "placement": "illness-sitting",
+      "image": "assets/images/learn/prayer_illness_faceless_mat.webp"
+    },
+    {
+      "guide": "travel_illness",
+      "placement": "illness-bed",
+      "image": "assets/images/learn/illness_bed.webp"
+    },
+    {
+      "guide": "umrah",
+      "placement": "cover",
+      "image": "assets/images/learn/umrah_overview_faceless.webp"
+    },
+    {
+      "guide": "umrah",
+      "placement": "overview",
+      "image": "assets/images/learn/umrah_overview_faceless.webp"
+    },
+    {
+      "guide": "umrah",
+      "placement": "ihram",
+      "image": "assets/images/learn/umrah_ihram_faceless.webp"
+    },
+    {
+      "guide": "umrah",
+      "placement": "tawaf",
+      "image": "assets/images/learn/umrah_tawaf_faceless.webp"
+    },
+    {
+      "guide": "umrah",
+      "placement": "prayer",
+      "image": "assets/images/learn/umrah_prayer_faceless_mat.webp"
+    },
+    {
+      "guide": "umrah",
+      "placement": "sai",
+      "image": "assets/images/learn/umrah_sai_faceless.webp"
+    },
+    {
+      "guide": "umrah",
+      "placement": "completion",
+      "image": "assets/images/learn/umrah_completion_faceless.webp"
+    },
+    {
+      "guide": "wudu",
+      "placement": "cover",
+      "image": "assets/images/learn/wudu_hands_faceless.webp"
+    },
+    {
+      "guide": "wudu",
+      "placement": "wudu-begin",
+      "image": "assets/images/learn/wudu_hands_faceless.webp"
+    },
+    {
+      "guide": "wudu",
+      "placement": "wudu-wash",
+      "image": "assets/images/learn/wudu_face_faceless.webp"
+    },
+    {
+      "guide": "wudu",
+      "placement": "wudu-finish",
+      "image": "assets/images/learn/wudu_feet.webp"
+    },
+    {
+      "guide": "zakat",
+      "placement": "cover",
+      "image": "assets/images/learn/zakat.webp"
+    },
+    {
+      "guide": "zakat",
+      "placement": "zakat-check",
+      "image": "assets/images/learn/zakat_assess.webp"
+    },
+    {
+      "guide": "zakat",
+      "placement": "zakat-calculate",
+      "image": "assets/images/learn/zakat_calculate.webp"
+    },
+    {
+      "guide": "zakat",
+      "placement": "zakat-pay",
+      "image": "assets/images/learn/zakat.webp"
+    }
+  ],
+  "replacement_renames": {
+    "prayer_standing.webp": "prayer_standing_faceless_mat.webp",
+    "prayer_bowing.webp": "prayer_bowing_faceless_mat.webp",
+    "prayer_prostration.webp": "prayer_prostration_faceless_mat.webp",
+    "prayer_seated.webp": "prayer_seated_faceless_mat.webp",
+    "wudu_hands.webp": "wudu_hands_faceless.webp",
+    "wudu_face.webp": "wudu_face_faceless.webp",
+    "tayammum.webp": "tayammum_faceless.webp",
+    "umrah_overview.webp": "umrah_overview_faceless.webp",
+    "umrah_ihram.webp": "umrah_ihram_faceless.webp",
+    "umrah_tawaf.webp": "umrah_tawaf_faceless.webp",
+    "umrah_prayer.webp": "umrah_prayer_faceless_mat.webp",
+    "umrah_sai.webp": "umrah_sai_faceless.webp",
+    "umrah_completion.webp": "umrah_completion_faceless.webp",
+    "hajj_arafat.webp": "hajj_arafat_faceless.webp",
+    "hajj_mina.webp": "hajj_mina_faceless.webp",
+    "hajj_jamarat.webp": "hajj_jamarat_faceless.webp",
+    "congregation.webp": "congregation_faceless.webp",
+    "eid.webp": "eid_faceless.webp",
+    "jumuah.webp": "jumuah_faceless.webp",
+    "janazah.webp": "janazah_faceless.webp",
+    "prayer_travel.webp": "prayer_travel_faceless_mat.webp",
+    "prayer_illness.webp": "prayer_illness_faceless_mat.webp"
+  },
+  "assets": [
+    {
+      "path": "assets/images/learn/congregation_complete.webp",
+      "sha256": "bdd91827bce3c48ecb7d431073b7ddf29da08d9fb50092aa104b38433967fbd4",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/congregation_faceless.webp",
+      "sha256": "bce1955737ce578b8dc2755db90cb370dca4142cf5dd6ceae93bcc97677918dc",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/eid_faceless.webp",
+      "sha256": "ad6af62824c1033a21819877fa4672e0f7eb4bb3e69429cfbf62b1bd6e442b16",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/fasting.webp",
+      "sha256": "c344e5eaa69462141646cd634b3b3a56ad67967a94c54d4cc0ada314be01ae91",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/fasting_day.webp",
+      "sha256": "67eeaf8b3285500460616ee17fee01a154bf64ba67443c7a27bb0cddd513f4d1",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/fasting_makeup.webp",
+      "sha256": "ca698feebdd3576cdafe39b1b9a8fb49530ae7bd3085104b79d04e754967e701",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/fasting_suhoor.webp",
+      "sha256": "923b4743c071e121eb013cd3ee4c15ff6e75d2af924f9194b309bd05a5d978ba",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/ghusl_preparation.webp",
+      "sha256": "a8f9b402ca36c1fd3dce514d2a67aa202da0bbcc6a7f5f17d0f753df53544c89",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/ghusl_wash.webp",
+      "sha256": "770199031122075ae291eb437001ac19408ec43596fa23990722fc8dcba5eb3d",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/hajj_arafat_faceless.webp",
+      "sha256": "9c5f4a6958f2937f760edbb93bfc408e59f15f78263d8592a6b2c91cf1d2b7f0",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/hajj_jamarat_faceless.webp",
+      "sha256": "c82deed343b8ee28f58b90f13ed875bbab726a2c4c0b17806b5f5bb072abb63f",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/hajj_mina_faceless.webp",
+      "sha256": "9447eb55609db946d807fae53d134cf84ebbf3e2733d36227995c5eaf44f6a76",
+      "referenced": false
+    },
+    {
+      "path": "assets/images/learn/hajj_muzdalifah.webp",
+      "sha256": "4cb213f9e17d5423fb3aaa56b55312f68f19cb695a7bbfaa7f5032ba721891cf",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/illness_bed.webp",
+      "sha256": "6ac71ef4f05af573efebbf013e3b613cb8c313bb0aacb81c3b2d489882611122",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/janazah_faceless.webp",
+      "sha256": "4f9a6406aa75f5e176b48ab9c8e290303b345ac45b8b6699dc65bf16e628215b",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/jumuah_faceless.webp",
+      "sha256": "5566e8b059cae7c4d2f537e023f5a09f10ff7dc9315571b8df70b5d1f3f228f2",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/jumuah_prayer.webp",
+      "sha256": "37370284c250e04e848dec71200866bf4784b2f1bfea73b69d6c6e81927aaa3d",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/prayer_bowing_faceless_mat.webp",
+      "sha256": "cd324890377984e0b325bc4519d409be8fe5ae9e06dcae5aad257722cf46e9fe",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/prayer_illness_faceless_mat.webp",
+      "sha256": "5ae4eabf00e5a51d6d3305e4820bac96570aaa3784f7d8cb8e9ac9eca18c5910",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/prayer_prostration_faceless_mat.webp",
+      "sha256": "e0046b32f2e9d08e5b6704d9d167adcba2fabda59a2091b60de4644d7a344df9",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/prayer_seated_faceless_mat.webp",
+      "sha256": "2ae91047df5105d4394fde06bbafa315eb80189227418c70efeae3889739857a",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/prayer_standing_faceless_mat.webp",
+      "sha256": "1a9011bdbbbe2e4de7914d99e8a52652da0a312f4cb514b1e23c94c310f428ea",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/prayer_travel_faceless_mat.webp",
+      "sha256": "c237b2453ef984489d9dced802de1b5dfb60efdaf7df7f5f2d396e73922014bc",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/tayammum_arms.webp",
+      "sha256": "d43a1794e59ca164ae8a9d7a82b10579d05c39ba74c402bd09c888d67b3e6f5e",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/tayammum_faceless.webp",
+      "sha256": "649a7a016b7932371b2645520fa4dd53018f01107bbf942c49ba59e078321abc",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/tayammum_prayer.webp",
+      "sha256": "0b6f50d622f6486d9e1d3d8c66d1ebf730573ac323f10486fdf42c4694398848",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/umrah_completion_faceless.webp",
+      "sha256": "de73e65eb624f54f8b7b4146ac09d911b825b985eaf2fc2dc167088a34ab7f91",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/umrah_ihram_faceless.webp",
+      "sha256": "7e17fa6ecb38fac77c5947a094fd82a761bc7c71c01c57d637daa03d9bb492c9",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/umrah_overview_faceless.webp",
+      "sha256": "65424191d7753ccb7ff00e4d45283915d534042c06ed4e32e562fbf22b190466",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/umrah_prayer_faceless_mat.webp",
+      "sha256": "84adffcd6d4813ca64e2fd882ead1830eaf9ef436420ad746017ba05116e1c61",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/umrah_sai_faceless.webp",
+      "sha256": "4d63d673bb91e3071e196400a12fefe2273aa8ee655985d65c65fee999afd241",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/umrah_tawaf_faceless.webp",
+      "sha256": "ab8c24b24af47f121d2ba4f74a19b35dbfe862f106b5e742f41018768c611681",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/wudu_face_faceless.webp",
+      "sha256": "ce6712de2c3a5a8de104ef79e2b04f300adf74e25a4c247b71ca1b56cc901d83",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/wudu_feet.webp",
+      "sha256": "2f52656b032763e74914a8a1cf1ad23b01fe3dabc1d7eb9b3b5bd20fe2a92faa",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/wudu_hands_faceless.webp",
+      "sha256": "e171cd03987a294013f28fdbdfa248488c2e6faeaabbefdb83dc484470f516c2",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/zakat.webp",
+      "sha256": "dadd9b0f884f6b4c01d71ba94769962574508b2fdee460eb2f5fdfd1d0c820a8",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/zakat_assess.webp",
+      "sha256": "95f6114afa0ef83d4b5d822cdf903dde4c965f4fd5d2edc07b28e1e795c6a25e",
+      "referenced": true
+    },
+    {
+      "path": "assets/images/learn/zakat_calculate.webp",
+      "sha256": "7db73143a20cf7498a594f62ae864400812757c840a8cbf3d43bfed698cceb61",
+      "referenced": true
+    }
+  ],
+  "instructional_content_unchanged": true,
+  "validation": {
+    "asset_paths": "passed; 62 placements",
+    "guide_prose_unchanged": true,
+    "dart_analyze_lib": "passed; no issues",
+    "unsigned_ios_build": "passed; 42.3 seconds",
+    "bundled_asset_hashes_match": true,
+    "bundled_learn_asset_set_matches_source": true,
+    "bundle_newer_than_learn_sources_and_images": true,
+    "git_diff_check": "passed",
+    "tests_run": false,
+    "simulators_run": false
+  },
+  "prayer_mat_review": {
+    "date": "2026-10-21",
+    "assets_reviewed": 38,
+    "images_revised": 7,
+    "revision_renames": {
+      "prayer_bowing_faceless.webp": "prayer_bowing_faceless_mat.webp",
+      "prayer_illness_faceless.webp": "prayer_illness_faceless_mat.webp",
+      "prayer_prostration_faceless.webp": "prayer_prostration_faceless_mat.webp",
+      "prayer_seated_faceless.webp": "prayer_seated_faceless_mat.webp",
+      "prayer_standing_faceless.webp": "prayer_standing_faceless_mat.webp",
+      "prayer_travel_faceless.webp": "prayer_travel_faceless_mat.webp",
+      "umrah_prayer_faceless.webp": "umrah_prayer_faceless_mat.webp"
+    },
+    "guide_prose_unchanged": true,
+    "face_free_viewpoints_preserved": true,
+    "record": "docs/learn_prayer_mat_audit.md"
+  }
+}

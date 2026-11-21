@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/search/local_search_revision.dart';
 
 import '../../domain/entities/prayer_tracking_models.dart';
 
@@ -117,6 +118,7 @@ class PrayerTrackingStore {
     } else {
       _memory?[key] = value;
     }
+    LocalSearchRevision.changed(source: 'journal');
   }
 
   Iterable<String> _keys() {
@@ -130,5 +132,6 @@ class PrayerTrackingStore {
     } else {
       _memory?.clear();
     }
+    LocalSearchRevision.changed(source: 'journal');
   }
 }

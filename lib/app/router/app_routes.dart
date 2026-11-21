@@ -6,7 +6,9 @@ class AppRoutes {
   static const homeScreenWidgets = '/settings/home-screen-widgets';
   static const onboarding = '/onboarding';
   static const quranReader = '/quran/:surahNumber';
+  static const search = '/search';
   static const quranSearch = '/quran-search';
+  static const offlineSearch = '/offline-search';
   static const quranDownloads = '/quran-downloads';
   static const quranTranslations = '/quran-translations';
   static const quranBookmarks = '/quran-bookmarks';
@@ -52,13 +54,21 @@ class AppRoutes {
     return edit ? '$onboarding?edit=true' : onboarding;
   }
 
-  static String quranSearchPath([String? query]) {
+  static String searchPath({String? query, String? filter}) {
     final normalized = query?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return quranSearch;
-    }
-    return '$quranSearch?query=${Uri.encodeQueryComponent(normalized)}';
+    final parameters = <String, String>{
+      if (normalized != null && normalized.isNotEmpty) 'query': normalized,
+      if (filter != null && filter != 'all') 'filter': filter,
+    };
+    return Uri(
+      path: search,
+      queryParameters: parameters.isEmpty ? null : parameters,
+    ).toString();
   }
+
+  static String quranSearchPath([String? query]) => searchPath(query: query);
+
+  static String offlineSearchPath([String? query]) => searchPath(query: query);
 
   static String quranDownloadsPath({bool showTranslations = false}) {
     return showTranslations

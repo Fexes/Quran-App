@@ -14,7 +14,8 @@ import '../../features/quran/presentation/pages/quran_bookmarks_page.dart';
 import '../../features/quran/presentation/pages/quran_notes_page.dart';
 import '../../features/quran/presentation/pages/quran_reader_page.dart';
 import '../../features/quran/presentation/pages/quran_translation_manager_page.dart';
-import '../../features/quran/presentation/pages/search/quran_search_page.dart';
+import '../../features/search/domain/entities/offline_search_result.dart';
+import '../../features/search/presentation/pages/offline_search_page.dart';
 import '../../features/quran_audio/presentation/pages/quran_downloads_page.dart';
 import '../../features/reading_goals/presentation/pages/reading_goals_page.dart';
 import '../../features/prayer_tracking/presentation/pages/prayer_tracking_page.dart';
@@ -88,17 +89,36 @@ final appRouter = GoRouter(
           initialTranslationResourceId: int.tryParse(
             state.uri.queryParameters['translation'] ?? '',
           ),
+          initialTafsirResourceId: int.tryParse(
+            state.uri.queryParameters['tafsir'] ?? '',
+          ),
+          initialShowBundledTafsir:
+              state.uri.queryParameters['tafsir'] == 'bundled',
         );
       },
     ),
     GoRoute(
+      path: AppRoutes.search,
+      name: 'search',
+      builder: (context, state) => OfflineSearchPage(
+        initialQuery: state.uri.queryParameters['query'],
+        initialFilter: OfflineSearchFilter.values.firstWhere(
+          (filter) => filter.name == state.uri.queryParameters['filter'],
+          orElse: () => OfflineSearchFilter.all,
+        ),
+      ),
+    ),
+    GoRoute(
       path: AppRoutes.quranSearch,
       name: 'quran-search',
-      builder: (context, state) {
-        return QuranSearchPage(
-          initialQuery: state.uri.queryParameters['query'],
-        );
-      },
+      redirect: (context, state) =>
+          AppRoutes.searchPath(query: state.uri.queryParameters['query']),
+    ),
+    GoRoute(
+      path: AppRoutes.offlineSearch,
+      name: 'offline-search',
+      redirect: (context, state) =>
+          AppRoutes.searchPath(query: state.uri.queryParameters['query']),
     ),
     GoRoute(
       path: AppRoutes.quranDownloads,
@@ -179,7 +199,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const ZakatPage(),
     ),
     GoRoute(
-      path: AppRoutes.ramadan,
+      path: AppRoutes.fastingPlan,
       name: 'ramadan',
       builder: (context, state) => const RamadanPage(),
     ),
@@ -200,6 +220,7 @@ final appRouter = GoRouter(
         return HadithBookPage(
           bookId: state.pathParameters['bookId'] ?? '',
           initialLookup: state.uri.queryParameters['hadith'],
+          initialLanguageCode: state.uri.queryParameters['language'],
         );
       },
     ),
@@ -210,6 +231,7 @@ final appRouter = GoRouter(
         return AzkarCategoryPage(
           categoryId: state.pathParameters['categoryId'] ?? '',
           initialItemId: state.uri.queryParameters['item'],
+          initialLanguageCode: state.uri.queryParameters['language'],
         );
       },
     ),

@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/storage/settings_store.dart';
+import '../../../../core/utils/parse_localized_int.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/adaptive_inset_area.dart';
@@ -103,9 +104,9 @@ class _PrayerView extends StatelessWidget {
                     subtitle: l10n.prayerSubtitle,
                     actions: [
                       ShellHeaderAction(
-                        icon: Icons.refresh_rounded,
-                        tooltip: l10n.commonRefresh,
-                        onTap: context.read<PrayerTimesCubit>().load,
+                        icon: Icons.manage_search_rounded,
+                        tooltip: l10n.searchEverythingTitle,
+                        onTap: () => context.push(AppRoutes.searchPath()),
                       ),
                     ],
                   ),
@@ -1468,9 +1469,85 @@ Future<void> showIslamicCalendarSheet(BuildContext context) async {
     backgroundColor: Colors.transparent,
     builder: (_) => const AppSheet(
       title: 'Islamic calendar',
+      subtitle: 'Explore a date, month, or year.',
       child: _IslamicCalendarContent(),
     ),
   );
+}
+
+// The installed Umm al-Qura table contains full years 1356 through 1500.
+// Derive month lengths from its starts, rather than the package's fixed pattern.
+const _calendarFirstYear = 1356;
+const _calendarLastYear = 1500;
+const _calendarMonthCount = (_calendarLastYear - _calendarFirstYear + 1) * 12;
+final _calendarFirstGregorian = HijriCalendarConfig().hijriToGregorian(
+  _calendarFirstYear,
+  1,
+  1,
+);
+final _calendarLastGregorian = _calendarGregorianForMonthIndex(
+  _calendarMonthCount,
+  0,
+);
+
+DateTime _calendarGregorianForMonthIndex(int index, [int day = 1]) {
+  final offset = ummAlquraDateArray[index] - ummAlquraDateArray.first + day - 1;
+  return DateTime(
+    _calendarFirstGregorian.year,
+    _calendarFirstGregorian.month,
+    _calendarFirstGregorian.day + offset,
+  );
+}
+
+int _calendarMonthIndex(int year, int month) =>
+    (year - _calendarFirstYear) * 12 + month - 1;
+
+int _calendarDaysInMonth(int year, int month) {
+  final index = _calendarMonthIndex(year, month);
+  return ummAlquraDateArray[index + 1] - ummAlquraDateArray[index];
+}
+
+class _CalendarHijriDate {
+  const _CalendarHijriDate(this.year, this.month, this.day);
+
+  final int year;
+  final int month;
+  final int day;
+}
+
+_CalendarHijriDate? _calendarHijriForGregorian(DateTime date) {
+  // UTC is used only to count civil days without a daylight-saving offset.
+  final offset = DateTime.utc(date.year, date.month, date.day)
+      .difference(
+        DateTime.utc(
+          _calendarFirstGregorian.year,
+          _calendarFirstGregorian.month,
+          _calendarFirstGregorian.day,
+        ),
+      )
+      .inDays;
+  final lunarDay = ummAlquraDateArray.first + offset;
+  if (lunarDay < ummAlquraDateArray.first ||
+      lunarDay >= ummAlquraDateArray[_calendarMonthCount]) {
+    return null;
+  }
+  var low = 0;
+  var high = _calendarMonthCount - 1;
+  while (low <= high) {
+    final index = (low + high) ~/ 2;
+    if (lunarDay < ummAlquraDateArray[index]) {
+      high = index - 1;
+    } else if (lunarDay >= ummAlquraDateArray[index + 1]) {
+      low = index + 1;
+    } else {
+      return _CalendarHijriDate(
+        _calendarFirstYear + index ~/ 12,
+        index % 12 + 1,
+        lunarDay - ummAlquraDateArray[index] + 1,
+      );
+    }
+  }
+  return null;
 }
 
 class _IslamicCalendarContent extends StatefulWidget {
@@ -1481,9 +1558,10 @@ class _IslamicCalendarContent extends StatefulWidget {
       _IslamicCalendarContentState();
 }
 
-class _IslamicCalendarContentState extends State<_IslamicCalendarContent> {
-  late final DateTime _todayGregorian;
-  late final HijriCalendarConfig _todayHijri;
+class _IslamicCalendarContentState extends State<_IslamicCalendarContent>
+    with WidgetsBindingObserver {
+  _CalendarHijriDate? _today;
+  Timer? _dayRefresh;
   late int _displayedYear;
   late int _displayedMonth;
   late int _selectedDay;
@@ -1491,215 +1569,449 @@ class _IslamicCalendarContentState extends State<_IslamicCalendarContent> {
   @override
   void initState() {
     super.initState();
-    HijriCalendarConfig.language = 'en';
-    _todayGregorian = DateTime.now();
-    _todayHijri = HijriCalendarConfig.fromGregorian(_todayGregorian);
-    _displayedYear = _todayHijri.hYear;
-    _displayedMonth = _todayHijri.hMonth;
-    _selectedDay = _todayHijri.hDay;
+    WidgetsBinding.instance.addObserver(this);
+    final now = DateTime.now();
+    _today = _calendarHijriForGregorian(now);
+    final initial =
+        _today ??
+        (now.isBefore(_calendarFirstGregorian)
+            ? const _CalendarHijriDate(_calendarFirstYear, 1, 1)
+            : _CalendarHijriDate(
+                _calendarLastYear,
+                12,
+                _calendarDaysInMonth(_calendarLastYear, 12),
+              ));
+    _displayedYear = initial.year;
+    _displayedMonth = initial.month;
+    _selectedDay = initial.day;
+    _scheduleDayRefresh();
   }
 
-  void _changeMonth(int delta) {
+  @override
+  void dispose() {
+    _dayRefresh?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshToday();
+    } else if (state == AppLifecycleState.paused) {
+      _dayRefresh?.cancel();
+    }
+  }
+
+  bool get _selectedIsToday =>
+      _today?.year == _displayedYear &&
+      _today?.month == _displayedMonth &&
+      _today?.day == _selectedDay;
+
+  void _scheduleDayRefresh() {
+    _dayRefresh?.cancel();
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    _dayRefresh = Timer(
+      tomorrow.difference(now) + const Duration(milliseconds: 100),
+      _refreshToday,
+    );
+  }
+
+  void _refreshToday() {
+    if (!mounted) return;
+    final followToday = _selectedIsToday;
     setState(() {
-      var nextMonth = _displayedMonth + delta;
-      var nextYear = _displayedYear;
-      while (nextMonth < 1) {
-        nextMonth += 12;
-        nextYear--;
+      _today = _calendarHijriForGregorian(DateTime.now());
+      if (followToday && _today != null) {
+        _displayedYear = _today!.year;
+        _displayedMonth = _today!.month;
+        _selectedDay = _today!.day;
       }
-      while (nextMonth > 12) {
-        nextMonth -= 12;
-        nextYear++;
-      }
-      final maxDay = HijriCalendarConfig().getDaysInMonth(nextYear, nextMonth);
-      _displayedYear = nextYear;
-      _displayedMonth = nextMonth;
-      _selectedDay = math.min(_selectedDay, maxDay);
+    });
+    _scheduleDayRefresh();
+  }
+
+  void _showMonth(int year, int month) {
+    if (year < _calendarFirstYear ||
+        year > _calendarLastYear ||
+        month < 1 ||
+        month > 12) {
+      return;
+    }
+    setState(() {
+      _displayedYear = year;
+      _displayedMonth = month;
+      _selectedDay = math.min(_selectedDay, _calendarDaysInMonth(year, month));
     });
   }
 
-  void _selectDay(int day) {
-    setState(() => _selectedDay = day);
+  void _changeMonth(int delta) {
+    final index = _calendarMonthIndex(_displayedYear, _displayedMonth) + delta;
+    if (index < 0 || index >= _calendarMonthCount) return;
+    _showMonth(_calendarFirstYear + index ~/ 12, index % 12 + 1);
   }
 
   void _goToToday() {
+    final today = _calendarHijriForGregorian(DateTime.now());
+    if (today == null) {
+      _refreshToday();
+      return;
+    }
     setState(() {
-      _displayedYear = _todayHijri.hYear;
-      _displayedMonth = _todayHijri.hMonth;
-      _selectedDay = _todayHijri.hDay;
+      _today = today;
+      _displayedYear = today.year;
+      _displayedMonth = today.month;
+      _selectedDay = today.day;
+    });
+    _scheduleDayRefresh();
+  }
+
+  Future<void> _chooseMonth() async {
+    final choice = await showModalBottomSheet<_CalendarHijriDate>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AppSheet(
+        title: 'Go to month & year',
+        subtitle: 'Enter any Hijri year from 1356 to 1500.',
+        child: _CalendarMonthPicker(
+          year: _displayedYear,
+          month: _displayedMonth,
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    _showMonth(choice.year, choice.month);
+  }
+
+  Future<void> _chooseGregorianDate() async {
+    final index = _calendarMonthIndex(_displayedYear, _displayedMonth);
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _calendarGregorianForMonthIndex(index, _selectedDay),
+      firstDate: _calendarFirstGregorian,
+      lastDate: _calendarLastGregorian,
+      helpText: 'Go to Gregorian date',
+      confirmText: 'Show date',
+    );
+    if (!mounted || selected == null) return;
+    final hijri = _calendarHijriForGregorian(selected);
+    if (hijri == null) return;
+    setState(() {
+      _displayedYear = hijri.year;
+      _displayedMonth = hijri.month;
+      _selectedDay = hijri.day;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final monthHijri = HijriCalendarConfig.fromHijri(
-      _displayedYear,
-      _displayedMonth,
-      _selectedDay,
-    );
-    final daysInMonth = monthHijri.getDaysInMonth(
-      _displayedYear,
-      _displayedMonth,
-    );
-    final firstGregorian = monthHijri.hijriToGregorian(
-      _displayedYear,
-      _displayedMonth,
-      1,
-    );
-    final lastGregorian = monthHijri.hijriToGregorian(
-      _displayedYear,
-      _displayedMonth,
+    final theme = Theme.of(context);
+    final monthIndex = _calendarMonthIndex(_displayedYear, _displayedMonth);
+    final daysInMonth = _calendarDaysInMonth(_displayedYear, _displayedMonth);
+    final firstGregorian = _calendarGregorianForMonthIndex(monthIndex);
+    final lastGregorian = _calendarGregorianForMonthIndex(
+      monthIndex,
       daysInMonth,
     );
-    final selectedGregorian = monthHijri.hijriToGregorian(
-      _displayedYear,
-      _displayedMonth,
+    final selectedGregorian = _calendarGregorianForMonthIndex(
+      monthIndex,
       _selectedDay,
     );
+    final monthName = monthNames[_displayedMonth]!;
     final leadingBlanks = firstGregorian.weekday % 7;
-    final primary = Theme.of(context).colorScheme.primary;
+    final cellCount = ((leadingBlanks + daysInMonth + 6) ~/ 7) * 7;
     final showingCurrentMonth =
-        _displayedYear == _todayHijri.hYear &&
-        _displayedMonth == _todayHijri.hMonth;
+        _today?.year == _displayedYear && _today?.month == _displayedMonth;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
           children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: QuranTheme.softFill(context, primary),
-                shape: BoxShape.circle,
-              ),
-              child: AppIcon(
-                Icons.calendar_month_rounded,
-                color: primary,
-                size: 26,
-              ),
+            OutlinedButton.icon(
+              onPressed: _chooseMonth,
+              icon: const AppIcon(Icons.calendar_month_rounded, size: 18),
+              label: const Text('Month & year'),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            TextButton.icon(
+              onPressed: _chooseGregorianDate,
+              icon: const AppIcon(Icons.search_rounded, size: 18),
+              label: const Text('Gregorian date'),
+            ),
+            TextButton.icon(
+              onPressed: _today != null && !_selectedIsToday
+                  ? _goToToday
+                  : null,
+              icon: const AppIcon(Icons.calendar_today_rounded, size: 18),
+              label: const Text('Today'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        PremiumSurface(
+          borderColor: QuranTheme.outline(context),
+          padding: const EdgeInsets.fromLTRB(8, 14, 8, 4),
+          child: Column(
+            children: [
+              Row(
                 children: [
-                  Text(
-                    '${monthHijri.getLongMonthName()} $_displayedYear',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
+                  IconButton(
+                    tooltip: 'Previous month',
+                    icon: const AppIcon(Icons.chevron_left_rounded),
+                    onPressed: monthIndex > 0 ? () => _changeMonth(-1) : null,
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          monthName,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$_displayedYear AH',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: QuranTheme.subText(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${DateFormat('MMM d').format(firstGregorian)} to ${DateFormat('MMM d, y').format(lastGregorian)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: QuranTheme.subText(context, 0.64),
-                      fontWeight: FontWeight.w600,
+                  IconButton(
+                    tooltip: 'Next month',
+                    icon: const AppIcon(Icons.chevron_right_rounded),
+                    onPressed: monthIndex < _calendarMonthCount - 1
+                        ? () => _changeMonth(1)
+                        : null,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${DateFormat('d MMM y').format(firstGregorian)} to ${DateFormat('d MMM y').format(lastGregorian)}',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: QuranTheme.subText(context),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Divider(height: 1),
+              Row(
+                children: [
+                  Expanded(
+                    child: _CalendarYearButton(
+                      label: 'Previous year',
+                      icon: Icons.chevron_left_rounded,
+                      onTap: _displayedYear > _calendarFirstYear
+                          ? () =>
+                                _showMonth(_displayedYear - 1, _displayedMonth)
+                          : null,
+                    ),
+                  ),
+                  Expanded(
+                    child: _CalendarYearButton(
+                      label: 'Next year',
+                      icon: Icons.chevron_right_rounded,
+                      onTap: _displayedYear < _calendarLastYear
+                          ? () =>
+                                _showMonth(_displayedYear + 1, _displayedMonth)
+                          : null,
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: Text('Select a day', style: theme.textTheme.titleSmall),
+            ),
+            Text(
+              '$daysInMonth days',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: QuranTheme.subText(context),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            _CalendarTodayButton(
-              enabled: !showingCurrentMonth || _selectedDay != _todayHijri.hDay,
-              onTap: _goToToday,
-            ),
-            const Spacer(),
-            IconButton(
-              tooltip: 'Previous month',
-              icon: const AppIcon(Icons.chevron_left_rounded),
-              onPressed: () => _changeMonth(-1),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: 'Next month',
-              icon: const AppIcon(Icons.chevron_right_rounded),
-              onPressed: () => _changeMonth(1),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        _SelectedHijriDateCard(
-          hijri: monthHijri,
-          gregorian: selectedGregorian,
-          day: _selectedDay,
-        ),
-        const SizedBox(height: 16),
         const _HijriWeekdayHeader(),
         const SizedBox(height: 8),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: 42,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          padding: EdgeInsets.zero,
+          itemCount: cellCount,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 7,
-            mainAxisSpacing: 7,
-            crossAxisSpacing: 7,
+            mainAxisExtent: math.max(
+              44,
+              MediaQuery.textScalerOf(context).scale(16) + 20,
+            ),
+            mainAxisSpacing: 4,
+            crossAxisSpacing: 4,
           ),
           itemBuilder: (context, index) {
             final day = index - leadingBlanks + 1;
             if (day < 1 || day > daysInMonth) {
               return const SizedBox.shrink();
             }
-            final selected = day == _selectedDay;
-            final today = showingCurrentMonth && day == _todayHijri.hDay;
+            final gregorian = _calendarGregorianForMonthIndex(monthIndex, day);
             return _HijriDayCell(
               day: day,
-              selected: selected,
-              today: today,
-              onTap: () => _selectDay(day),
+              selected: day == _selectedDay,
+              today: showingCurrentMonth && day == _today?.day,
+              semanticLabel:
+                  '$day $monthName $_displayedYear AH, '
+                  '${DateFormat('EEEE, d MMMM y').format(gregorian)}',
+              onTap: () => setState(() => _selectedDay = day),
             );
           },
         ),
+        const SizedBox(height: 16),
+        _SelectedHijriDateCard(
+          hijriLabel: '$_selectedDay $monthName $_displayedYear AH',
+          gregorian: selectedGregorian,
+          today: _selectedIsToday,
+        ),
         const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: _CalendarStatPill(
-                label: 'Month length',
-                value: '$daysInMonth days',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _CalendarStatPill(label: 'Calendar', value: 'Umm al-Qura'),
-            ),
-          ],
+        Text(
+          'Umm al-Qura calendar · 1356 to 1500 AH',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: QuranTheme.subText(context),
+          ),
         ),
       ],
     );
   }
 }
 
-class _CalendarTodayButton extends StatelessWidget {
-  const _CalendarTodayButton({required this.enabled, required this.onTap});
+class _CalendarMonthPicker extends StatefulWidget {
+  const _CalendarMonthPicker({required this.year, required this.month});
 
-  final bool enabled;
-  final VoidCallback onTap;
+  final int year;
+  final int month;
+
+  @override
+  State<_CalendarMonthPicker> createState() => _CalendarMonthPickerState();
+}
+
+class _CalendarMonthPickerState extends State<_CalendarMonthPicker> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _yearController;
+  late int _month;
+
+  @override
+  void initState() {
+    super.initState();
+    _yearController = TextEditingController(text: widget.year.toString());
+    _month = widget.month;
+  }
+
+  @override
+  void dispose() {
+    _yearController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() != true) return;
+    Navigator.of(context).pop(
+      _CalendarHijriDate(parseLocalizedInt(_yearController.text)!, _month, 1),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return TextButton.icon(
-      onPressed: enabled ? onTap : null,
-      icon: const AppIcon(Icons.calendar_today_rounded, size: 18),
-      label: const Text('Today'),
-      style: TextButton.styleFrom(
-        foregroundColor: primary,
-        disabledForegroundColor: QuranTheme.subText(context, 0.38),
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 8),
+          DropdownButtonFormField<int>(
+            initialValue: _month,
+            isExpanded: true,
+            isDense: false,
+            itemHeight: null,
+            menuMaxHeight: 340,
+            decoration: const InputDecoration(labelText: 'Hijri month'),
+            items: [
+              for (var month = 1; month <= 12; month++)
+                DropdownMenuItem(value: month, child: Text(monthNames[month]!)),
+            ],
+            onChanged: (month) {
+              if (month != null) setState(() => _month = month);
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _yearController,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              labelText: 'Hijri year',
+              suffixText: 'AH',
+              helperText: '1356 to 1500',
+            ),
+            validator: (value) {
+              final year = parseLocalizedInt(value);
+              if (year == null ||
+                  year < _calendarFirstYear ||
+                  year > _calendarLastYear) {
+                return 'Enter a year from 1356 to 1500.';
+              }
+              return null;
+            },
+            onFieldSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: _submit,
+            icon: const AppIcon(Icons.calendar_month_rounded, size: 20),
+            label: const Text('Show month'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarYearButton extends StatelessWidget {
+  const _CalendarYearButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onTap,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AppIcon(icon, size: 16),
+          const SizedBox(width: 6),
+          Flexible(child: Text(label, textAlign: TextAlign.center)),
+        ],
       ),
     );
   }
@@ -1707,69 +2019,49 @@ class _CalendarTodayButton extends StatelessWidget {
 
 class _SelectedHijriDateCard extends StatelessWidget {
   const _SelectedHijriDateCard({
-    required this.hijri,
+    required this.hijriLabel,
     required this.gregorian,
-    required this.day,
+    required this.today,
   });
 
-  final HijriCalendarConfig hijri;
+  final String hijriLabel;
   final DateTime gregorian;
-  final int day;
+  final bool today;
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: QuranTheme.softFill(context, primary),
-        borderRadius: BorderRadius.circular(QuranTheme.radiusCard),
-        border: Border.all(color: primary.withValues(alpha: 0.15)),
-      ),
-      child: Row(
+    final theme = Theme.of(context);
+    return PremiumSurface(
+      borderColor: QuranTheme.outline(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              shape: BoxShape.circle,
-              border: Border.all(color: QuranTheme.outline(context)),
-            ),
-            child: Center(
-              child: Text(
-                day.toString(),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  hijri.fullDate(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  DateFormat('EEEE, MMMM d, y').format(gregorian),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: QuranTheme.subText(context, 0.62),
-                    fontWeight: FontWeight.w500,
+          Row(
+            children: [
+              const AppIcon(Icons.calendar_today_rounded, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  today ? 'Selected date · Today' : 'Selected date',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: QuranTheme.subText(context),
                   ),
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            hijriLabel,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            DateFormat('EEEE, d MMMM y').format(gregorian),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: QuranTheme.subText(context),
             ),
           ),
         ],
@@ -1783,17 +2075,33 @@ class _HijriWeekdayHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const names = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
     return Row(
       children: [
-        for (final label in labels)
+        for (var index = 0; index < labels.length; index++)
           Expanded(
-            child: Center(
-              child: Text(
-                label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: QuranTheme.subText(context, 0.54),
-                  fontWeight: FontWeight.w700,
+            child: Semantics(
+              label: names[index],
+              excludeSemantics: true,
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    labels[index],
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: QuranTheme.subText(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1808,87 +2116,58 @@ class _HijriDayCell extends StatelessWidget {
     required this.day,
     required this.selected,
     required this.today,
+    required this.semanticLabel,
     required this.onTap,
   });
 
   final int day;
   final bool selected;
   final bool today;
+  final String semanticLabel;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    final fill = selected
-        ? primary
-        : today
-        ? QuranTheme.softFill(context, primary)
-        : Colors.transparent;
-    final border = today ? primary : Colors.transparent;
-    final textColor = selected
-        ? Theme.of(context).colorScheme.onPrimary
-        : today
-        ? primary
-        : QuranTheme.subText(context, 0.78);
-    return Material(
-      color: fill,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: border),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                day.toString(),
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: textColor,
-                  fontWeight: FontWeight.w500,
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
+      side: today ? BorderSide(color: primary, width: 1.5) : BorderSide.none,
+    );
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: today ? '$semanticLabel, today' : semanticLabel,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? primary : Colors.transparent,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          customBorder: shape,
+          onTap: onTap,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  day.toString(),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: selected
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : today
+                        ? primary
+                        : null,
+                    fontWeight: selected || today
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _CalendarStatPill extends StatelessWidget {
-  const _CalendarStatPill({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: QuranTheme.subText(context, 0.58),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ],
       ),
     );
   }

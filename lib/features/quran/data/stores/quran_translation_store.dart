@@ -376,6 +376,19 @@ class QuranTranslationStore {
     return entries;
   }
 
+  Map<String, Object?> searchSnapshot() => {
+    'catalog': [for (final resource in catalog()) resource.toJson()],
+    'selected': selectedResource()?.toJson(),
+    for (final key in _keys())
+      if (key.startsWith('translation:') && key.contains(':verse:'))
+        if (_translationText(
+              _read(key),
+              cachePolicy: ContentCachePolicy.quranFoundation,
+            )
+            case final String text)
+          key: text,
+  };
+
   bool hasFullTranslation({
     required int resourceId,
     required String version,
@@ -491,6 +504,33 @@ class QuranTranslationStore {
       _memory?.remove(key);
     }
     LocalSearchRevision.changed(source: 'quran-translations');
+  }
+
+  /// Earliest still-valid verse expiry, so search removes expired cache entries
+  /// before the next query without scanning all text on every keystroke.
+  DateTime? get nextSearchExpiry {
+    final now = DateTime.now();
+    DateTime? earliest;
+    final catalogExpiry = ContentCachePolicy.quranFoundation.expiresAt(
+      _date(_read('translation_catalog_fetched_at')),
+    );
+    if (catalogExpiry != null && !catalogExpiry.isBefore(now)) {
+      earliest = catalogExpiry.add(const Duration(milliseconds: 1));
+    }
+    for (final key in _keys()) {
+      if (!key.startsWith('translation:') || !key.contains(':verse:')) continue;
+      final raw = _read(key);
+      if (raw is! Map) continue;
+      final expiry = ContentCachePolicy.quranFoundation.expiresAt(
+        _date(raw['fetchedAt']),
+      );
+      if (expiry != null &&
+          !expiry.isBefore(now) &&
+          (earliest == null || expiry.isBefore(earliest))) {
+        earliest = expiry.add(const Duration(milliseconds: 1));
+      }
+    }
+    return earliest;
   }
 
   Iterable<String> _keys() {

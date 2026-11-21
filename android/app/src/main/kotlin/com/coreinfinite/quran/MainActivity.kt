@@ -1,5 +1,6 @@
 package com.coreinfinite.quran
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.hardware.GeomagneticField
@@ -7,12 +8,19 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.Surface
 import com.ryanheise.audioservice.AudioServiceActivity
+import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.Executors
 
 class MainActivity : AudioServiceActivity() {
     private var widgetChannel: MethodChannel? = null
@@ -49,6 +57,94 @@ class MainActivity : AudioServiceActivity() {
                     result.success(path)
                 }
                 else -> result.notImplemented()
+            }
+        }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "quran/offline_search_assets")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "prepare") {
+                    OfflineSearchAssets.prepare(appContext, result)
+                } else {
+                    result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "quran/external_maps")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "openGoogleMapsMosques") {
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("geo:0,0?q=${Uri.encode("mosques near me")}"),
+                    ).setPackage("com.google.android.apps.maps")
+                    val opened = try {
+                        if (intent.resolveActivity(packageManager) != null) {
+                            startActivity(intent)
+                            true
+                        } else {
+                            false
+                        }
+                    } catch (_: ActivityNotFoundException) {
+                        false
+                    } catch (_: SecurityException) {
+                        false
+                    }
+                    result.success(opened)
+                } else {
+                    result.notImplemented()
+                }
+            }
+    }
+}
+
+private object OfflineSearchAssets {
+    private val executor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val filenames = listOf(
+        "manifest.json",
+        "search.sqlite",
+    )
+
+    fun prepare(context: Context, result: MethodChannel.Result) {
+        executor.execute {
+            try {
+                @Suppress("DEPRECATION")
+                val updatedAt = context.packageManager
+                    .getPackageInfo(context.packageName, 0).lastUpdateTime
+                val directory = File(context.cacheDir, "offline_search_bundle/$updatedAt-keyword-v3")
+                check(directory.isDirectory || directory.mkdirs())
+                val loader = FlutterInjector.instance().flutterLoader()
+                val paths = filenames.associateWith { filename ->
+                    val destination = File(directory, filename)
+                    if (!destination.isFile) {
+                        val partial = File.createTempFile("$filename.", ".partial", directory)
+                        try {
+                            val assetKey = loader.getLookupKeyForAsset("assets/keyword_search/$filename")
+                            context.assets.open(assetKey).use { input ->
+                                FileOutputStream(partial).use { output ->
+                                    input.copyTo(output, 64 * 1024)
+                                    output.fd.sync()
+                                }
+                            }
+                            check(partial.renameTo(destination))
+                        } finally {
+                            partial.delete()
+                        }
+                    }
+                    destination.absolutePath
+                }
+                directory.parentFile?.listFiles()?.forEach { previous ->
+                    if (previous.isDirectory && previous.name != directory.name &&
+                        previous.name.matches(Regex("[0-9]+(?:-keyword-v[0-9]+)?"))) {
+                        previous.deleteRecursively()
+                    }
+                }
+                mainHandler.post { result.success(paths) }
+            } catch (_: Exception) {
+                mainHandler.post {
+                    result.error(
+                        "offline_search_assets_unavailable",
+                        "Offline search assets could not be prepared.",
+                        null,
+                    )
+                }
             }
         }
     }

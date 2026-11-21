@@ -11,6 +11,7 @@ import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_sheet.dart';
 import '../../../../core/widgets/premium_surface.dart';
+import '../../../../l10n/gen/app_localizations.dart';
 import '../../../prayer/presentation/pages/prayer_page.dart'
     show showIslamicCalendarSheet;
 import '../../../prayer_times/domain/entities/daily_prayer_times.dart';
@@ -82,7 +83,7 @@ class _HomeDashboardTilesState extends State<HomeDashboardTiles> {
     context.push(switch (tile) {
       HomeTile.tasbieh => AppRoutes.tasbiehPath(),
       HomeTile.bookmarks => AppRoutes.quranBookmarksPath(),
-      HomeTile.fasting => AppRoutes.ramadanPath(),
+      HomeTile.fasting => AppRoutes.fastingPlanPath(),
       HomeTile.todayReadingGoal => AppRoutes.readingGoalsPath(),
       HomeTile.prayerJournal => AppRoutes.prayerTrackingPath(),
       HomeTile.duas => AppRoutes.duasPath(),
@@ -175,10 +176,12 @@ class _HomeDashboardTilesState extends State<HomeDashboardTiles> {
               final tile = _tiles[i];
               if (tile.fullWidth || single) {
                 rows.add(
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _buildTile(tile),
-                  ),
+                  tile == HomeTile.dailyAyah
+                      ? _buildTile(tile)
+                      : Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _buildTile(tile),
+                        ),
                 );
                 i++;
                 continue;
@@ -429,7 +432,9 @@ class _FastingTile extends StatelessWidget {
                               Icons.fact_check_outlined,
                               size: 18,
                             ),
-                            label: const Text('Fasting journal'),
+                            label: Text(
+                              AppLocalizations.of(context).fastingJournalTitle,
+                            ),
                           ),
                         ),
                         const SizedBox(
@@ -444,12 +449,14 @@ class _FastingTile extends StatelessWidget {
                           child: TextButton.icon(
                             style: buttonStyle,
                             onPressed: () =>
-                                context.push(AppRoutes.ramadanPath()),
+                                context.push(AppRoutes.fastingPlanPath()),
                             icon: const AppIcon(
                               Icons.nightlight_outlined,
                               size: 18,
                             ),
-                            label: const Text('Fasting Plan'),
+                            label: Text(
+                              AppLocalizations.of(context).ramadanTitle,
+                            ),
                           ),
                         ),
                       ],

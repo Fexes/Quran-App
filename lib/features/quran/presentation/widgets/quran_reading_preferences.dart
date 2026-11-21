@@ -133,11 +133,11 @@ class _QuranReadingPreferencesState extends State<QuranReadingPreferences> {
             ],
             _ChoiceTile(
               icon: Icons.translate_rounded,
-              label: 'Language',
+                label: 'Translation language',
               value:
                   translation?.displayLanguage ??
                   (widget.requireLanguageSelection
-                      ? 'Select language'
+                        ? 'Select translation language'
                       : 'English'),
               filled: true,
               onTap: widget.enabled ? () => _chooseLanguage(reciters) : null,

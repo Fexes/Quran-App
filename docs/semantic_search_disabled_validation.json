@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-21",
+  "analysis": "passed; no issues",
+  "ios_unsigned_build": "passed; 311.5 MB app bundle",
+  "android_arm64_release_build": "passed; 130.5 MB APK",
+  "android_apk_bytes": 130451369,
+  "search_asset_reduction_bytes": 298668693,
+  "keyword_index_bytes": 165048320,
+  "bundled_keyword_index_hash_matches": true,
+  "semantic_assets_and_onnx_absent_from_both_artifacts": true,
+  "keyword_and_reference_database_queries": "passed",
+  "learn_corner_arrows_removed": true,
+  "tests_run": false,
+  "simulators_run": false
+}

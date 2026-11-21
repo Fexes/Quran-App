@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-from collections import defaultdict, deque
+from collections import defaultdict
+import hashlib
 import json
 
 from import_hadith_azkar import (
     ASSETS,
     UMMAH_HADITHS,
     clean_text,
+    fetch_bytes,
     grade_text,
     normalize,
     number_sort_key,
@@ -23,21 +25,50 @@ UMMAH_BOOKS = (
     "nasai",
     "tirmidhi",
 )
+HADITH_SOURCE_COMMIT = "df57907be35291c91ad6a6691180e22ca9920784"
 
 
 def read_json(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def translation_key(value):
-    return clean_text(value)
+def source_edition(edition, raw=None):
+    url = (
+        "https://raw.githubusercontent.com/fawazahmed0/hadith-api/"
+        f"{HADITH_SOURCE_COMMIT}/editions/{edition}.min.json"
+    )
+    payload = raw if raw is not None else fetch_bytes(url)
+    data = json.loads(payload.decode("utf-8"))
+    by_number = {}
+    for item in data.get("hadiths", []):
+        number = number_text(item.get("hadithnumber"))
+        if not number or number in by_number:
+            raise RuntimeError(f"Missing or ambiguous source number in {edition}: {number}")
+        by_number[number] = item
+    return by_number, {
+        "project": "fawazahmed0/hadith-api",
+        "edition": edition,
+        "url": url,
+        "commit": HADITH_SOURCE_COMMIT,
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
 
 
-def rebuild_ummah_book(book_slug, current):
+def rebuild_ummah_book(book_slug, current, source_editions=None):
     source = read_json(UMMAH_HADITHS / f"eng-{book_slug}.json")
-    current_by_translation = defaultdict(deque)
+    if source_editions is None:
+        source_editions = {
+            language: source_edition(f"{language}-{book_slug}")
+            for language in ("eng", "ara")
+        }
+    english_by_number, english_provenance = source_editions["eng"]
+    arabic_by_number, arabic_provenance = source_editions["ara"]
+    current_by_number = {}
     for hadith in current.get("hadiths", []):
-        current_by_translation[translation_key(hadith.get("translation"))].append(hadith)
+        number = number_text(hadith.get("hadithNumber"))
+        if not number or number in current_by_number:
+            raise RuntimeError(f"Missing or duplicate current number in {book_slug}: {number}")
+        current_by_number[number] = hadith
 
     chapter_counts = defaultdict(int)
     chapter_numbers = defaultdict(list)
@@ -46,20 +77,33 @@ def rebuild_ummah_book(book_slug, current):
     for source_hadith in source.get("hadiths", []):
         number = number_text(source_hadith.get("number"))
         text = clean_text(source_hadith.get("text"))
-        candidates = current_by_translation[translation_key(text)]
-        previous = candidates.popleft() if candidates else {}
+        previous = current_by_number.get(number, {})
         reference_data = source_hadith.get("reference") or {}
         book_number = int(reference_data.get("book") or 0)
-        local_number = number_text(reference_data.get("hadith") or number)
         grades = source_hadith.get("grades") or []
-        reference = f"{source['name']} {local_number}"
+        reference = f"{source['name']} {number}"
 
-        arabic = clean_text(previous.get("arabic"))
-        arabic_number = number_text(previous.get("arabicNumber"))
-        if "." in number:
-            arabic = ""
-            arabic_number = ""
-        elif arabic:
+        # English text and assessments must still belong to the exact pinned
+        # source number before Arabic is attached. Never join by translation.
+        upstream_english = english_by_number.get(number)
+        if (
+            upstream_english is None
+            or clean_text(upstream_english.get("text")) != text
+            or clean_text(grade_text(upstream_english.get("grades") or []))
+            != clean_text(grade_text(grades))
+            or (upstream_english.get("reference") or {}) != reference_data
+        ):
+            raise RuntimeError(f"English source verification failed: {book_slug}:{number}")
+
+        upstream_arabic = arabic_by_number.get(number)
+        arabic = clean_text((upstream_arabic or {}).get("text"))
+        arabic_number = number if upstream_arabic is not None else ""
+        arabic_status = (
+            "exact_number"
+            if arabic
+            else "source_empty" if upstream_arabic is not None else "missing_source_record"
+        )
+        if arabic:
             matched_arabic += 1
 
         item = dict(previous)
@@ -74,14 +118,16 @@ def rebuild_ummah_book(book_slug, current):
                 "hadithNumber": number,
                 "arabicNumber": arabic_number,
                 "arabic": arabic,
+                "arabicSourceStatus": arabic_status,
                 "translation": text,
                 "grade": grade_text(grades),
                 "grades": grades,
                 "reference": reference,
                 "cleanReference": reference,
+                "sourceEditionReference": reference_data,
                 "collectionName": source["name"],
                 "englishEdition": source["collectionId"],
-                "arabicEdition": previous.get("arabicEdition", f"ara-{book_slug}"),
+                "arabicEdition": f"ara-{book_slug}",
                 "sourceId": "ummah_library_hadith",
             }
         )
@@ -127,6 +173,8 @@ def rebuild_ummah_book(book_slug, current):
                 "ingestionProject": "Ummah Library",
                 "upstream": source.get("source", {}),
                 "datasetVersion": source.get("version", ""),
+                "verifiedEnglishEdition": english_provenance,
+                "verifiedArabicEdition": arabic_provenance,
             },
             "chapters": chapters,
             "hadiths": rebuilt,
@@ -168,6 +216,8 @@ def search_record(hadith):
         "targetType": "hadith",
         "targetId": hadith["id"],
         "bookId": hadith["bookId"],
+        "sourceId": hadith.get("sourceId", ""),
+        "grades": hadith.get("grades") or [],
     }
 
 
@@ -244,6 +294,9 @@ def main():
         + "\n",
         encoding="utf-8",
     )
+    from build_compact_hadith_search_index import main as build_compact_index
+
+    build_compact_index()
     update_sources()
     print(f"search index: {len(search_records)} unique Hadith records")
 

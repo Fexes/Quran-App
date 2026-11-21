@@ -34,6 +34,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabSettings => 'Settings';
 
   @override
+  String get tabLearn => 'Learn';
+
+  @override
   String get nextPrayerTitle => 'Next prayer';
 
   @override
@@ -379,7 +382,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readingJourneyTitle => 'Reading journey';
 
   @override
-  String get hifzDashboardTitle => 'Hifz learning';
+  String get hifzDashboardTitle => 'Memorization';
 
   @override
   String get prayerJournalTitle => 'Prayer & fasting journal';
@@ -400,7 +403,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get zakatTitle => 'Zakat calculator';
 
   @override
-  String get ramadanTitle => 'Ramadan dashboard';
+  String get ramadanTitle => 'Fasting plan';
 
   @override
   String get achievementsTitle => 'Private achievements';

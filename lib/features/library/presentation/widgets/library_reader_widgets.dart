@@ -104,6 +104,7 @@ class LibraryReaderActionBar extends StatelessWidget {
     required this.onShare,
     required this.onSource,
     required this.onDetails,
+    this.sourceLabel = 'Source',
   });
 
   final String title;
@@ -114,6 +115,7 @@ class LibraryReaderActionBar extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback onSource;
   final VoidCallback onDetails;
+  final String sourceLabel;
 
   static double bottomClearance(BuildContext context) =>
       96 +
@@ -171,7 +173,7 @@ class LibraryReaderActionBar extends StatelessWidget {
                     onTap: onShare,
                   ),
                   _LibraryActionButton(
-                    tooltip: 'Source',
+                    tooltip: sourceLabel,
                     icon: Icons.info_outline_rounded,
                     onTap: onSource,
                   ),

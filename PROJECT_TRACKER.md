@@ -222,7 +222,7 @@ Research notes from current public documentation:
 | Islamic calendar | Hijri packages vary. `hijri_date` offers Umm al-Qura calendar, events, localization, and moon phase utilities. | Use a package or internal service with user-adjustable Hijri offset. |
 | Hadith database | Sunnah.com provides an API, but it requires an API key and currently exposes a portion of data. fawazahmed0/hadith-api provides static JSON endpoints via CDN with multiple languages and grades. AhmedBaset/hadith-json provides a large JSON database of 17 books, including the nine books. | MVP should avoid hard dependency on a key. Prefer bundled/downloadable JSON or SQLite subsets with repository interfaces for later online refresh. |
 | Azkar database | Azkar content should be bundled from a credited Hisnul Muslim/adhkar JSON source after license verification. | Keep Azkar fully offline, grouped by morning, evening, sleep, prayer, and general categories. |
-| Mosque locations | OpenStreetMap maps mosques as `amenity=place_of_worship` + `religion=muslim`; Overpass can query nearby nodes/ways/relations. | Prefer OpenStreetMap/Overpass for a no-key MVP, with Apple/Google Maps deep links for directions. Add provider abstraction in case Google Places is selected later. |
+| Mosque locations | External maps app or browser search. | Prefer installed Google Maps, then Apple Maps on iOS, then a browser search; no in-app places provider or API key. |
 
 Database-first source strategy:
 
@@ -236,7 +236,7 @@ Database-first source strategy:
 | Prayer times | Local calculation plus optional API validation | `adhan_dart`, AlAdhan for reference | No static database; cache calculated monthly timetable. |
 | Islamic calendar | Local calculation/API-backed conversion | Hijri/Umm al-Qura package or AlAdhan calendar endpoint | Cache month results; allow manual Hijri offset. |
 | Qibla | Device/location calculation | Device location + Kaaba bearing formula + compass | No content database. |
-| Mosque locations | Remote location query | OpenStreetMap Overpass | Cache recent nearby results with timestamp and radius. |
+| Mosque locations | External map search | Google Maps, Apple Maps, browser | The external maps app manages nearby results. |
 
 Reference links:
 
@@ -307,7 +307,7 @@ Status values: `Planned`, `Research`, `In Progress`, `Blocked`, `Done`.
 | Qibla | In Progress | `lib/features/qibla/presentation/bloc/*`, `lib/features/qibla/data/*`, `ios/Runner/QiblaHeadingStreamHandler.swift`, `android/app/src/main/kotlin/com/coreinfinite/quran/MainActivity.kt` | `lib/features/qibla/presentation/pages/qibla_page.dart`, `lib/features/qibla/presentation/widgets/qibla_compass.dart` | Native live heading and redesigned compass implemented: moving Kaaba, fixed alignment target, shortest-turn arc, degree guidance, stable alignment confirmation, haptic feedback, and independent accuracy gating. Browser preview and static checks complete; physical-device accuracy/haptics remain to verify. See `docs/design/qibla-compass-redesign.md`. |
 | Islamic calendar | Planned | `lib/features/islamic_calendar/*` | Calendar page/card | Hijri offset and Islamic events. |
 | Azkar | In Progress | `lib/features/azkar/domain/*`, `lib/features/azkar/data/*`, `lib/features/azkar/presentation/bloc/*`, `lib/app/di/injection.dart` | `lib/features/library/presentation/pages/library_page.dart` | Repository, local data-source scaffold, source attribution, category/search Cubit, Library UI section, and tests are implemented. Real source/license selection still pending before importing release content. |
-| Mosque locator | Planned | `lib/features/mosque_locator/*` | Mosque list/map/directions | Provider decision needed. |
+| Nearby mosques | Implemented | `lib/features/worship_tools/*` | One-tap external nearby search | Google Maps, then Apple Maps, then browser. |
 | Hadith | In Progress | `lib/features/hadith/domain/*`, `lib/features/hadith/data/*`, `lib/features/hadith/presentation/bloc/*`, `lib/app/di/injection.dart` | `lib/features/library/presentation/pages/library_page.dart` | Repository, local data-source scaffold, source attribution, collection/search Cubit, Library UI section, and tests are implemented. Real source/license selection still pending before importing release content. |
 | Settings | In Progress | `lib/features/settings/*`, `core/theme`, `core/localization` | `lib/features/settings/presentation/pages/settings_page.dart` | Theme, language, and font controls implemented. Prayer method and notification settings still pending. |
 
@@ -714,27 +714,21 @@ Relevant files:
 
 ### Milestone 10: Mosque Locator
 
-Goal: Find nearby mosques and open directions.
+Goal: Open a nearby-mosque search in the user's maps app.
 
-Tasks:
+Current implementation, 14 October 2026:
 
-1. Choose provider: Google Places, Apple/Google Maps query links, or OpenStreetMap Overpass.
-2. Document API key/cost/privacy tradeoffs.
-3. Add mosque entity.
-4. Create location-based repository.
-5. Create `MosqueLocatorBloc`.
-6. Build permission-first screen.
-7. Build nearby mosque list.
-8. Add distance and directions.
-9. Add map deep link.
-10. Add fallback manual search.
-11. Add tests for distance sorting.
-12. Run analyze.
+1. Open Google Maps when installed, with an explicitly targeted Google Maps intent on Android.
+2. On iOS, try Apple Maps next using an app-only map URL.
+3. Open the Google Maps search URL in the browser if neither maps app opens.
+4. Preserve the existing mosque route so Home, Prayer, and search shortcuts all use the same one-tap handoff.
+5. Remove the in-app Overpass repository, mosque-result model, radius controls, and saved-city search UI.
 
 Relevant files:
 
-- `lib/features/mosque_locator/*`
-- `lib/core/location/*`
+- `lib/features/worship_tools/presentation/pages/mosque_locator_page.dart`
+- `lib/features/worship_tools/data/services/nearby_mosques_launcher.dart`
+- Platform app-query configuration and Android map intent handler.
 
 ### Milestone 11: Polish, QA, and Release Readiness
 

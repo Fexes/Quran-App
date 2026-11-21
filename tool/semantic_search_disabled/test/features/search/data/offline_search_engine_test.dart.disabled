@@ -1,0 +1,649 @@
+import 'dart:convert';
+import 'dart:ffi';
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:onnxruntime_plus/onnxruntime_plus.dart';
+import 'package:quran/features/search/data/services/e5_embedder.dart';
+import 'package:quran/features/search/data/repositories/offline_search_repository_impl.dart';
+import 'package:quran/features/search/data/services/offline_search_database.dart';
+import 'package:quran/features/search/domain/entities/offline_search_result.dart';
+import 'package:quran/features/search/domain/entities/search_document.dart';
+import 'package:quran/features/search/data/services/offline_search_overlay.dart';
+
+class _NoNetwork extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) => throw StateError(
+    'Network access forbidden during offline retrieval checks.',
+  );
+}
+
+void main() {
+  late OfflineSearchDatabase database;
+  late E5Embedder embedder;
+  var databaseOpen = false;
+  var nativeInitialized = false;
+  var embedderOpen = false;
+  final benchmark = <String, dynamic>{};
+  final cases =
+      (jsonDecode(
+                File(
+                  'test/fixtures/offline_search/query_embeddings.json',
+                ).readAsStringSync(),
+              )
+              as Map<String, dynamic>)['cases']
+          as List;
+
+  setUpAll(() {
+    // Flutter's test host does not link CocoaPods. Load the package's real native
+    // runtime explicitly, so the same FFI binding can resolve process symbols.
+    if (Platform.isMacOS) {
+      final file = File('.dart_tool/package_config.json').absolute;
+      final configuration = jsonDecode(file.readAsStringSync()) as Map;
+      final package = (configuration['packages'] as List)
+          .cast<Map>()
+          .firstWhere((value) => value['name'] == 'onnxruntime_plus');
+      final root = Directory(
+        file.uri.resolve(package['rootUri'] as String).toFilePath(),
+      ).uri;
+      DynamicLibrary.open(
+        root.resolve('macos/libonnxruntime.1.15.1.dylib').toFilePath(),
+      );
+    }
+    HttpOverrides.global = _NoNetwork();
+    final clock = Stopwatch()..start();
+    final initialMemory = ProcessInfo.currentRss;
+    database = OfflineSearchDatabase('assets/offline_search/search.sqlite');
+    databaseOpen = true;
+    OrtEnv.instance.init();
+    nativeInitialized = true;
+    embedder = E5Embedder(
+      modelPath: 'assets/offline_search/model.int8.onnx',
+      tokenizerPath: 'assets/offline_search/tokenizer.json',
+    );
+    embedderOpen = true;
+    embedder.verifyTokenizerParity(
+      'assets/offline_search/tokenizer_parity.json',
+    );
+    benchmark.addAll({
+      'platform':
+          '${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+      'runtime': OrtEnv.version,
+      'database_sha_model': database.metadata['model_sha256'],
+      'initialization_ms': clock.elapsedMilliseconds,
+      'rss_before_bytes': initialMemory,
+      'rss_after_initialization_bytes': ProcessInfo.currentRss,
+      'corpus':
+          (jsonDecode(
+                File('assets/offline_search/manifest.json').readAsStringSync(),
+              )
+              as Map)['corpus'],
+      'queries': <Map<String, dynamic>>[],
+      'device_measurement': false,
+      'quality_judgments':
+          'Not supplied; retrieval parity is not relevance evaluation.',
+    });
+  });
+
+  tearDownAll(() {
+    if (embedderOpen) {
+      benchmark['peak_rss_test_process_bytes'] = ProcessInfo.maxRss;
+      File('docs/offline_search_native_benchmark.json').writeAsStringSync(
+        '${const JsonEncoder.withIndent('  ').convert(benchmark)}\n',
+      );
+      embedder.dispose();
+    }
+    if (databaseOpen) database.dispose();
+    if (nativeInitialized) OrtEnv.instance.release();
+    HttpOverrides.global = null;
+  });
+
+  test('RRF uses rank 1 and deduplicates each retrieval list', () {
+    final fused = reciprocalRankFusion([1, 1, 2], [2, 3]);
+    expect(fused.map((value) => value.id), [2, 1, 3]);
+    expect(fused.first.score, closeTo(1 / 62 + 1 / 61, 1e-12));
+    expect(fused[1].score, closeTo(1 / 61, 1e-12));
+  });
+
+  test('exact multilingual references and missing citations stay exact', () {
+    for (final query in ['2:255', '2 : 255', '۲:۲۵۵', '٢:٢٥٥', 'quran:2:255']) {
+      final exact = database.exactReferences(query, OfflineSearchFilter.quran);
+      expect(exact, hasLength(1), reason: query);
+      final hits = database.retrieve([
+        RankedPassage(exact.single, 1),
+      ], limit: 1);
+      expect(hits.single.passage.canonicalId, 'quran:2:255');
+      expect(hits.single.passage.surahNumber, 2);
+      expect(hits.single.passage.ayahNumber, 255);
+    }
+    final bukhari = database.exactReferences(
+      'bukhari 1',
+      OfflineSearchFilter.all,
+    );
+    expect(bukhari, hasLength(1));
+    expect(
+      database
+          .retrieve([RankedPassage(bukhari.single, 1)], limit: 1)
+          .single
+          .passage
+          .canonicalId,
+      'hadith:bukhari:1',
+    );
+    expect(database.looksLikeCanonicalReference('bukhari 999999'), isTrue);
+    expect(
+      database.looksLikeCanonicalReference('Sahih al-Bukhari 999999'),
+      isTrue,
+    );
+    expect(
+      database.exactReferences('bukhari 999999', OfflineSearchFilter.all),
+      isEmpty,
+    );
+    expect(
+      database.exactReferences('2:255', OfflineSearchFilter.hadith),
+      isEmpty,
+    );
+  });
+
+  for (final item in cases) {
+    final query = (item as Map)['query'] as String;
+    test('native E5 parity and offline retrieval: $query', () {
+      final total = Stopwatch()..start();
+      final step = Stopwatch()..start();
+      final keyword = database.keywordCandidates(
+        query,
+        OfflineSearchFilter.all,
+      );
+      final keywordUs = step.elapsedMicroseconds;
+      step
+        ..reset()
+        ..start();
+      final actual = embedder.embedQuery(query);
+      final embeddingUs = step.elapsedMicroseconds;
+      final expected = Float32List.fromList([
+        for (final value in item['embedding'] as List)
+          (value as num).toDouble(),
+      ]);
+      var dot = 0.0;
+      var norm = 0.0;
+      for (var i = 0; i < 384; i++) {
+        expect(actual[i].isFinite, isTrue);
+        dot += actual[i] * expected[i];
+        norm += actual[i] * actual[i];
+      }
+      expect(math.sqrt(norm), closeTo(1, 1e-5));
+      expect(
+        dot,
+        greaterThan(0.99999),
+        reason: 'Python index and native query embedding must agree.',
+      );
+      step
+        ..reset()
+        ..start();
+      final semantic = database.vectorCandidates(
+        actual,
+        OfflineSearchFilter.all,
+      );
+      final vectorUs = step.elapsedMicroseconds;
+      final expectedSemantic = database.vectorCandidates(
+        expected,
+        OfflineSearchFilter.all,
+      );
+      expect(semantic.take(10), orderedEquals(expectedSemantic.take(10)));
+      final hits = database.retrieve(
+        reciprocalRankFusion(keyword, semantic),
+        limit: 10,
+      );
+      expect(hits, hasLength(10));
+      expect(hits.map((hit) => hit.passage.canonicalId).toSet(), hasLength(10));
+      expect(
+        hits.every(
+          (hit) => hit.passage.arabic.isNotEmpty || hit.passage.body.isNotEmpty,
+        ),
+        isTrue,
+      );
+      (benchmark['queries'] as List).add({
+        'query': query,
+        'keyword_us': keywordUs,
+        'embedding_us': embeddingUs,
+        'vector_us': vectorUs,
+        'total_us_including_parity_verification': total.elapsedMicroseconds,
+        'top_10': [for (final hit in hits) hit.passage.canonicalId],
+      });
+    });
+  }
+
+  test('source filters apply before both retrieval methods', () {
+    final vector = embedder.embedQuery('patience');
+    for (final filter in [
+      OfflineSearchFilter.quran,
+      OfflineSearchFilter.hadith,
+    ]) {
+      final lexical = database.keywordCandidates('patience', filter);
+      final semantic = database.vectorCandidates(vector, filter);
+      final hits = database.retrieve(
+        reciprocalRankFusion(lexical, semantic),
+        limit: 20,
+      );
+      expect(hits, isNotEmpty);
+      expect(hits.every((hit) => hit.passage.kind == filter.name), isTrue);
+    }
+  });
+
+  test(
+    'persistent worker searches real local assets and closes cleanly',
+    () async {
+      benchmark['peak_rss_native_core_bytes'] = ProcessInfo.maxRss;
+      final repository = LocalOfflineSearchRepository(
+        bundledFiles: {
+          for (final name in [
+            'manifest.json',
+            'search.sqlite',
+            'model.int8.onnx',
+            'tokenizer.json',
+            'tokenizer_parity.json',
+          ])
+            name: File('assets/offline_search/$name').absolute.path,
+        },
+      );
+      try {
+        await repository.warmUp();
+        final exact = await repository.search(
+          '2 : 255',
+          filter: OfflineSearchFilter.quran,
+        );
+        expect(exact.semanticAvailable, isTrue);
+        expect(exact.hits.single.passage.canonicalId, 'quran:2:255');
+        final semantic = await repository.search('مجھے اپنے مستقبل کی فکر ہے');
+        expect(semantic.semanticAvailable, isTrue);
+        expect(semantic.hits, hasLength(20));
+        benchmark['federated_queries'] = <Map<String, dynamic>>[];
+        for (final value in cases) {
+          final query = value['query'] as String;
+          final result = await repository.search(query);
+          expect(result.semanticAvailable, isTrue);
+          (benchmark['federated_queries'] as List).add({
+            'query': query,
+            'timings_ms': result.timingsMs,
+            'top_10': [
+              for (final hit in result.hits.take(10)) hit.passage.canonicalId,
+            ],
+          });
+        }
+        final missing = await repository.search('Sahih al-Bukhari 999999');
+        expect(missing.hits, isEmpty);
+        expect(missing.warning, isNotNull);
+      } finally {
+        await repository.dispose();
+      }
+      expect(repository.search('patience'), throwsStateError);
+    },
+  );
+  test(
+    'private source snapshots update, delete and persist without stale vectors',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'search-overlay-check',
+      );
+      final path = '${directory.path}/overlay.sqlite';
+      var overlay = OfflineSearchOverlay(path, 'test-model');
+      SearchDocument document(String id, String text) => SearchDocument(
+        id: id,
+        text: text,
+        passage: OfflineSearchPassage(
+          canonicalId: id,
+          kind: 'notes',
+          reference: 'Personal note',
+          title: 'My note',
+          arabic: '',
+          translations: const [],
+          grades: const [],
+          body: text,
+          isUserContent: true,
+        ),
+      );
+      try {
+        overlay.upsert('notes', '1', [
+          document('a', 'journey sunrise'),
+          document('b', 'garden sunlight'),
+        ]);
+        overlay.finish('notes', '1', completedRevision: 'content-hash-one');
+        expect(overlay.completedSourceRevisions['notes'], 'content-hash-one');
+        final first = overlay.nextPending()!;
+        final vector = Float32List(384)..[0] = 1;
+        overlay.addVector(first.id, 0, vector);
+        overlay.finishEmbedding(first.id);
+        expect(
+          overlay.vectorScores(vector, OfflineSearchFilter.notes, 10),
+          isNotEmpty,
+        );
+        overlay.upsert('notes', '2', [
+          document('a', 'changed reflection ocean'),
+        ]);
+        expect(overlay.completedSourceRevisions, isEmpty);
+        overlay.finish('notes', '2', completedRevision: 'content-hash-two');
+        expect(
+          overlay.keywordScores('sunrise', OfflineSearchFilter.all, 10),
+          isEmpty,
+        );
+        expect(
+          overlay.keywordScores('garden', OfflineSearchFilter.all, 10),
+          isEmpty,
+        );
+        expect(
+          overlay.vectorScores(vector, OfflineSearchFilter.all, 10),
+          isEmpty,
+        );
+        expect(
+          overlay.keywordScores('ocean', OfflineSearchFilter.notes, 10),
+          hasLength(1),
+        );
+        expect(
+          overlay.keywordScores('ocean', OfflineSearchFilter.quran, 10),
+          isEmpty,
+        );
+        overlay.dispose();
+        overlay = OfflineSearchOverlay(path, 'test-model');
+        expect(overlay.completedSourceRevisions['notes'], 'content-hash-two');
+        expect(overlay.pendingDocuments, 1);
+        expect(
+          overlay.keywordScores('ocean', OfflineSearchFilter.notes, 10),
+          hasLength(1),
+        );
+        overlay.finish('notes', '3');
+        expect(overlay.pendingDocuments, 0);
+        expect(
+          overlay.keywordScores('ocean', OfflineSearchFilter.all, 10),
+          isEmpty,
+        );
+      } finally {
+        overlay.dispose();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'semantic-only downloaded winner retains its edition and original Arabic',
+    () async {
+      const query = 'uneasiness regarding forthcoming uncertainties';
+      final vector = embedder.embedQuery(query);
+      final baseScores = database.vectorScores(
+        vector,
+        OfflineSearchFilter.quran,
+      );
+      final keywordIds = database.keywordScores(
+        query,
+        OfflineSearchFilter.quran,
+      );
+      final candidate = baseScores.entries.firstWhere(
+        (entry) => !keywordIds.containsKey(entry.key),
+      );
+      expect(candidate.value, lessThan(0.999));
+      final original = database
+          .retrieve([RankedPassage(candidate.key, candidate.value)], limit: 1)
+          .single
+          .passage;
+      final directory = await Directory.systemTemp.createTemp(
+        'search-semantic-edition-check',
+      );
+      final path = '${directory.path}/overlay.sqlite';
+      final manifest =
+          jsonDecode(
+                File('assets/offline_search/manifest.json').readAsStringSync(),
+              )
+              as Map<String, dynamic>;
+      final identity =
+          '${manifest['model_revision']}:${database.metadata['model_sha256']}:${database.metadata['tokenizer_sha256']}:512:64:8192:mean_l2';
+      final overlay = OfflineSearchOverlay(path, identity);
+      final edition = SearchDocument(
+        id: 'edition:999:${original.canonicalId}',
+        text: 'دل کو تسلی اور آنے والے حالات کے بارے میں اطمینان',
+        language: 'ur',
+        passage: OfflineSearchPassage(
+          canonicalId: original.canonicalId,
+          kind: 'quran',
+          reference: original.reference,
+          title: original.reference,
+          arabic: '',
+          translations: const [
+            OfflineSearchTranslation(
+              language: 'ur',
+              text: 'دل کو تسلی اور آنے والے حالات کے بارے میں اطمینان',
+              source: 'Downloaded test edition',
+            ),
+          ],
+          grades: const [],
+          body: 'مقامی توضیح',
+          route:
+              '/quran/${original.surahNumber}?ayah=${original.ayahNumber}&translation=999',
+          language: 'ur',
+          sourceLabel: 'Downloaded test edition',
+          surahNumber: original.surahNumber,
+          ayahNumber: original.ayahNumber,
+          metadata: const {'translationResourceId': '999'},
+        ),
+      );
+      try {
+        overlay.upsert('quran-translations', 'one', [edition]);
+        overlay.finish('quran-translations', 'one');
+        expect(
+          overlay.keywordScores(query, OfflineSearchFilter.quran, 75),
+          isEmpty,
+          reason: 'This regression must exercise semantic-only retrieval.',
+        );
+        final pending = overlay.nextPending()!;
+        // A controlled perfect cosine isolates representation selection from
+        // relevance/model drift. The worker still embeds the real query itself.
+        overlay.addVector(pending.id, 0, vector);
+        overlay.finishEmbedding(pending.id);
+      } finally {
+        overlay.dispose();
+      }
+      final repository = LocalOfflineSearchRepository(
+        bundledFiles: {
+          for (final name in [
+            'manifest.json',
+            'search.sqlite',
+            'model.int8.onnx',
+            'tokenizer.json',
+            'tokenizer_parity.json',
+          ])
+            name: File('assets/offline_search/$name').absolute.path,
+        },
+        overlayPath: path,
+      );
+      try {
+        final result = await repository.search(
+          query,
+          filter: OfflineSearchFilter.quran,
+        );
+        expect(result.semanticAvailable, isTrue);
+        expect(result.pendingDocuments, 0);
+        final match = result.hits
+            .firstWhere(
+              (hit) => hit.passage.canonicalId == original.canonicalId,
+            )
+            .passage;
+        expect(match.route, edition.passage.route);
+        expect(match.language, 'ur');
+        expect(match.body, edition.passage.body);
+        expect(match.sourceLabel, 'Downloaded test edition');
+        expect(match.metadata['translationResourceId'], '999');
+        expect(match.arabic, original.arabic);
+      } finally {
+        await repository.dispose();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'worker indexes new private content by meaning, then removes it',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'search-private-check',
+      );
+      final files = {
+        for (final name in [
+          'manifest.json',
+          'search.sqlite',
+          'model.int8.onnx',
+          'tokenizer.json',
+          'tokenizer_parity.json',
+        ])
+          name: File('assets/offline_search/$name').absolute.path,
+      };
+      final repository = LocalOfflineSearchRepository(
+        bundledFiles: files,
+        overlayPath: '${directory.path}/overlay.sqlite',
+      );
+      const text =
+          'I saved a personal reflection about feeling anxious before an important journey.';
+      const document = SearchDocument(
+        id: 'note:journey',
+        text: text,
+        passage: OfflineSearchPassage(
+          canonicalId: 'note:journey',
+          kind: 'notes',
+          reference: 'Personal note',
+          title: 'Journey reflection',
+          arabic: '',
+          translations: [],
+          grades: [],
+          body: text,
+          isUserContent: true,
+        ),
+      );
+      try {
+        await repository.synchronizeSource(
+          'notes',
+          'one',
+          Stream.value([document]),
+        );
+        final immediately = await repository.search(
+          'journey',
+          filter: OfflineSearchFilter.notes,
+        );
+        expect(immediately.hits.single.passage.canonicalId, 'note:journey');
+        final deadline = DateTime.now().add(const Duration(seconds: 20));
+        while (true) {
+          final result = await repository.search(
+            'uneasy about travelling',
+            filter: OfflineSearchFilter.notes,
+          );
+          if (result.pendingDocuments == 0) {
+            expect(result.semanticAvailable, isTrue);
+            expect(result.hits.single.passage.canonicalId, 'note:journey');
+            break;
+          }
+          expect(
+            DateTime.now().isBefore(deadline),
+            isTrue,
+            reason: 'Background embedding must complete',
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        }
+        await repository.synchronizeSource(
+          'notes',
+          'two',
+          Stream.value(const <SearchDocument>[]),
+        );
+        final removed = await repository.search(
+          'uneasy about travelling',
+          filter: OfflineSearchFilter.notes,
+        );
+        expect(removed.hits, isEmpty);
+        expect(removed.pendingDocuments, 0);
+        const edition = SearchDocument(
+          id: 'edition:999:2:255',
+          text: 'Downloaded edition uniquelanguageterm',
+          language: 'ur',
+          passage: OfflineSearchPassage(
+            canonicalId: 'quran:2:255',
+            kind: 'quran',
+            reference: 'Quran 2:255',
+            title: 'Quran 2:255',
+            arabic: '',
+            translations: [
+              OfflineSearchTranslation(
+                language: 'ur',
+                text: 'Downloaded edition uniquelanguageterm',
+                source: 'Local edition',
+              ),
+            ],
+            grades: [],
+            route: '/quran/2?ayah=255&translation=999',
+            language: 'ur',
+            sourceLabel: 'Local edition',
+            surahNumber: 2,
+            ayahNumber: 255,
+            metadata: {'translationResourceId': '999'},
+          ),
+        );
+        const commentary = SearchDocument(
+          id: 'tafsir:9:2:255',
+          text: 'Locally downloaded commentary',
+          passage: OfflineSearchPassage(
+            canonicalId: 'tafsir:9:2:255',
+            kind: 'tafsir',
+            reference: 'Quran 2:255',
+            title: 'Local commentary',
+            arabic: '',
+            translations: [],
+            grades: [],
+            body: 'Locally downloaded commentary',
+            route: '/quran/2?ayah=255&tafsir=9',
+            metadata: {'verseKey': '2:255'},
+          ),
+        );
+        await repository.synchronizeSource(
+          'quran-translations',
+          'one',
+          Stream.value([edition]),
+        );
+        await repository.synchronizeSource(
+          'tafsir',
+          'one',
+          Stream.value([commentary]),
+        );
+        final exactEdition = await repository.search(
+          '۲:۲۵۵',
+          filter: OfflineSearchFilter.quran,
+        );
+        expect(exactEdition.hits.single.passage.arabic, isNotEmpty);
+        expect(exactEdition.hits.single.passage.route, edition.passage.route);
+        expect(
+          exactEdition.hits.single.passage.translations.any(
+            (t) => t.source == 'Local edition',
+          ),
+          isTrue,
+        );
+        final exactCommentary = await repository.search(
+          '2:255',
+          filter: OfflineSearchFilter.tafsir,
+        );
+        expect(
+          exactCommentary.hits.any(
+            (hit) => hit.passage.canonicalId == 'tafsir:9:2:255',
+          ),
+          isTrue,
+        );
+        final languageMatch = await repository.search(
+          'uniquelanguageterm',
+          filter: OfflineSearchFilter.quran,
+        );
+        final match = languageMatch.hits
+            .firstWhere((h) => h.passage.canonicalId == 'quran:2:255')
+            .passage;
+        expect(match.route, edition.passage.route);
+        expect(match.arabic, isNotEmpty);
+        expect(match.metadata['translationResourceId'], '999');
+      } finally {
+        await repository.dispose();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+}

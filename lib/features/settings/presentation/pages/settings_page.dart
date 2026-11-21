@@ -46,7 +46,7 @@ class SettingsPage extends StatelessWidget {
           IconButton(
             tooltip: l10n.searchEverythingTitle,
             icon: const AppIcon(Icons.search_rounded),
-            onPressed: () => context.push(AppRoutes.quranSearchPath()),
+            onPressed: () => context.push(AppRoutes.searchPath()),
           ),
         ],
       ),

@@ -1,0 +1,26 @@
+{
+  "retrieval_mode": "keyword",
+  "schema_version": 3,
+  "normalization_version": 1,
+  "corpus": {
+    "quran_count": 6236,
+    "hadith_count": 36108,
+    "azkar_count": 287,
+    "divine_name_count": 99,
+    "tafsir_count": 6236,
+    "surah_count": 114,
+    "languages": [
+      "ar",
+      "en"
+    ],
+    "sha256": "98751df5c6f365edb4a370554441069d05e606546dfcadaf0ae7a5fb2fd2bec8"
+  },
+  "artifacts": {
+    "search.sqlite": {
+      "sha256": "bb04986cd8aba8b53226ac02d5a5619e0f2e4e0ae0c6d1b533a258b9aa254b0e",
+      "bytes": 165048320
+    }
+  },
+  "source_policy": "All nonempty reader records, including weak, disputed and ungraded Hadith; original attributed assessments preserved; no independent authentication",
+  "translation_coverage": "Bundled Arabic and English reader sources; downloaded language packs are indexed on-device separately"
+}

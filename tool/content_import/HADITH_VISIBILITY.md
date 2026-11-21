@@ -1,7 +1,7 @@
 # Hadith visibility metadata
 
 After importing or modifying bundled Hadith books, regenerate the compact
-authenticity index from the repository root:
+display-availability index from the repository root:
 
 ```sh
 dart run tool/content_import/build_hadith_visibility.dart
@@ -12,5 +12,7 @@ uses the same `HadithAuthenticityPolicy` as the reader. Library counts and searc
 use this metadata without parsing every book on startup. Individual book reads
 still apply the policy independently.
 
-This is filtering based on the source's recorded grades and narration text,
-not an independent religious authentication of the corpus.
+Version 2 includes every record with nonempty Arabic or translation, including
+weak, disputed, scoped, and ungraded records. The reader and search display
+original attributed assessments separately. Visibility is not independent
+religious authentication of the corpus.

@@ -12,10 +12,10 @@ void main() {
     });
 
     test('encodes Quran search query', () {
-      expect(AppRoutes.quranSearchPath(), '/quran-search');
+      expect(AppRoutes.quranSearchPath(), '/search');
       expect(
         AppRoutes.quranSearchPath(' الرحمن الرحيم '),
-        '/quran-search?query=%D8%A7%D9%84%D8%B1%D8%AD%D9%85%D9%86+%D8%A7%D9%84%D8%B1%D8%AD%D9%8A%D9%85',
+        '/search?query=%D8%A7%D9%84%D8%B1%D8%AD%D9%85%D9%86+%D8%A7%D9%84%D8%B1%D8%AD%D9%8A%D9%85',
       );
     });
 

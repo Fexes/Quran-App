@@ -31,8 +31,8 @@ class HomeReadingGoalTile extends StatelessWidget {
       null => '',
     };
     return PremiumSurface(
-      borderColor: QuranTheme.outline(context).withValues(alpha: 0.75),
-      borderWidth: 0.6,
+      borderColor: QuranTheme.outline(context),
+      borderWidth: 0.8,
       onTap: onTap,
       padding: const EdgeInsets.all(16),
       child: Column(

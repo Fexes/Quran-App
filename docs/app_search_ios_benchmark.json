@@ -1,0 +1,1409 @@
+{
+  "platform": "ios",
+  "operating_system": "Version 27.0 (Build 24A437)",
+  "physical_device_requested": true,
+  "model": "intfloat/multilingual-e5-small INT8",
+  "scope": "Full packaged corpus plus current app source registry and live providers",
+  "queries": [
+    {
+      "query": "I'm worried about my future.",
+      "runs": [
+        {
+          "round_trip_ms": 380,
+          "timings_ms": {
+            "keyword": 179,
+            "embedding": 3,
+            "vector": 117,
+            "ranking": 78,
+            "total": 379
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42263,
+          "top_10": [
+            "quran:76:10",
+            "azkar:joy-and-distress:140",
+            "quran:69:38",
+            "azkar:joy-and-distress:141",
+            "quran:89:29",
+            "azkar:joy-and-distress:223",
+            "quran:74:27",
+            "quran:79:9",
+            "tafsir:157:35:34",
+            "quran:80:15"
+          ]
+        },
+        {
+          "round_trip_ms": 173,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 3,
+            "vector": 98,
+            "ranking": 67,
+            "total": 173
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42262,
+          "top_10": [
+            "quran:76:10",
+            "azkar:joy-and-distress:140",
+            "quran:69:38",
+            "azkar:joy-and-distress:141",
+            "quran:89:29",
+            "azkar:joy-and-distress:223",
+            "quran:74:27",
+            "quran:79:9",
+            "tafsir:157:35:34",
+            "quran:80:15"
+          ]
+        },
+        {
+          "round_trip_ms": 180,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 4,
+            "vector": 98,
+            "ranking": 67,
+            "total": 174
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42262,
+          "top_10": [
+            "quran:76:10",
+            "azkar:joy-and-distress:140",
+            "quran:69:38",
+            "azkar:joy-and-distress:141",
+            "quran:89:29",
+            "azkar:joy-and-distress:223",
+            "quran:74:27",
+            "quran:79:9",
+            "tafsir:157:35:34",
+            "quran:80:15"
+          ]
+        },
+        {
+          "round_trip_ms": 175,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 3,
+            "vector": 99,
+            "ranking": 67,
+            "total": 175
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42261,
+          "top_10": [
+            "quran:76:10",
+            "azkar:joy-and-distress:140",
+            "quran:69:38",
+            "azkar:joy-and-distress:141",
+            "quran:89:29",
+            "azkar:joy-and-distress:223",
+            "quran:74:27",
+            "quran:79:9",
+            "tafsir:157:35:34",
+            "quran:80:15"
+          ]
+        },
+        {
+          "round_trip_ms": 183,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 4,
+            "vector": 100,
+            "ranking": 69,
+            "total": 179
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42261,
+          "top_10": [
+            "quran:76:10",
+            "azkar:joy-and-distress:140",
+            "quran:69:38",
+            "azkar:joy-and-distress:141",
+            "quran:89:29",
+            "azkar:joy-and-distress:223",
+            "quran:74:27",
+            "quran:79:9",
+            "tafsir:157:35:34",
+            "quran:80:15"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "مجھے اپنے مستقبل کی فکر ہے",
+      "runs": [
+        {
+          "round_trip_ms": 248,
+          "timings_ms": {
+            "keyword": 41,
+            "embedding": 2,
+            "vector": 98,
+            "ranking": 105,
+            "total": 248
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42260,
+          "top_10": [
+            "hadith:ibnmajah:3891",
+            "quran:26:107",
+            "quran:26:143",
+            "tafsir:157:27:72",
+            "quran:86:16",
+            "tafsir:157:18:23",
+            "quran:80:10",
+            "tafsir:157:20:62",
+            "quran:69:29",
+            "tafsir:157:20:63"
+          ]
+        },
+        {
+          "round_trip_ms": 213,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 3,
+            "vector": 100,
+            "ranking": 100,
+            "total": 209
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42260,
+          "top_10": [
+            "hadith:ibnmajah:3891",
+            "quran:26:107",
+            "quran:26:143",
+            "tafsir:157:27:72",
+            "quran:86:16",
+            "tafsir:157:18:23",
+            "quran:80:10",
+            "tafsir:157:20:62",
+            "quran:69:29",
+            "tafsir:157:20:63"
+          ]
+        },
+        {
+          "round_trip_ms": 208,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 2,
+            "vector": 100,
+            "ranking": 99,
+            "total": 208
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42259,
+          "top_10": [
+            "hadith:ibnmajah:3891",
+            "quran:26:107",
+            "quran:26:143",
+            "tafsir:157:27:72",
+            "quran:86:16",
+            "tafsir:157:18:23",
+            "quran:80:10",
+            "tafsir:157:20:62",
+            "quran:69:29",
+            "tafsir:157:20:63"
+          ]
+        },
+        {
+          "round_trip_ms": 215,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 3,
+            "vector": 100,
+            "ranking": 100,
+            "total": 210
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42259,
+          "top_10": [
+            "hadith:ibnmajah:3891",
+            "quran:26:107",
+            "quran:26:143",
+            "tafsir:157:27:72",
+            "quran:86:16",
+            "tafsir:157:18:23",
+            "quran:80:10",
+            "tafsir:157:20:62",
+            "quran:69:29",
+            "tafsir:157:20:63"
+          ]
+        },
+        {
+          "round_trip_ms": 208,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 2,
+            "vector": 99,
+            "ranking": 100,
+            "total": 208
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42258,
+          "top_10": [
+            "hadith:ibnmajah:3891",
+            "quran:26:107",
+            "quran:26:143",
+            "tafsir:157:27:72",
+            "quran:86:16",
+            "tafsir:157:18:23",
+            "quran:80:10",
+            "tafsir:157:20:62",
+            "quran:69:29",
+            "tafsir:157:20:63"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "أشعر بالقلق بشأن مستقبلي",
+      "runs": [
+        {
+          "round_trip_ms": 191,
+          "timings_ms": {
+            "keyword": 7,
+            "embedding": 3,
+            "vector": 102,
+            "ranking": 73,
+            "total": 187
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42258,
+          "top_10": [
+            "hadith:malik:443",
+            "quran:20:25",
+            "hadith:bukhari:4535",
+            "quran:26:14",
+            "azkar:joy-and-distress:140",
+            "quran:7:112",
+            "azkar:joy-and-distress:141",
+            "quran:56:75",
+            "azkar:joy-and-distress:223",
+            "quran:30:2"
+          ]
+        },
+        {
+          "round_trip_ms": 179,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 2,
+            "vector": 100,
+            "ranking": 70,
+            "total": 178
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42257,
+          "top_10": [
+            "hadith:malik:443",
+            "quran:20:25",
+            "hadith:bukhari:4535",
+            "quran:26:14",
+            "azkar:joy-and-distress:140",
+            "quran:7:112",
+            "azkar:joy-and-distress:141",
+            "quran:56:75",
+            "azkar:joy-and-distress:223",
+            "quran:30:2"
+          ]
+        },
+        {
+          "round_trip_ms": 189,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 4,
+            "vector": 103,
+            "ranking": 73,
+            "total": 185
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42257,
+          "top_10": [
+            "hadith:malik:443",
+            "quran:20:25",
+            "hadith:bukhari:4535",
+            "quran:26:14",
+            "azkar:joy-and-distress:140",
+            "quran:7:112",
+            "azkar:joy-and-distress:141",
+            "quran:56:75",
+            "azkar:joy-and-distress:223",
+            "quran:30:2"
+          ]
+        },
+        {
+          "round_trip_ms": 181,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 2,
+            "vector": 100,
+            "ranking": 72,
+            "total": 180
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42256,
+          "top_10": [
+            "hadith:malik:443",
+            "quran:20:25",
+            "hadith:bukhari:4535",
+            "quran:26:14",
+            "azkar:joy-and-distress:140",
+            "quran:7:112",
+            "azkar:joy-and-distress:141",
+            "quran:56:75",
+            "azkar:joy-and-distress:223",
+            "quran:30:2"
+          ]
+        },
+        {
+          "round_trip_ms": 184,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 3,
+            "vector": 101,
+            "ranking": 70,
+            "total": 180
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42256,
+          "top_10": [
+            "hadith:malik:443",
+            "quran:20:25",
+            "hadith:bukhari:4535",
+            "quran:26:14",
+            "azkar:joy-and-distress:140",
+            "quran:7:112",
+            "azkar:joy-and-distress:141",
+            "quran:56:75",
+            "azkar:joy-and-distress:223",
+            "quran:30:2"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "Mujhe apne mustaqbil ki fikar hai",
+      "runs": [
+        {
+          "round_trip_ms": 183,
+          "timings_ms": {
+            "keyword": 7,
+            "embedding": 3,
+            "vector": 100,
+            "ranking": 72,
+            "total": 183
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42255,
+          "top_10": [
+            "azkar:joy-and-distress:140",
+            "divine_name:61",
+            "azkar:joy-and-distress:141",
+            "hadith:muslim:4376",
+            "azkar:joy-and-distress:223",
+            "hadith:muslim:2033",
+            "hadith:muslim:4767",
+            "tafsir:157:35:34",
+            "divine_name:14",
+            "tafsir:157:2:19"
+          ]
+        },
+        {
+          "round_trip_ms": 187,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 5,
+            "vector": 103,
+            "ranking": 69,
+            "total": 183
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42255,
+          "top_10": [
+            "azkar:joy-and-distress:140",
+            "divine_name:61",
+            "azkar:joy-and-distress:141",
+            "hadith:muslim:4376",
+            "azkar:joy-and-distress:223",
+            "hadith:muslim:2033",
+            "hadith:muslim:4767",
+            "tafsir:157:35:34",
+            "divine_name:14",
+            "tafsir:157:2:19"
+          ]
+        },
+        {
+          "round_trip_ms": 177,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 3,
+            "vector": 101,
+            "ranking": 67,
+            "total": 177
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42254,
+          "top_10": [
+            "azkar:joy-and-distress:140",
+            "divine_name:61",
+            "azkar:joy-and-distress:141",
+            "hadith:muslim:4376",
+            "azkar:joy-and-distress:223",
+            "hadith:muslim:2033",
+            "hadith:muslim:4767",
+            "tafsir:157:35:34",
+            "divine_name:14",
+            "tafsir:157:2:19"
+          ]
+        },
+        {
+          "round_trip_ms": 186,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 5,
+            "vector": 102,
+            "ranking": 69,
+            "total": 182
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42254,
+          "top_10": [
+            "azkar:joy-and-distress:140",
+            "divine_name:61",
+            "azkar:joy-and-distress:141",
+            "hadith:muslim:4376",
+            "azkar:joy-and-distress:223",
+            "hadith:muslim:2033",
+            "hadith:muslim:4767",
+            "tafsir:157:35:34",
+            "divine_name:14",
+            "tafsir:157:2:19"
+          ]
+        },
+        {
+          "round_trip_ms": 178,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 3,
+            "vector": 100,
+            "ranking": 68,
+            "total": 177
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42253,
+          "top_10": [
+            "azkar:joy-and-distress:140",
+            "divine_name:61",
+            "azkar:joy-and-distress:141",
+            "hadith:muslim:4376",
+            "azkar:joy-and-distress:223",
+            "hadith:muslim:2033",
+            "hadith:muslim:4767",
+            "tafsir:157:35:34",
+            "divine_name:14",
+            "tafsir:157:2:19"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "What helps when life is difficult?",
+      "runs": [
+        {
+          "round_trip_ms": 341,
+          "timings_ms": {
+            "keyword": 47,
+            "embedding": 2,
+            "vector": 100,
+            "ranking": 186,
+            "total": 337
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42253,
+          "top_10": [
+            "azkar:praising-allah:159",
+            "quran:2:280",
+            "quran:2:220",
+            "hadith:tirmidhi:1930",
+            "quran:90:12",
+            "quran:20:124",
+            "quran:26:93",
+            "hadith:muslim:7438",
+            "hadith:muslim:7088",
+            "hadith:nasai:1306"
+          ]
+        },
+        {
+          "round_trip_ms": 278,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 2,
+            "vector": 99,
+            "ranking": 171,
+            "total": 278
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42252,
+          "top_10": [
+            "azkar:praising-allah:159",
+            "quran:2:280",
+            "quran:2:220",
+            "hadith:tirmidhi:1930",
+            "quran:90:12",
+            "quran:20:124",
+            "quran:26:93",
+            "hadith:muslim:7438",
+            "hadith:muslim:7088",
+            "hadith:nasai:1306"
+          ]
+        },
+        {
+          "round_trip_ms": 286,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 4,
+            "vector": 101,
+            "ranking": 170,
+            "total": 280
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42252,
+          "top_10": [
+            "azkar:praising-allah:159",
+            "quran:2:280",
+            "quran:2:220",
+            "hadith:tirmidhi:1930",
+            "quran:90:12",
+            "quran:20:124",
+            "quran:26:93",
+            "hadith:muslim:7438",
+            "hadith:muslim:7088",
+            "hadith:nasai:1306"
+          ]
+        },
+        {
+          "round_trip_ms": 282,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 3,
+            "vector": 101,
+            "ranking": 172,
+            "total": 282
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42251,
+          "top_10": [
+            "azkar:praising-allah:159",
+            "quran:2:280",
+            "quran:2:220",
+            "hadith:tirmidhi:1930",
+            "quran:90:12",
+            "quran:20:124",
+            "quran:26:93",
+            "hadith:muslim:7438",
+            "hadith:muslim:7088",
+            "hadith:nasai:1306"
+          ]
+        },
+        {
+          "round_trip_ms": 291,
+          "timings_ms": {
+            "keyword": 4,
+            "embedding": 4,
+            "vector": 102,
+            "ranking": 178,
+            "total": 288
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42251,
+          "top_10": [
+            "azkar:praising-allah:159",
+            "quran:2:280",
+            "quran:2:220",
+            "hadith:tirmidhi:1930",
+            "quran:90:12",
+            "quran:20:124",
+            "quran:26:93",
+            "hadith:muslim:7438",
+            "hadith:muslim:7088",
+            "hadith:nasai:1306"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "How should I treat my parents?",
+      "runs": [
+        {
+          "round_trip_ms": 337,
+          "timings_ms": {
+            "keyword": 46,
+            "embedding": 2,
+            "vector": 98,
+            "ranking": 188,
+            "total": 337
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42250,
+          "top_10": [
+            "quran:31:14",
+            "hadith:muslim:6501",
+            "hadith:bukhari:6675",
+            "hadith:bukhari:3720",
+            "hadith:ibnmajah:3661",
+            "quran:68:41",
+            "hadith:ibnmajah:3658",
+            "quran:65:6",
+            "hadith:muslim:2325",
+            "quran:17:23"
+          ]
+        },
+        {
+          "round_trip_ms": 296,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 5,
+            "vector": 101,
+            "ranking": 179,
+            "total": 292
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42250,
+          "top_10": [
+            "quran:31:14",
+            "hadith:muslim:6501",
+            "hadith:bukhari:6675",
+            "hadith:bukhari:3720",
+            "hadith:ibnmajah:3661",
+            "quran:68:41",
+            "hadith:ibnmajah:3658",
+            "quran:65:6",
+            "hadith:muslim:2325",
+            "quran:17:23"
+          ]
+        },
+        {
+          "round_trip_ms": 291,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 3,
+            "vector": 101,
+            "ranking": 180,
+            "total": 290
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42249,
+          "top_10": [
+            "quran:31:14",
+            "hadith:muslim:6501",
+            "hadith:bukhari:6675",
+            "hadith:bukhari:3720",
+            "hadith:ibnmajah:3661",
+            "quran:68:41",
+            "hadith:ibnmajah:3658",
+            "quran:65:6",
+            "hadith:muslim:2325",
+            "quran:17:23"
+          ]
+        },
+        {
+          "round_trip_ms": 302,
+          "timings_ms": {
+            "keyword": 5,
+            "embedding": 4,
+            "vector": 101,
+            "ranking": 185,
+            "total": 297
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42249,
+          "top_10": [
+            "quran:31:14",
+            "hadith:muslim:6501",
+            "hadith:bukhari:6675",
+            "hadith:bukhari:3720",
+            "hadith:ibnmajah:3661",
+            "quran:68:41",
+            "hadith:ibnmajah:3658",
+            "quran:65:6",
+            "hadith:muslim:2325",
+            "quran:17:23"
+          ]
+        },
+        {
+          "round_trip_ms": 294,
+          "timings_ms": {
+            "keyword": 6,
+            "embedding": 2,
+            "vector": 101,
+            "ranking": 181,
+            "total": 291
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "quran:31:14",
+            "hadith:muslim:6501",
+            "hadith:bukhari:6675",
+            "hadith:bukhari:3720",
+            "hadith:ibnmajah:3661",
+            "quran:68:41",
+            "hadith:ibnmajah:3658",
+            "quran:65:6",
+            "hadith:muslim:2325",
+            "quran:17:23"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "2 : 255",
+      "runs": [
+        {
+          "round_trip_ms": 6,
+          "timings_ms": {
+            "reference": 2,
+            "total": 2
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "quran:2:255",
+            "tafsir:bundled:2:255",
+            "tafsir:157:2:255"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "quran:2:255",
+            "tafsir:bundled:2:255",
+            "tafsir:157:2:255"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "quran:2:255",
+            "tafsir:bundled:2:255",
+            "tafsir:157:2:255"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "quran:2:255",
+            "tafsir:bundled:2:255",
+            "tafsir:157:2:255"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "quran:2:255",
+            "tafsir:bundled:2:255",
+            "tafsir:157:2:255"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "bukhari 1",
+      "runs": [
+        {
+          "round_trip_ms": 1,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "bukhari 999999",
+      "runs": [
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is not available in the selected sources.",
+          "pending_documents": 42248,
+          "top_10": []
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is not available in the selected sources.",
+          "pending_documents": 42248,
+          "top_10": []
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is not available in the selected sources.",
+          "pending_documents": 42248,
+          "top_10": []
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is not available in the selected sources.",
+          "pending_documents": 42248,
+          "top_10": []
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is not available in the selected sources.",
+          "pending_documents": 42248,
+          "top_10": []
+        }
+      ]
+    },
+    {
+      "query": "When is the next prayer?",
+      "runs": [
+        {
+          "round_trip_ms": 425,
+          "timings_ms": {
+            "keyword": 226,
+            "embedding": 2,
+            "vector": 99,
+            "ranking": 95,
+            "total": 424
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42248,
+          "top_10": [
+            "live:prayer:asr:2026-10-14",
+            "hadith:muslim:550",
+            "hadith:muslim:551",
+            "hadith:abudawud:910",
+            "hadith:ibnmajah:1378",
+            "hadith:bukhari:228",
+            "hadith:ibnmajah:1257",
+            "hadith:ibnmajah:1132",
+            "hadith:ibnmajah:693",
+            "hadith:malik:408"
+          ]
+        },
+        {
+          "round_trip_ms": 210,
+          "timings_ms": {
+            "keyword": 12,
+            "embedding": 3,
+            "vector": 100,
+            "ranking": 93,
+            "total": 210
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42247,
+          "top_10": [
+            "live:prayer:asr:2026-10-14",
+            "hadith:muslim:550",
+            "hadith:muslim:551",
+            "hadith:abudawud:910",
+            "hadith:ibnmajah:1378",
+            "hadith:bukhari:228",
+            "hadith:ibnmajah:1257",
+            "hadith:ibnmajah:1132",
+            "hadith:ibnmajah:693",
+            "hadith:malik:408"
+          ]
+        },
+        {
+          "round_trip_ms": 215,
+          "timings_ms": {
+            "keyword": 13,
+            "embedding": 3,
+            "vector": 101,
+            "ranking": 93,
+            "total": 211
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42247,
+          "top_10": [
+            "live:prayer:asr:2026-10-14",
+            "hadith:muslim:550",
+            "hadith:muslim:551",
+            "hadith:abudawud:910",
+            "hadith:ibnmajah:1378",
+            "hadith:bukhari:228",
+            "hadith:ibnmajah:1257",
+            "hadith:ibnmajah:1132",
+            "hadith:ibnmajah:693",
+            "hadith:malik:408"
+          ]
+        },
+        {
+          "round_trip_ms": 211,
+          "timings_ms": {
+            "keyword": 12,
+            "embedding": 2,
+            "vector": 101,
+            "ranking": 93,
+            "total": 210
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42246,
+          "top_10": [
+            "live:prayer:asr:2026-10-14",
+            "hadith:muslim:550",
+            "hadith:muslim:551",
+            "hadith:abudawud:910",
+            "hadith:ibnmajah:1378",
+            "hadith:bukhari:228",
+            "hadith:ibnmajah:1257",
+            "hadith:ibnmajah:1132",
+            "hadith:ibnmajah:693",
+            "hadith:malik:408"
+          ]
+        },
+        {
+          "round_trip_ms": 216,
+          "timings_ms": {
+            "keyword": 13,
+            "embedding": 2,
+            "vector": 101,
+            "ranking": 94,
+            "total": 212
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42246,
+          "top_10": [
+            "live:prayer:asr:2026-10-14",
+            "hadith:muslim:550",
+            "hadith:muslim:551",
+            "hadith:abudawud:910",
+            "hadith:ibnmajah:1378",
+            "hadith:bukhari:228",
+            "hadith:ibnmajah:1257",
+            "hadith:ibnmajah:1132",
+            "hadith:ibnmajah:693",
+            "hadith:malik:408"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "Where can I find my downloaded languages?",
+      "runs": [
+        {
+          "round_trip_ms": 205,
+          "timings_ms": {
+            "keyword": 30,
+            "embedding": 3,
+            "vector": 103,
+            "ranking": 68,
+            "total": 204
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42245,
+          "top_10": [
+            "feature:downloads",
+            "feature:translations",
+            "feature:settings",
+            "audio:everyayah_Alafasy_128kbps_001_003",
+            "quran:26:195",
+            "audio:everyayah_Alafasy_128kbps_001_007",
+            "audio:everyayah_Alafasy_128kbps_001_005",
+            "audio:everyayah_Alafasy_128kbps_001_004",
+            "audio:everyayah_Alafasy_128kbps_001_006",
+            "audio:everyayah_Alafasy_128kbps_001_001"
+          ]
+        },
+        {
+          "round_trip_ms": 173,
+          "timings_ms": {
+            "keyword": 2,
+            "embedding": 3,
+            "vector": 100,
+            "ranking": 64,
+            "total": 170
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42245,
+          "top_10": [
+            "feature:downloads",
+            "feature:translations",
+            "feature:settings",
+            "audio:everyayah_Alafasy_128kbps_001_003",
+            "quran:26:195",
+            "audio:everyayah_Alafasy_128kbps_001_007",
+            "audio:everyayah_Alafasy_128kbps_001_005",
+            "audio:everyayah_Alafasy_128kbps_001_004",
+            "audio:everyayah_Alafasy_128kbps_001_006",
+            "audio:everyayah_Alafasy_128kbps_001_001"
+          ]
+        },
+        {
+          "round_trip_ms": 175,
+          "timings_ms": {
+            "keyword": 2,
+            "embedding": 5,
+            "vector": 102,
+            "ranking": 64,
+            "total": 174
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42244,
+          "top_10": [
+            "feature:downloads",
+            "feature:translations",
+            "feature:settings",
+            "audio:everyayah_Alafasy_128kbps_001_003",
+            "quran:26:195",
+            "audio:everyayah_Alafasy_128kbps_001_007",
+            "audio:everyayah_Alafasy_128kbps_001_005",
+            "audio:everyayah_Alafasy_128kbps_001_004",
+            "audio:everyayah_Alafasy_128kbps_001_006",
+            "audio:everyayah_Alafasy_128kbps_001_001"
+          ]
+        },
+        {
+          "round_trip_ms": 175,
+          "timings_ms": {
+            "keyword": 2,
+            "embedding": 4,
+            "vector": 101,
+            "ranking": 63,
+            "total": 172
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42244,
+          "top_10": [
+            "feature:downloads",
+            "feature:translations",
+            "feature:settings",
+            "audio:everyayah_Alafasy_128kbps_001_003",
+            "quran:26:195",
+            "audio:everyayah_Alafasy_128kbps_001_007",
+            "audio:everyayah_Alafasy_128kbps_001_005",
+            "audio:everyayah_Alafasy_128kbps_001_004",
+            "audio:everyayah_Alafasy_128kbps_001_006",
+            "audio:everyayah_Alafasy_128kbps_001_001"
+          ]
+        },
+        {
+          "round_trip_ms": 173,
+          "timings_ms": {
+            "keyword": 2,
+            "embedding": 4,
+            "vector": 102,
+            "ranking": 64,
+            "total": 173
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42243,
+          "top_10": [
+            "feature:downloads",
+            "feature:translations",
+            "feature:settings",
+            "audio:everyayah_Alafasy_128kbps_001_003",
+            "quran:26:195",
+            "audio:everyayah_Alafasy_128kbps_001_007",
+            "audio:everyayah_Alafasy_128kbps_001_005",
+            "audio:everyayah_Alafasy_128kbps_001_004",
+            "audio:everyayah_Alafasy_128kbps_001_006",
+            "audio:everyayah_Alafasy_128kbps_001_001"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "How can I track my fasting?",
+      "runs": [
+        {
+          "round_trip_ms": 38,
+          "timings_ms": {
+            "keyword": 29,
+            "embedding": 2,
+            "vector": 1,
+            "ranking": 1,
+            "total": 35
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42243,
+          "top_10": [
+            "feature:fasts",
+            "feature:ramadan",
+            "feature:journal",
+            "feature:settings",
+            "feature:backup",
+            "feature:prayer",
+            "feature:goals",
+            "surah:35",
+            "feature:achievements",
+            "surah:86"
+          ]
+        },
+        {
+          "round_trip_ms": 8,
+          "timings_ms": {
+            "keyword": 2,
+            "embedding": 3,
+            "vector": 1,
+            "ranking": 1,
+            "total": 8
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42243,
+          "top_10": [
+            "feature:fasts",
+            "feature:ramadan",
+            "feature:journal",
+            "feature:settings",
+            "feature:backup",
+            "feature:prayer",
+            "feature:goals",
+            "surah:35",
+            "feature:achievements",
+            "surah:86"
+          ]
+        },
+        {
+          "round_trip_ms": 9,
+          "timings_ms": {
+            "keyword": 2,
+            "embedding": 4,
+            "vector": 1,
+            "ranking": 1,
+            "total": 8
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42242,
+          "top_10": [
+            "feature:fasts",
+            "feature:ramadan",
+            "feature:journal",
+            "feature:settings",
+            "feature:backup",
+            "feature:prayer",
+            "feature:goals",
+            "surah:35",
+            "feature:achievements",
+            "surah:86"
+          ]
+        },
+        {
+          "round_trip_ms": 10,
+          "timings_ms": {
+            "keyword": 2,
+            "embedding": 5,
+            "vector": 1,
+            "ranking": 1,
+            "total": 10
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42242,
+          "top_10": [
+            "feature:fasts",
+            "feature:ramadan",
+            "feature:journal",
+            "feature:settings",
+            "feature:backup",
+            "feature:prayer",
+            "feature:goals",
+            "surah:35",
+            "feature:achievements",
+            "surah:86"
+          ]
+        },
+        {
+          "round_trip_ms": 11,
+          "timings_ms": {
+            "keyword": 2,
+            "embedding": 5,
+            "vector": 1,
+            "ranking": 1,
+            "total": 11
+          },
+          "semantic_available": true,
+          "warning": null,
+          "pending_documents": 42242,
+          "top_10": [
+            "feature:fasts",
+            "feature:ramadan",
+            "feature:journal",
+            "feature:settings",
+            "feature:backup",
+            "feature:prayer",
+            "feature:goals",
+            "surah:35",
+            "feature:achievements",
+            "surah:86"
+          ]
+        }
+      ]
+    }
+  ],
+  "quality_judgments": "Not supplied; these are performance and execution checks.",
+  "rss_before_bytes": 92930048,
+  "corpus": {
+    "quran_count": 6236,
+    "hadith_count": 30770,
+    "azkar_count": 287,
+    "divine_name_count": 99,
+    "tafsir_count": 6236,
+    "surah_count": 114,
+    "vector_count": 91272,
+    "languages": [
+      "ar",
+      "en"
+    ],
+    "sha256": "4f2bafa508cc405cac1083bb5da730740b0cf1d29e52af82b2c97d3ef3beef2d"
+  },
+  "initialization_ms": 4253,
+  "rss_after_initialization_bytes": 555352064,
+  "status": "passed",
+  "rss_peak_bytes": 560119808
+}

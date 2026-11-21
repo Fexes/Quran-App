@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/search/local_search_revision.dart';
 
 import '../../domain/entities/quran_audio_download_item.dart';
 
@@ -13,6 +14,24 @@ class QuranAudioDownloadStore {
   final Map<String, Object?>? _memory;
 
   static const boxName = 'quran_audio_downloads';
+
+  Map<String, Object?> searchSnapshot() => {
+    for (final raw in _values())
+      if (raw is Map && raw['id'] is String)
+        raw['id'] as String: {
+          for (final key in const [
+            'id',
+            'reciterId',
+            'reciterName',
+            'verseKey',
+            'surahNumber',
+            'ayahNumber',
+            'remoteUrl',
+            'status',
+          ])
+            key: raw[key],
+        },
+  };
 
   static Future<QuranAudioDownloadStore> open() async {
     await Hive.initFlutter();
@@ -68,8 +87,13 @@ class QuranAudioDownloadStore {
     return allItems.where((item) => item.isActive).toList(growable: false);
   }
 
-  Future<void> saveItem(QuranAudioDownloadItem item) {
-    return _write(item.id, item.toJson());
+  Future<void> saveItem(QuranAudioDownloadItem item) async {
+    final previous = itemById(item.id);
+    await _write(item.id, item.toJson());
+    if (previous?.status != item.status ||
+        previous?.reciterName != item.reciterName) {
+      LocalSearchRevision.changed(source: 'audio');
+    }
   }
 
   Future<void> saveItems(Iterable<QuranAudioDownloadItem> items) async {
@@ -82,15 +106,17 @@ class QuranAudioDownloadStore {
     for (final id in ids) {
       await _delete(id);
     }
+    LocalSearchRevision.changed(source: 'audio');
   }
 
   Future<void> clear() async {
     final box = _box;
     if (box != null) {
       await box.clear();
-      return;
+    } else {
+      _memory?.clear();
     }
-    _memory?.clear();
+    LocalSearchRevision.changed(source: 'audio');
   }
 
   Object? _read(String key) {

@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,7 +10,7 @@ import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../../core/widgets/app_sheet.dart';
-import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../quran/domain/repositories/quran_repository.dart';
 import '../../domain/entities/reading_progress.dart';
@@ -38,9 +39,9 @@ class _ReadingGoalsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppPageAppBar(
         title: Text(AppLocalizations.of(context).readingJourneyTitle),
-        flexibleSpace: const ArchitecturalBackdrop(),
+        flexibleSpace: const HeaderPatternBackdrop(),
       ),
       body: BlocBuilder<ReadingGoalsCubit, ReadingGoalsState>(
         builder: (context, state) {

@@ -148,6 +148,12 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get tabSettings;
 
+  /// No description provided for @tabLearn.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn'**
+  String get tabLearn;
+
   /// No description provided for @nextPrayerTitle.
   ///
   /// In en, this message translates to:
@@ -829,7 +835,7 @@ abstract class AppLocalizations {
   /// No description provided for @hifzDashboardTitle.
   ///
   /// In en, this message translates to:
-  /// **'Hifz learning'**
+  /// **'Memorization'**
   String get hifzDashboardTitle;
 
   /// No description provided for @prayerJournalTitle.
@@ -871,7 +877,7 @@ abstract class AppLocalizations {
   /// No description provided for @ramadanTitle.
   ///
   /// In en, this message translates to:
-  /// **'Ramadan dashboard'**
+  /// **'Fasting plan'**
   String get ramadanTitle;
 
   /// No description provided for @achievementsTitle.

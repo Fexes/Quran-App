@@ -34,6 +34,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get tabSettings => 'الإعدادات';
 
   @override
+  String get tabLearn => 'تعلّم';
+
+  @override
   String get nextPrayerTitle => 'الصلاة التالية';
 
   @override
@@ -399,7 +402,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get zakatTitle => 'حاسبة الزكاة';
 
   @override
-  String get ramadanTitle => 'لوحة رمضان';
+  String get ramadanTitle => 'خطة الصيام';
 
   @override
   String get achievementsTitle => 'الإنجازات الخاصة';

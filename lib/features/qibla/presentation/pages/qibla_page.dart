@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -11,6 +12,7 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../prayer_times/domain/entities/prayer_location.dart';
 import '../../domain/repositories/qibla_repository.dart';
@@ -39,7 +41,8 @@ class _QiblaView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppPageAppBar(
+        flexibleSpace: const HeaderPatternBackdrop(),
         title: const Text('Qibla'),
         centerTitle: true,
         leading: IconButton(

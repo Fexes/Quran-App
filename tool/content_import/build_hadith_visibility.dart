@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:quran/features/hadith/domain/entities/hadith_item.dart';
 import 'package:quran/features/hadith/domain/services/hadith_authenticity_policy.dart';
 
-// Run after importing books. Uses the same policy as the reader, without
-// requiring every book to be decoded when Library or Search opens.
+// Run after importing books. Uses the reader's text-availability policy,
+// including weak, disputed, and ungraded records. Visibility is not a grading.
 void main() {
   final directory = Directory('assets/data/hadith/books');
   final files =
@@ -29,8 +29,12 @@ void main() {
       'chapterCount': items.map((item) => item.chapterId).toSet().length,
     };
   }
-  File(
-    'assets/data/hadith/visibility.json',
-  ).writeAsStringSync(jsonEncode({'version': 1, 'books': books}));
+  File('assets/data/hadith/visibility.json').writeAsStringSync(
+    jsonEncode({
+      'version': 2,
+      'policy': 'nonempty-arabic-or-translation',
+      'books': books,
+    }),
+  );
   stdout.writeln('Updated visibility for ${books.length} books.');
 }

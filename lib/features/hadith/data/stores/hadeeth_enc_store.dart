@@ -16,6 +16,10 @@ class HadeethEncStore {
 
   static const boxName = 'hadeeth_enc';
 
+  Map<String, Object?> searchSnapshot() => {
+    for (final key in _keys()) key: _read(key),
+  };
+
   static Future<HadeethEncStore> open() async {
     await Hive.initFlutter();
     final box = await Hive.openBox<dynamic>(boxName);
@@ -77,6 +81,15 @@ class HadeethEncStore {
       'itemCount': items.length,
       'completedAt': DateTime.now().toIso8601String(),
     });
+  }
+
+  /// Decodes one record at a time so search can yield between bounded batches.
+  Iterable<HadeethEncItem> cachedSearchItems(String languageCode) sync* {
+    final raw = _read(_itemsKey(languageCode));
+    if (raw is! List) return;
+    for (final item in raw) {
+      if (item is Map) yield HadeethEncItem.fromJson(item);
+    }
   }
 
   List<HadeethEncItem> itemsForLanguage(String languageCode) {
@@ -151,7 +164,7 @@ class HadeethEncStore {
     } else {
       _memory?[key] = value;
     }
-    LocalSearchRevision.changed();
+    LocalSearchRevision.changed(source: 'hadeethenc');
   }
 
   static String _itemsKey(String languageCode) =>

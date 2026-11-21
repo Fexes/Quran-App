@@ -1,0 +1,323 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:sqlite3/sqlite3.dart';
+
+import '../../../../core/search/offline_search_normalizer.dart';
+import '../../../../core/search/search_query_terms.dart';
+import '../../domain/entities/offline_search_result.dart';
+
+/// FTS5 and exact cosine retrieval, run only inside the search isolate.
+/// Vector batches bound memory independently of the corpus size.
+class OfflineSearchDatabase {
+  OfflineSearchDatabase(
+    String path, {
+    this.config = const OfflineSearchConfig(),
+  }) : _db = sqlite3.open(path, mode: OpenMode.readOnly) {
+    try {
+      _db.execute('PRAGMA query_only = ON');
+      _db.execute('PRAGMA cache_size = -4096');
+      final values = _db.select('SELECT key, value FROM metadata');
+      metadata = {
+        for (final row in values) row['key'] as String: row['value'] as String,
+      };
+      if (!{'1', '2'}.contains(metadata['schema_version']) ||
+          metadata['dimensions'] != '384' ||
+          metadata['max_length'] != '512' ||
+          metadata['normalization_version'] != '1' ||
+          (metadata['schema_version'] == '2' &&
+              (metadata['vector_storage'] != 'blocks_v1' ||
+                  metadata['vector_block_size'] != '128' ||
+                  metadata['vector_encoding'] != 'float32_little_endian'))) {
+        throw const FormatException('Unsupported offline search index.');
+      }
+      // Prove this native SQLite build supports the packaged FTS5 table.
+      _db.select('SELECT rowid FROM passages_fts LIMIT 1');
+      final aliases = _db.select(
+        "SELECT a.alias FROM reference_aliases a JOIN passages p ON p.id = a.passage_id WHERE p.kind = 'hadith'",
+      );
+      final pattern = RegExp(r'^(.*?[ :])\d+[a-z]?$');
+      for (final row in aliases) {
+        final match = pattern.firstMatch(row['alias'] as String);
+        if (match != null) _referencePrefixes.add(match.group(1)!.trim());
+      }
+    } catch (_) {
+      _db.close();
+      rethrow;
+    }
+  }
+
+  final Database _db;
+  final OfflineSearchConfig config;
+  late final Map<String, String> metadata;
+  final _referencePrefixes = <String>{};
+
+  List<int> exactReferences(String query, OfflineSearchFilter filter) {
+    final rows = _db.select(
+      'SELECT p.id FROM reference_aliases a JOIN passages p ON p.id = a.passage_id '
+      'WHERE a.alias = ?${_kindClause(filter)} ORDER BY p.canonical_id',
+      [OfflineSearchNormalizer.reference(query), ..._kindParameters(filter)],
+    );
+    return [for (final row in rows) row['id'] as int];
+  }
+
+  bool looksLikeCanonicalReference(String query) {
+    final value = OfflineSearchNormalizer.reference(query);
+    if (RegExp(r'^(?:quran[: ]*)?\d{1,3}:\d{1,3}$').hasMatch(value) ||
+        value.startsWith('hadith:')) {
+      return true;
+    }
+    final match = RegExp(r'^(.*?[ :])\d+[a-z]?$').firstMatch(value);
+    return match != null && _referencePrefixes.contains(match.group(1)!.trim());
+  }
+
+  List<int> keywordCandidates(String query, OfflineSearchFilter filter) {
+    return keywordScores(query, filter).keys.toList();
+  }
+
+  Map<int, double> keywordScores(String query, OfflineSearchFilter filter) {
+    final expressions = SearchQueryTerms.analyze(
+      query,
+    ).expressionsFor(filter.name);
+    final scores = <int, double>{};
+    for (final expression in expressions) {
+      final rows = _db.select(
+        'SELECT p.id, bm25(passages_fts) AS score FROM passages_fts JOIN passages p ON p.id = passages_fts.rowid '
+        'WHERE passages_fts MATCH ?${_kindClause(filter)} '
+        'ORDER BY bm25(passages_fts), p.canonical_id LIMIT ?',
+        [expression, ..._kindParameters(filter), config.candidateLimit],
+      );
+      for (final row in rows) {
+        if (scores.length >= config.candidateLimit) break;
+        scores.putIfAbsent(
+          row['id'] as int,
+          () => -(row['score'] as num).toDouble(),
+        );
+      }
+      if (scores.length >= config.candidateLimit) break;
+    }
+    return scores;
+  }
+
+  List<int> vectorCandidates(Float32List query, OfflineSearchFilter filter) {
+    return vectorScores(query, filter).keys.toList();
+  }
+
+  Map<int, double> vectorScores(Float32List query, OfflineSearchFilter filter) {
+    if (query.length != 384 || query.any((value) => !value.isFinite)) {
+      throw const FormatException('Invalid query vector.');
+    }
+    final top = <int, double>{};
+    var minimumId = -1;
+    var minimumScore = double.negativeInfinity;
+    var lastVectorId = 0;
+    final packed = metadata['schema_version'] == '2';
+    final vectorTable = packed ? 'vector_entries' : 'vectors';
+    final vectorColumns = packed ? 'v.block_id, v.byte_offset' : 'v.embedding';
+    int? loadedBlockId;
+    ByteData? loadedBlock;
+    while (true) {
+      final rows = _db.select(
+        'SELECT v.id, v.passage_id, $vectorColumns FROM $vectorTable v '
+        // Keep the vector primary-key range scan outermost. SQLite otherwise
+        // rescans every Hadith vector and sorts it again for each small batch.
+        'CROSS JOIN passages p ON p.id = v.passage_id '
+        'WHERE v.id > ?${_kindClause(filter)} ORDER BY v.id LIMIT ?',
+        [lastVectorId, ..._kindParameters(filter), config.vectorBatchSize],
+      );
+      if (rows.isEmpty) break;
+      for (final row in rows) {
+        lastVectorId = row['id'] as int;
+        final id = row['passage_id'] as int;
+        late final ByteData data;
+        var offset = 0;
+        if (packed) {
+          final blockId = row['block_id'] as int;
+          if (loadedBlockId != blockId) {
+            final blocks = _db.select(
+              'SELECT embeddings FROM vector_blocks WHERE id = ?',
+              [blockId],
+            );
+            if (blocks.length != 1) {
+              throw const FormatException('Missing passage vector block.');
+            }
+            final bytes = blocks.single['embeddings'] as Uint8List;
+            if (bytes.isEmpty ||
+                bytes.length > 128 * 384 * 4 ||
+                bytes.length % (384 * 4) != 0) {
+              throw const FormatException('Corrupt passage vector block.');
+            }
+            loadedBlock = ByteData.sublistView(bytes);
+            loadedBlockId = blockId;
+          }
+          data = loadedBlock!;
+          offset = row['byte_offset'] as int;
+          if (offset < 0 ||
+              offset % (384 * 4) != 0 ||
+              offset + 384 * 4 > data.lengthInBytes) {
+            throw const FormatException('Corrupt passage vector offset.');
+          }
+        } else {
+          final bytes = row['embedding'] as Uint8List;
+          if (bytes.length != 384 * 4) {
+            throw const FormatException('Corrupt passage vector.');
+          }
+          data = ByteData.sublistView(bytes);
+        }
+        var score = 0.0;
+        for (var i = 0; i < 384; i++) {
+          score += query[i] * data.getFloat32(offset + i * 4, Endian.little);
+        }
+        if (!score.isFinite) {
+          throw const FormatException('Corrupt vector values.');
+        }
+        final previous = top[id];
+        if (previous != null && score <= previous) continue;
+        if (previous == null && top.length >= config.candidateLimit) {
+          if (score < minimumScore ||
+              (score == minimumScore && id > minimumId)) {
+            continue;
+          }
+          top.remove(minimumId);
+        }
+        top[id] = score;
+        if (top.length == config.candidateLimit) {
+          minimumScore = double.infinity;
+          for (final entry in top.entries) {
+            if (entry.value < minimumScore ||
+                (entry.value == minimumScore && entry.key > minimumId)) {
+              minimumId = entry.key;
+              minimumScore = entry.value;
+            }
+          }
+        }
+      }
+    }
+    final ids = top.keys.toList();
+    ids.sort((a, b) {
+      final comparison = top[b]!.compareTo(top[a]!);
+      return comparison == 0 ? a.compareTo(b) : comparison;
+    });
+    return {for (final id in ids) id: top[id]!};
+  }
+
+  List<OfflineSearchHit> retrieve(
+    List<RankedPassage> ranked, {
+    required int limit,
+  }) {
+    if (ranked.isEmpty) return const [];
+    final selected = ranked.take(limit).toList(growable: false);
+    final ids = selected.map((value) => value.id).toList(growable: false);
+    final rows = _db.select(
+      'SELECT * FROM passages WHERE id IN (${List.filled(ids.length, '?').join(',')})',
+      ids,
+    );
+    final passages = <int, OfflineSearchPassage>{};
+    for (final row in rows) {
+      final translations =
+          jsonDecode(row['translations_json'] as String) as List;
+      final grades = jsonDecode(row['grades_json'] as String) as List;
+      passages[row['id'] as int] = OfflineSearchPassage(
+        canonicalId: row['canonical_id'] as String,
+        kind: row['kind'] as String,
+        reference: row['reference'] as String,
+        title: row['title'] as String,
+        arabic: row['arabic'] as String,
+        translations: List.unmodifiable([
+          for (final value in translations)
+            OfflineSearchTranslation.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+        ]),
+        grades: List.unmodifiable([
+          for (final value in grades)
+            OfflineHadithGrade.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+        ]),
+        surahNumber: row['surah_number'] as int?,
+        ayahNumber: row['ayah_number'] as int?,
+        itemId: row['item_id'] as String?,
+        body: row['body'] as String? ?? '',
+        route: row['route'] as String? ?? '',
+        language: row['language'] as String? ?? '',
+        sourceLabel: row['source_label'] as String? ?? '',
+        isUserContent: row['is_user_content'] == 1,
+        metadata: (jsonDecode(row['metadata_json'] as String? ?? '{}') as Map)
+            .map((key, value) => MapEntry(key.toString(), value.toString())),
+      );
+    }
+    return List.unmodifiable([
+      for (final value in selected)
+        if (passages[value.id] case final passage?)
+          OfflineSearchHit(passage: passage, score: value.score),
+    ]);
+  }
+
+  void dispose() => _db.close();
+
+  Map<String, OfflineSearchPassage> canonicalPassages(
+    Iterable<String> identifiers,
+  ) {
+    final ids = identifiers.toSet().toList();
+    if (ids.isEmpty) return {};
+    final rows = _db.select(
+      'SELECT id FROM passages WHERE canonical_id IN (${List.filled(ids.length, '?').join(',')})',
+      ids,
+    );
+    return {
+      for (final hit in retrieve([
+        for (final row in rows) RankedPassage(row['id'] as int, 0),
+      ], limit: ids.length))
+        hit.passage.canonicalId: hit.passage,
+    };
+  }
+
+  static String _kindClause(OfflineSearchFilter filter) => switch (filter) {
+    OfflineSearchFilter.all => '',
+    OfflineSearchFilter.tools =>
+      " AND p.kind IN ('tools','tool','widget','divine_name','surah')",
+    _ => ' AND p.kind = ?',
+  };
+
+  static List<String> _kindParameters(OfflineSearchFilter filter) =>
+      filter == OfflineSearchFilter.all || filter == OfflineSearchFilter.tools
+      ? const []
+      : [filter.name];
+}
+
+class RankedPassage {
+  const RankedPassage(this.id, this.score);
+
+  final int id;
+  final double score;
+}
+
+List<RankedPassage> reciprocalRankFusion(
+  List<int> keyword,
+  List<int> semantic, {
+  OfflineSearchConfig config = const OfflineSearchConfig(),
+}) {
+  final scores = <int, double>{};
+  void add(List<int> ids, double weight) {
+    final unique = ids.toSet().toList(growable: false);
+    for (var i = 0; i < unique.length; i++) {
+      scores.update(
+        unique[i],
+        (score) => score + weight / (config.rrfConstant + i + 1),
+        ifAbsent: () => weight / (config.rrfConstant + i + 1),
+      );
+    }
+  }
+
+  add(keyword, config.keywordWeight);
+  add(semantic, config.semanticWeight);
+  final ranked = [
+    for (final entry in scores.entries) RankedPassage(entry.key, entry.value),
+  ];
+  ranked.sort((a, b) {
+    final comparison = b.score.compareTo(a.score);
+    return comparison == 0 ? a.id.compareTo(b.id) : comparison;
+  });
+  return ranked;
+}

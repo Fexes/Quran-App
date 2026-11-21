@@ -1,0 +1,125 @@
+{
+  "counts": {
+    "passages": 49080,
+    "reference_aliases": 225725,
+    "vectors": 103719,
+    "fts_rows": 49080,
+    "passages_fts_docsize": 49080,
+    "passages_fts_config": 1
+  },
+  "float32_vectors_identical": true,
+  "passages_and_aliases_identical": true,
+  "model_and_corpus_metadata_identical": true,
+  "fts_token_instances": 7074617,
+  "fts_token_instances_sha256": "23ba8638d03ae96e72fc6c0f2180d5bfc7b7f1503f875c51975f9cc838d90e74",
+  "fts_token_positions_identical": true,
+  "fts_docsize_config_and_corpus_counts_identical": true,
+  "keyword_rankings_and_bm25_identical": [
+    {
+      "match": "\"mercy\"*",
+      "identical_ranked_results": 727
+    },
+    {
+      "match": "\"merciful\"*",
+      "identical_ranked_results": 376
+    },
+    {
+      "match": "\"future\"* OR \"worried\"*",
+      "identical_ranked_results": 90
+    },
+    {
+      "match": "\"difficult\"* OR \"life\"*",
+      "identical_ranked_results": 1301
+    },
+    {
+      "match": "\"prayer\"*",
+      "identical_ranked_results": 5247
+    },
+    {
+      "match": "\"patience\"*",
+      "identical_ranked_results": 96
+    },
+    {
+      "match": "\"compassion\"* OR \"forgiveness\"*",
+      "identical_ranked_results": 422
+    },
+    {
+      "match": "\"house\"* OR \"leaving\"*",
+      "identical_ranked_results": 2087
+    },
+    {
+      "match": "\"allah\"*",
+      "identical_ranked_results": 28353
+    },
+    {
+      "match": "\"dua\"*",
+      "identical_ranked_results": 29
+    },
+    {
+      "match": "\"fasting\"*",
+      "identical_ranked_results": 689
+    },
+    {
+      "match": "\"bukhari\"*",
+      "identical_ranked_results": 7703
+    },
+    {
+      "match": "\"2\" OR \"255\"*",
+      "identical_ranked_results": 1248
+    },
+    {
+      "match": "\"الله\"*",
+      "identical_ranked_results": 39015
+    },
+    {
+      "match": "\"رحمه\"*",
+      "identical_ranked_results": 58
+    },
+    {
+      "match": "\"الصلاه\"*",
+      "identical_ranked_results": 0
+    },
+    {
+      "match": "\"صبر\"* OR \"ايمان\"*",
+      "identical_ranked_results": 400
+    },
+    {
+      "match": "\"مستقبل\"*",
+      "identical_ranked_results": 70
+    },
+    {
+      "match": "\"مجھے\"* OR \"فکر\"*",
+      "identical_ranked_results": 0
+    },
+    {
+      "match": "\"اميد\"*",
+      "identical_ranked_results": 0
+    },
+    {
+      "match": "\"mustaqbil\"* OR \"fikar\"*",
+      "identical_ranked_results": 0
+    },
+    {
+      "match": "\"mercy forgiveness\"",
+      "identical_ranked_results": 0
+    },
+    {
+      "match": "body:\"merciful\"*",
+      "identical_ranked_results": 376
+    },
+    {
+      "match": "reference:\"bukhari\"*",
+      "identical_ranked_results": 7660
+    }
+  ],
+  "source_sha256": "a456610f4a1f81fb72a6c35073e30ed2aee692023d85abbbc890b9a391f448e2",
+  "optimized_sha256": "82488a119de802f833be9c0af0d6cd19390b5167836cdeab857ec113158dc71b",
+  "source_bytes": 435286016,
+  "optimized_bytes": 328220672,
+  "saved_bytes": 107065344,
+  "vector_storage": "blocks_v1",
+  "vector_block_size": 128,
+  "conversion_seconds": 37.423,
+  "applied": true,
+  "rollback_directory": "/Users/farhanfida/Desktop/Quran/quran/.dart_tool/offline_search/size-optimized/rollback"
+}

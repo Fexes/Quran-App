@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icon.dart';
 
@@ -5,7 +6,7 @@ import '../../../../app/di/injection.dart';
 import '../../../../core/content/content_source.dart';
 import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme.dart';
-import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../azkar/domain/entities/azkar_category.dart';
 import '../../../azkar/domain/entities/dhikr_item.dart';
@@ -63,9 +64,9 @@ class _DuasPageState extends State<DuasPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppPageAppBar(
         title: Text(AppLocalizations.of(context).duasTitle),
-        flexibleSpace: const ArchitecturalBackdrop(),
+        flexibleSpace: const HeaderPatternBackdrop(),
       ),
       body: FutureBuilder<_DuaData>(
         future: _future,

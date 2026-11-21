@@ -34,6 +34,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get tabSettings => 'سیٹنگز';
 
   @override
+  String get tabLearn => 'سیکھیں';
+
+  @override
   String get nextPrayerTitle => 'اگلی نماز';
 
   @override
@@ -399,7 +402,7 @@ class AppLocalizationsUr extends AppLocalizations {
   String get zakatTitle => 'زکوٰۃ کیلکولیٹر';
 
   @override
-  String get ramadanTitle => 'رمضان ڈیش بورڈ';
+  String get ramadanTitle => 'روزوں کا منصوبہ';
 
   @override
   String get achievementsTitle => 'نجی کامیابیاں';

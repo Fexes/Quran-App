@@ -10,9 +10,14 @@ class PrayerTrackingCubit extends Cubit<PrayerTrackingState> {
       super(const PrayerTrackingState());
 
   final PrayerTrackingRepository _repository;
+  int _loadGeneration = 0;
+  bool _saving = false;
 
   Future<void> load([DateTime? date]) async {
-    final selected = date ?? state.selectedDate ?? DateTime.now();
+    if (isClosed || _saving) return;
+    final requested = date ?? state.selectedDate ?? DateTime.now();
+    final selected = DateTime(requested.year, requested.month, requested.day);
+    final generation = ++_loadGeneration;
     emit(
       state.copyWith(
         status: PrayerTrackingStatus.loading,
@@ -22,6 +27,7 @@ class PrayerTrackingCubit extends Cubit<PrayerTrackingState> {
     );
     try {
       final dashboard = await _repository.dashboard(selected);
+      if (isClosed || generation != _loadGeneration) return;
       emit(
         state.copyWith(
           status: PrayerTrackingStatus.success,
@@ -30,11 +36,12 @@ class PrayerTrackingCubit extends Cubit<PrayerTrackingState> {
           clearError: true,
         ),
       );
-    } catch (error) {
+    } catch (_) {
+      if (isClosed || generation != _loadGeneration) return;
       emit(
         state.copyWith(
           status: PrayerTrackingStatus.failure,
-          errorMessage: error.toString(),
+          errorMessage: 'Your journal could not be loaded. Please try again.',
         ),
       );
     }
@@ -42,67 +49,80 @@ class PrayerTrackingCubit extends Cubit<PrayerTrackingState> {
 
   Future<void> changeDay(int offset) {
     final current = state.selectedDate ?? DateTime.now();
-    return load(current.add(Duration(days: offset)));
+    return load(DateTime(current.year, current.month, current.day + offset));
   }
 
   Future<void> savePrayer({
     required TrackedPrayer prayer,
     required PrayerCompletion status,
     required bool congregation,
-  }) async {
-    await _repository.savePrayer(
-      date: state.selectedDate ?? DateTime.now(),
+  }) => _mutate(
+    (date) => _repository.savePrayer(
+      date: date,
       prayer: prayer,
       status: status,
       congregation: congregation,
-    );
-    await load();
-  }
+    ),
+  );
 
   Future<void> setQadaPlan({
     required int currentBalance,
     required int dailyTarget,
     required bool enabled,
-  }) async {
-    await _repository.setQadaPlan(
+  }) => _mutate(
+    (_) => _repository.setQadaPlan(
       currentBalance: currentBalance,
       dailyTarget: dailyTarget,
       enabled: enabled,
-    );
-    await load();
-  }
+    ),
+  );
 
   Future<void> addPauseRange({
     required DateTime start,
     required DateTime end,
     required bool suppressReminders,
     required bool exemptTracking,
-  }) async {
-    await _repository.addPauseRange(
+  }) => _mutate(
+    (_) => _repository.addPauseRange(
       start: start,
       end: end,
       suppressReminders: suppressReminders,
       exemptTracking: exemptTracking,
+    ),
+  );
+
+  Future<void> removePauseRange(String id) =>
+      _mutate((_) => _repository.removePauseRange(id));
+
+  Future<void> saveFast(FastType type, FastStatus status) => _mutate(
+    (date) => _repository.saveFast(date: date, type: type, status: status),
+  );
+
+  Future<void> removeFast() => _mutate(_repository.removeFast);
+
+  Future<void> _mutate(Future<void> Function(DateTime date) action) async {
+    if (isClosed || _saving) return;
+    final date = state.selectedDate ?? DateTime.now();
+    _saving = true;
+    _loadGeneration++;
+    emit(
+      state.copyWith(status: PrayerTrackingStatus.loading, clearError: true),
     );
-    await load();
-  }
-
-  Future<void> removePauseRange(String id) async {
-    await _repository.removePauseRange(id);
-    await load();
-  }
-
-  Future<void> saveFast(FastType type, FastStatus status) async {
-    await _repository.saveFast(
-      date: state.selectedDate ?? DateTime.now(),
-      type: type,
-      status: status,
-    );
-    await load();
-  }
-
-  Future<void> removeFast() async {
-    await _repository.removeFast(state.selectedDate ?? DateTime.now());
-    await load();
+    try {
+      await action(date);
+    } catch (_) {
+      if (!isClosed) {
+        emit(
+          state.copyWith(
+            status: PrayerTrackingStatus.failure,
+            errorMessage: 'Your changes could not be saved. Please try again.',
+          ),
+        );
+      }
+      rethrow;
+    } finally {
+      _saving = false;
+    }
+    if (!isClosed) await load(date);
   }
 }

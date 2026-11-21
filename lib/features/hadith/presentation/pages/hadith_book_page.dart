@@ -1,6 +1,9 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../../../../core/widgets/animated_expansion.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -23,22 +26,32 @@ import '../../../quran/domain/repositories/quran_translation_repository.dart';
 import '../../domain/entities/hadith_book.dart';
 import '../../domain/entities/hadith_item.dart';
 import '../../domain/repositories/hadith_repository.dart';
+import '../../domain/services/hadith_grading.dart';
 import '../bloc/hadith_library_cubit.dart';
 import '../bloc/hadith_library_state.dart';
 import '../widgets/hadith_translation_sheet.dart';
+import '../widgets/hadith_grading_panel.dart';
 
 class HadithBookPage extends StatelessWidget {
-  const HadithBookPage({super.key, required this.bookId, this.initialLookup});
+  const HadithBookPage({
+    super.key,
+    required this.bookId,
+    this.initialLookup,
+    this.initialLanguageCode,
+  });
 
   final String bookId;
   final String? initialLookup;
+  final String? initialLanguageCode;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) {
         final cubit = HadithLibraryCubit(repository: getIt<HadithRepository>());
-        final languageCode = getIt<SettingsStore>().hadithLanguageCodeOrNull;
+        final languageCode =
+            initialLanguageCode ??
+            getIt<SettingsStore>().hadithLanguageCodeOrNull;
         final lookup = initialLookup?.trim();
         if (lookup != null && lookup.isNotEmpty) {
           cubit.lookupHadith(
@@ -51,7 +64,11 @@ class HadithBookPage extends StatelessWidget {
         }
         return cubit;
       },
-      child: _HadithBookView(bookId: bookId, initialLookup: initialLookup),
+      child: _HadithBookView(
+        bookId: bookId,
+        initialLookup: initialLookup,
+        initialLanguageCode: initialLanguageCode,
+      ),
     );
   }
 }
@@ -69,10 +86,15 @@ String? _lastHadithNumberForBook(String bookId) {
 }
 
 class _HadithBookView extends StatefulWidget {
-  const _HadithBookView({required this.bookId, this.initialLookup});
+  const _HadithBookView({
+    required this.bookId,
+    this.initialLookup,
+    this.initialLanguageCode,
+  });
 
   final String bookId;
   final String? initialLookup;
+  final String? initialLanguageCode;
 
   @override
   State<_HadithBookView> createState() => _HadithBookViewState();
@@ -84,6 +106,7 @@ class _HadithBookViewState extends State<_HadithBookView> {
   late final FocusNode _searchFocusNode;
   late final SettingsStore _settingsStore;
   late final LibraryUserDataStore _userDataStore;
+  String? _languageOverride;
   bool _showTranslation = true;
   bool _showExplanation = false;
   QuranTranslationResource? _selectedTranslation;
@@ -98,6 +121,9 @@ class _HadithBookViewState extends State<_HadithBookView> {
   late final ValueNotifier<String?> _currentHadithNumber;
   late final String? _resumeHadithNumber;
   String? _lastSavedItemKey;
+  final _visibleCards = <_VisibleHadithCardState>{};
+  bool _positionUpdateScheduled = false;
+  late HadithLibraryState _positionState;
 
   String get _scopeKey => 'hadith:${widget.bookId}';
   String? get _activeHadithLanguageCode => _language.hadithCode;
@@ -107,13 +133,16 @@ class _HadithBookViewState extends State<_HadithBookView> {
     super.initState();
     _settingsStore = getIt<SettingsStore>();
     _userDataStore = getIt<LibraryUserDataStore>();
-    _showTranslation = _settingsStore.libraryTranslationEnabled;
+    _languageOverride = widget.initialLanguageCode;
+    _showTranslation =
+        _languageOverride != null || _settingsStore.libraryTranslationEnabled;
     _showExplanation = _settingsStore.libraryHadithExplanationEnabled;
     _scrollController = ScrollController()..addListener(_onScroll);
     _lookupController = TextEditingController(text: widget.initialLookup ?? '');
     _searchFocusNode = FocusNode();
     _resumeHadithNumber = _lastHadithNumberForBook(widget.bookId);
     _currentHadithNumber = ValueNotifier(null);
+    _positionState = context.read<HadithLibraryCubit>().state;
     _loadContentLanguage();
   }
 
@@ -133,7 +162,7 @@ class _HadithBookViewState extends State<_HadithBookView> {
     final translationRepository = getIt<QuranTranslationRepository>();
     final previousQuranSelection = await translationRepository
         .selectedTranslation();
-    var code = _settingsStore.hadithLanguageCodeOrNull;
+    var code = _languageOverride ?? _settingsStore.hadithLanguageCodeOrNull;
     if (code == null) {
       code =
           libraryLanguageFromQuranTranslation(
@@ -168,6 +197,7 @@ class _HadithBookViewState extends State<_HadithBookView> {
       _translationSupported = supported.contains(code);
       _loadingLanguage = false;
     });
+    _scheduleVisiblePosition();
     final cubit = context.read<HadithLibraryCubit>();
     final loadedLanguageCode =
         cubit.state.selectedTranslationLanguageCode ?? 'en';
@@ -198,16 +228,66 @@ class _HadithBookViewState extends State<_HadithBookView> {
     if (position.pixels >= position.maxScrollExtent - 600) {
       cubit.loadMore();
     }
-    final hadiths = cubit.state.hadiths;
-    if (hadiths.isEmpty || position.maxScrollExtent <= 0) {
+    _scheduleVisiblePosition();
+  }
+
+  void _registerVisibleCard(_VisibleHadithCardState card) {
+    _visibleCards.add(card);
+    _scheduleVisiblePosition();
+  }
+
+  void _unregisterVisibleCard(_VisibleHadithCardState card) {
+    _visibleCards.remove(card);
+  }
+
+  void _scheduleVisiblePosition() {
+    if (!mounted || _positionUpdateScheduled) return;
+    _positionUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _positionUpdateScheduled = false;
+      if (mounted) _updateVisiblePosition();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _updateVisiblePosition() {
+    final state = context.read<HadithLibraryCubit>().state;
+    if (_loadingLanguage ||
+        state.status != HadithLibraryStatus.success ||
+        state.hadiths.isEmpty) {
+      _currentHadithNumber.value = null;
       return;
     }
-    final index =
-        ((position.pixels / position.maxScrollExtent) * (hadiths.length - 1))
-            .round()
-            .clamp(0, hadiths.length - 1)
-            .toInt();
-    final item = hadiths[index];
+    HadithItem? visible;
+    var firstTop = double.infinity;
+    // Only mounted lazy children are registered. Cached children outside the
+    // viewport must not advance the reading position or overwrite last read.
+    for (final card in _visibleCards) {
+      if (!card.mounted) continue;
+      final render = card.context.findRenderObject();
+      if (render is! RenderBox || !render.attached || !render.hasSize) continue;
+      final viewport = RenderAbstractViewport.maybeOf(render);
+      if (viewport == null || viewport is! RenderBox) continue;
+      final viewportBox = viewport as RenderBox;
+      if (!viewportBox.hasSize) continue;
+      final top = render.localToGlobal(Offset.zero, ancestor: viewportBox).dy;
+      final bottom = top + render.size.height;
+      if (!top.isFinite || bottom <= 0 || top >= viewportBox.size.height) {
+        continue;
+      }
+      if (top < firstTop) {
+        firstTop = top;
+        visible = card.widget.hadith;
+      }
+    }
+    if (visible == null) {
+      _currentHadithNumber.value = null;
+      return;
+    }
+    _recordCurrentHadith(visible);
+  }
+
+  void _recordCurrentHadith(HadithItem item) {
     final itemKey = _itemKey(item);
     if (_currentHadithNumber.value != item.hadithNumber) {
       _currentHadithNumber.value = item.hadithNumber;
@@ -218,260 +298,364 @@ class _HadithBookViewState extends State<_HadithBookView> {
     }
   }
 
+  void _onHadithStateChanged(
+    HadithLibraryState previous,
+    HadithLibraryState state,
+  ) {
+    final scopeChanged =
+        previous.query != state.query ||
+        previous.selectedBookId != state.selectedBookId ||
+        previous.selectedChapterId != state.selectedChapterId ||
+        previous.selectedTranslationLanguageCode !=
+            state.selectedTranslationLanguageCode;
+    final resultsChanged = !identical(previous.hadiths, state.hadiths);
+    final appended =
+        resultsChanged &&
+        previous.hadiths.isNotEmpty &&
+        state.hadiths.length > previous.hadiths.length &&
+        identical(previous.hadiths.first, state.hadiths.first) &&
+        identical(
+          previous.hadiths.last,
+          state.hadiths[previous.hadiths.length - 1],
+        );
+    if (scopeChanged ||
+        state.status != HadithLibraryStatus.success ||
+        (resultsChanged && !appended)) {
+      _currentHadithNumber.value = null;
+    }
+    _scheduleVisiblePosition();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<QuranThemeCubit, QuranThemeState>(
-      builder: (context, themeState) {
-        return Scaffold(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          appBar: AppBar(
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            titleSpacing: 0,
-            title: BlocBuilder<HadithLibraryCubit, HadithLibraryState>(
-              buildWhen: (previous, current) =>
-                  previous.selectedBook != current.selectedBook ||
-                  previous.status != current.status,
+    final theme = Theme.of(context);
+    final titleStyle =
+        (theme.appBarTheme.titleTextStyle ?? theme.textTheme.titleLarge)
+            ?.copyWith(height: 1.2);
+    final subtitleStyle = theme.textTheme.labelSmall?.copyWith(
+      color: QuranTheme.subText(context),
+      height: 1.25,
+    );
+    final scaler = MediaQuery.textScalerOf(context);
+    final toolbarHeight =
+        (scaler.scale(titleStyle?.fontSize ?? 20) * 1.2 +
+                scaler.scale(subtitleStyle?.fontSize ?? 12) * 1.25 +
+                15)
+            .clamp(kToolbarHeight, double.infinity)
+            .toDouble();
+    return BlocListener<HadithLibraryCubit, HadithLibraryState>(
+      listener: (_, current) {
+        final previous = _positionState;
+        _positionState = current;
+        _onHadithStateChanged(previous, current);
+      },
+      child: BlocBuilder<QuranThemeCubit, QuranThemeState>(
+        builder: (context, themeState) {
+          _scheduleVisiblePosition();
+          return Scaffold(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            appBar: AppPageAppBar(
+              flexibleSpace: const HeaderPatternBackdrop(),
+              toolbarHeight: toolbarHeight,
+              titleSpacing: 0,
+              title: BlocBuilder<HadithLibraryCubit, HadithLibraryState>(
+                buildWhen: (previous, current) =>
+                    previous.selectedBook != current.selectedBook ||
+                    previous.status != current.status ||
+                    !identical(previous.hadiths, current.hadiths) ||
+                    previous.query != current.query ||
+                    previous.selectedChapterId != current.selectedChapterId ||
+                    previous.selectedTranslationLanguageCode !=
+                        current.selectedTranslationLanguageCode,
+                builder: (context, state) {
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _showNavigationMenu(state),
+                    child: ValueListenableBuilder<String?>(
+                      valueListenable: _currentHadithNumber,
+                      builder: (context, number, _) {
+                        final visibleNumber =
+                            number ??
+                            (state.hadiths.length == 1
+                                ? state.hadiths.first.hadithNumber
+                                : null);
+                        final showPosition =
+                            !_loadingLanguage &&
+                            state.status == HadithLibraryStatus.success &&
+                            state.hadiths.isNotEmpty &&
+                            visibleNumber != null;
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              state.selectedBook?.englishName ?? 'Hadith',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: titleStyle,
+                            ),
+                            if (showPosition) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                'Hadith $visibleNumber',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: subtitleStyle,
+                              ),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'Search this book',
+                  onPressed: _searchFocusNode.requestFocus,
+                  icon: const AppIcon(Icons.search_rounded),
+                ),
+                IconButton(
+                  tooltip: 'Reader settings',
+                  onPressed: _showSettings,
+                  icon: const AppIcon(Icons.tune_rounded),
+                ),
+              ],
+            ),
+            body: BlocBuilder<HadithLibraryCubit, HadithLibraryState>(
               builder: (context, state) {
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _showNavigationMenu(state),
-                  child: Text(state.selectedBook?.englishName ?? 'Hadith'),
+                if (state.status == HadithLibraryStatus.failure) {
+                  return AppErrorView(
+                    title: 'Hadith book could not be loaded',
+                    message: state.errorMessage ?? 'Please try again.',
+                    onRetry: () => context.read<HadithLibraryCubit>().openBook(
+                      widget.bookId,
+                      languageCode: _activeHadithLanguageCode,
+                    ),
+                  );
+                }
+
+                if (state.status == HadithLibraryStatus.loading &&
+                    state.hadiths.isEmpty) {
+                  return const AppLoadingView(label: 'Loading hadith book');
+                }
+
+                return Stack(
+                  children: [
+                    Scrollbar(
+                      controller: _scrollController,
+                      thumbVisibility: true,
+                      interactive: true,
+                      child: CustomScrollView(
+                        controller: _scrollController,
+                        slivers: [
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+                            sliver: SliverToBoxAdapter(
+                              child: Column(
+                                children: [
+                                  if (state.selectedBook != null)
+                                    _BookSummary(
+                                      book: state.selectedBook!,
+                                      resumeHadithNumber: state.query.isEmpty
+                                          ? _resumeHadithNumber
+                                          : null,
+                                      onResume: _resumeHadithNumber == null
+                                          ? null
+                                          : () {
+                                              _lookupController.text =
+                                                  _resumeHadithNumber;
+                                              _lookup(_resumeHadithNumber);
+                                            },
+                                    ),
+                                  if (_showTranslation &&
+                                      !_loadingLanguage &&
+                                      !_translationAvailable) ...[
+                                    if (_translationSupported)
+                                      OutlinedButton.icon(
+                                        onPressed: _showTranslationPicker,
+                                        icon: const AppIcon(
+                                          Icons.download_rounded,
+                                        ),
+                                        label: Text(
+                                          'Download ${_language.label} for all available books',
+                                        ),
+                                      )
+                                    else
+                                      Text(
+                                        '${_language.label} translation is not available for this book.',
+                                      ),
+                                  ],
+                                  const SizedBox(height: 12),
+                                  TextField(
+                                    controller: _lookupController,
+                                    focusNode: _searchFocusNode,
+                                    textInputAction: TextInputAction.search,
+                                    onChanged: (_) => setState(() {}),
+                                    onSubmitted: _searchBook,
+                                    decoration: InputDecoration(
+                                      hintText: 'Search text or hadith number',
+                                      prefixIcon: const AppIcon(
+                                        Icons.search_rounded,
+                                      ),
+                                      suffixIcon:
+                                          _lookupController.text.trim().isEmpty
+                                          ? null
+                                          : IconButton(
+                                              tooltip: 'Clear search',
+                                              onPressed: _clearLookup,
+                                              icon: const AppIcon(
+                                                Icons.close_rounded,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                  if (state.chapters.isNotEmpty &&
+                                      state.query.isEmpty) ...[
+                                    const SizedBox(height: 12),
+                                    _ChapterStrip(state: state),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (state.status == HadithLibraryStatus.empty)
+                            SliverPadding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                              ),
+                              sliver: SliverToBoxAdapter(
+                                child: _EmptyLookup(
+                                  bookId: widget.bookId,
+                                  query: state.query,
+                                ),
+                              ),
+                            )
+                          else
+                            SliverPadding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                              ),
+                              sliver: SliverList.builder(
+                                addAutomaticKeepAlives: false,
+                                itemCount: state.hadiths.length,
+                                itemBuilder: (context, index) {
+                                  final hadith = state.hadiths[index];
+                                  return Padding(
+                                    key: ValueKey(_itemKey(hadith)),
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _VisibleHadithCard(
+                                      hadith: hadith,
+                                      onMount: _registerVisibleCard,
+                                      onUnmount: _unregisterVisibleCard,
+                                      onLayoutChanged: _scheduleVisiblePosition,
+                                      child: _HadithReaderCard(
+                                        hadith: hadith,
+                                        themeState: themeState,
+                                        selected:
+                                            _selectedItemKey ==
+                                            _itemKey(hadith),
+                                        showTranslation:
+                                            _showTranslation &&
+                                            !_loadingLanguage &&
+                                            _translationAvailable,
+                                        translationAvailable:
+                                            _translationAvailable,
+                                        languageLabel: _language.label,
+                                        languageCode: _activeHadithLanguageCode,
+                                        translationResource:
+                                            _selectedTranslation,
+                                        onTap: () => _selectHadith(hadith),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          if (state.hasMoreHadiths && state.query.isEmpty)
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
+                              sliver: SliverToBoxAdapter(
+                                child: OutlinedButton.icon(
+                                  onPressed: state.loadingMoreHadiths
+                                      ? null
+                                      : context
+                                            .read<HadithLibraryCubit>()
+                                            .loadMore,
+                                  icon: state.loadingMoreHadiths
+                                      ? const SizedBox.square(
+                                          dimension: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const AppIcon(
+                                          Icons.expand_more_rounded,
+                                        ),
+                                  label: Text(
+                                    state.loadingMoreHadiths
+                                        ? 'Loading more'
+                                        : 'Load more',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          SliverToBoxAdapter(
+                            child: SizedBox(
+                              height: _selectedItem(state) == null
+                                  ? 24
+                                  : LibraryReaderActionBar.bottomClearance(
+                                      context,
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_selectedItem(state) != null)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: LibraryReaderActionBar(
+                          title: _selectedItem(state)!.reference,
+                          isBookmarked: _userDataStore.isBookmarked(
+                            _itemKey(_selectedItem(state)!),
+                          ),
+                          onBookmark: () =>
+                              _toggleBookmark(_selectedItem(state)!),
+                          onNote: () => _editNote(_selectedItem(state)!),
+                          onCopy: () => _copyHadith(_selectedItem(state)!),
+                          onShare: () => showHadithShareSheet(
+                            context,
+                            _selectedItem(state)!,
+                            languageCode: _activeHadithLanguageCode,
+                            translationResource: _selectedTranslation,
+                            includeTranslation: _showTranslation,
+                            translationAvailable:
+                                _translationAvailable && !_loadingLanguage,
+                          ),
+                          onSource: () =>
+                              _showGradingSheet(_selectedItem(state)!),
+                          sourceLabel: switch (Localizations.localeOf(
+                            context,
+                          ).languageCode) {
+                            'ur' => 'درجہ',
+                            'ar' => 'الحكم',
+                            _ => 'Grades',
+                          },
+                          onDetails: () =>
+                              _showDetailsSheet(_selectedItem(state)!),
+                        ),
+                      ),
+                  ],
                 );
               },
             ),
-            actions: [
-              IconButton(
-                tooltip: 'Search this book',
-                onPressed: _searchFocusNode.requestFocus,
-                icon: const AppIcon(Icons.search_rounded),
-              ),
-              IconButton(
-                tooltip: 'Reader settings',
-                onPressed: _showSettings,
-                icon: const AppIcon(Icons.tune_rounded),
-              ),
-            ],
-          ),
-          body: BlocBuilder<HadithLibraryCubit, HadithLibraryState>(
-            builder: (context, state) {
-              if (state.status == HadithLibraryStatus.failure) {
-                return AppErrorView(
-                  title: 'Hadith book could not be loaded',
-                  message: state.errorMessage ?? 'Please try again.',
-                  onRetry: () => context.read<HadithLibraryCubit>().openBook(
-                    widget.bookId,
-                    languageCode: _activeHadithLanguageCode,
-                  ),
-                );
-              }
-
-              if (state.status == HadithLibraryStatus.loading &&
-                  state.hadiths.isEmpty) {
-                return const AppLoadingView(label: 'Loading hadith book');
-              }
-
-              return Stack(
-                children: [
-                  Scrollbar(
-                    controller: _scrollController,
-                    thumbVisibility: true,
-                    interactive: true,
-                    child: CustomScrollView(
-                      controller: _scrollController,
-                      slivers: [
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
-                          sliver: SliverToBoxAdapter(
-                            child: Column(
-                              children: [
-                                if (state.selectedBook != null)
-                                  _BookSummary(
-                                    book: state.selectedBook!,
-                                    resumeHadithNumber: state.query.isEmpty
-                                        ? _resumeHadithNumber
-                                        : null,
-                                    onResume: _resumeHadithNumber == null
-                                        ? null
-                                        : () {
-                                            _lookupController.text =
-                                                _resumeHadithNumber;
-                                            _lookup(_resumeHadithNumber);
-                                          },
-                                  ),
-                                if (_showTranslation &&
-                                    !_loadingLanguage &&
-                                    !_translationAvailable) ...[
-                                  if (_translationSupported)
-                                    OutlinedButton.icon(
-                                      onPressed: _showTranslationPicker,
-                                      icon: const AppIcon(
-                                        Icons.download_rounded,
-                                      ),
-                                      label: Text(
-                                        'Download ${_language.label} for all available books',
-                                      ),
-                                    )
-                                  else
-                                    Text(
-                                      '${_language.label} translation is not available for this book.',
-                                    ),
-                                ],
-                                const SizedBox(height: 12),
-                                TextField(
-                                  controller: _lookupController,
-                                  focusNode: _searchFocusNode,
-                                  textInputAction: TextInputAction.search,
-                                  onChanged: (_) => setState(() {}),
-                                  onSubmitted: _searchBook,
-                                  decoration: InputDecoration(
-                                    hintText: 'Search text or hadith number',
-                                    prefixIcon: const AppIcon(
-                                      Icons.search_rounded,
-                                    ),
-                                    suffixIcon:
-                                        _lookupController.text.trim().isEmpty
-                                        ? null
-                                        : IconButton(
-                                            tooltip: 'Clear search',
-                                            onPressed: _clearLookup,
-                                            icon: const AppIcon(
-                                              Icons.close_rounded,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                                if (state.chapters.isNotEmpty &&
-                                    state.query.isEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  _ChapterStrip(state: state),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (state.status == HadithLibraryStatus.empty)
-                          SliverPadding(
-                            padding: const EdgeInsets.symmetric(horizontal: 18),
-                            sliver: SliverToBoxAdapter(
-                              child: _EmptyLookup(
-                                bookId: widget.bookId,
-                                query: state.query,
-                              ),
-                            ),
-                          )
-                        else
-                          SliverPadding(
-                            padding: const EdgeInsets.symmetric(horizontal: 18),
-                            sliver: SliverList.builder(
-                              itemCount: state.hadiths.length,
-                              itemBuilder: (context, index) {
-                                final hadith = state.hadiths[index];
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _HadithReaderCard(
-                                    hadith: hadith,
-                                    themeState: themeState,
-                                    selected:
-                                        _selectedItemKey == _itemKey(hadith),
-                                    showTranslation:
-                                        _showTranslation &&
-                                        !_loadingLanguage &&
-                                        _translationAvailable,
-                                    translationAvailable: _translationAvailable,
-                                    languageLabel: _language.label,
-                                    languageCode: _activeHadithLanguageCode,
-                                    translationResource: _selectedTranslation,
-                                    onTap: () => _selectHadith(hadith),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        if (state.hasMoreHadiths && state.query.isEmpty)
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
-                            sliver: SliverToBoxAdapter(
-                              child: OutlinedButton.icon(
-                                onPressed: state.loadingMoreHadiths
-                                    ? null
-                                    : context
-                                          .read<HadithLibraryCubit>()
-                                          .loadMore,
-                                icon: state.loadingMoreHadiths
-                                    ? const SizedBox.square(
-                                        dimension: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const AppIcon(Icons.expand_more_rounded),
-                                label: Text(
-                                  state.loadingMoreHadiths
-                                      ? 'Loading more'
-                                      : 'Load more',
-                                ),
-                              ),
-                            ),
-                          ),
-                        SliverToBoxAdapter(
-                          child: SizedBox(
-                            height: _selectedItem(state) == null
-                                ? 24
-                                : LibraryReaderActionBar.bottomClearance(
-                                    context,
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (state.hadiths.isNotEmpty)
-                    PositionedDirectional(
-                      end: 8,
-                      top: MediaQuery.sizeOf(context).height * 0.38,
-                      child: ValueListenableBuilder<String?>(
-                        valueListenable: _currentHadithNumber,
-                        builder: (context, number, child) => _ProgressPill(
-                          label:
-                              'Hadith ${number ?? state.hadiths.first.hadithNumber}',
-                        ),
-                      ),
-                    ),
-                  if (_selectedItem(state) != null)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: LibraryReaderActionBar(
-                        title: _selectedItem(state)!.reference,
-                        isBookmarked: _userDataStore.isBookmarked(
-                          _itemKey(_selectedItem(state)!),
-                        ),
-                        onBookmark: () =>
-                            _toggleBookmark(_selectedItem(state)!),
-                        onNote: () => _editNote(_selectedItem(state)!),
-                        onCopy: () => _copyHadith(_selectedItem(state)!),
-                        onShare: () => showHadithShareSheet(
-                          context,
-                          _selectedItem(state)!,
-                          languageCode: _activeHadithLanguageCode,
-                          translationResource: _selectedTranslation,
-                          includeTranslation: _showTranslation,
-                          translationAvailable:
-                              _translationAvailable && !_loadingLanguage,
-                        ),
-                        onSource: () => _showSourceSheet(_selectedItem(state)!),
-                        onDetails: () =>
-                            _showDetailsSheet(_selectedItem(state)!),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -480,9 +664,7 @@ class _HadithBookViewState extends State<_HadithBookView> {
     setState(() {
       _selectedItemKey = key;
     });
-    _currentHadithNumber.value = hadith.hadithNumber;
-    _lastSavedItemKey = key;
-    _userDataStore.saveLastRead(scopeKey: _scopeKey, itemKey: key);
+    _recordCurrentHadith(hadith);
   }
 
   HadithItem? _selectedItem(HadithLibraryState state) {
@@ -702,6 +884,7 @@ class _HadithBookViewState extends State<_HadithBookView> {
     );
     if (!mounted || selected == null) return;
     setState(() {
+      _languageOverride = null;
       _showTranslation = true;
       _loadingLanguage = true;
     });
@@ -741,20 +924,18 @@ class _HadithBookViewState extends State<_HadithBookView> {
     ).showSnackBar(const SnackBar(content: Text('Copied')));
   }
 
-  void _showSourceSheet(HadithItem hadith) {
-    final matches = context
-        .read<HadithLibraryCubit>()
-        .state
-        .contentSources
-        .where((source) => source.id == hadith.sourceId);
-    final source = matches.isEmpty ? null : matches.first;
+  void _showGradingSheet(HadithItem hadith) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => AppSheet(
-        title: 'Source',
+        title: switch (Localizations.localeOf(context).languageCode) {
+          'ur' => 'درجہ اور حوالہ',
+          'ar' => 'الحكم والمرجع',
+          _ => 'Grades & reference',
+        },
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -764,33 +945,8 @@ class _HadithBookViewState extends State<_HadithBookView> {
                   ? hadith.reference
                   : hadith.collectionName,
             ),
-            if (hadith.cleanReference.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(hadith.cleanReference),
-            ],
-            if (hadith.grade.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(hadith.grade),
-            ],
-            if (source != null) ...[
-              const SizedBox(height: 14),
-              Text(
-                source.name,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              Text(source.attribution),
-              if (source.license?.trim().isNotEmpty == true) ...[
-                const SizedBox(height: 6),
-                Text(source.license!),
-              ],
-              if (source.url?.trim().isNotEmpty == true) ...[
-                const SizedBox(height: 6),
-                SelectableText(source.url!),
-              ],
-            ],
+            const SizedBox(height: 12),
+            HadithGradingPanel.fromHadith(hadith: hadith),
           ],
         ),
       ),
@@ -798,6 +954,7 @@ class _HadithBookViewState extends State<_HadithBookView> {
   }
 
   void _showDetailsSheet(HadithItem hadith) {
+    final grading = HadithGrading.fromHadith(hadith);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -809,6 +966,10 @@ class _HadithBookViewState extends State<_HadithBookView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (grading.requiresCaution) ...[
+              HadithGradingPanel(grading: grading, compact: true),
+              const SizedBox(height: 8),
+            ],
             LibraryArabicText(
               text: hadith.arabic,
               themeState: context.read<QuranThemeCubit>().state,
@@ -826,9 +987,10 @@ class _HadithBookViewState extends State<_HadithBookView> {
                 languageCode: _activeHadithLanguageCode,
               ),
             ],
-            if (_showExplanation && hadith.cleanReference.isNotEmpty) ...[
+            if (_showExplanation &&
+                hadithTextReference(hadith.cleanReference).isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text(hadith.cleanReference),
+              Text(hadithTextReference(hadith.cleanReference)),
             ],
           ],
         ),
@@ -837,11 +999,21 @@ class _HadithBookViewState extends State<_HadithBookView> {
   }
 
   String _plainText(HadithItem hadith) {
+    final grading = HadithGrading.fromHadith(hadith);
     return [
       hadith.reference,
+      grading.shareSummary,
       hadith.arabic,
       if (_showTranslation && _translationAvailable) hadith.translation,
       if (hadith.grade.isNotEmpty) hadith.grade,
+      for (final grade in hadith.grades)
+        if (grade is Map && grade['grade'] != null)
+          [
+            grade['grade'].toString(),
+            (grade['name'] ?? grade['grader'] ?? '').toString(),
+          ].where((part) => part.trim().isNotEmpty).join(' · ')
+        else if (grade != null)
+          grade.toString(),
     ].where((line) => line.trim().isNotEmpty).join('\n\n');
   }
 
@@ -983,6 +1155,7 @@ class _HadithReaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final grading = HadithGrading.fromHadith(hadith);
     return PremiumSurface(
       onTap: onTap,
       padding: const EdgeInsets.all(14),
@@ -1008,6 +1181,10 @@ class _HadithReaderCard extends StatelessWidget {
                 ),
             ],
           ),
+          if (grading.requiresCaution) ...[
+            const SizedBox(height: 8),
+            HadithGradingPanel(grading: grading, compact: true),
+          ],
           if (hadith.arabic.trim().isNotEmpty) ...[
             const SizedBox(height: 10),
             LibraryArabicText(
@@ -1035,47 +1212,61 @@ class _HadithReaderCard extends StatelessWidget {
               ],
             ),
           ),
-          if (hadith.grade.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              hadith.grade,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: QuranTheme.subText(context, 0.72),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-class _ProgressPill extends StatelessWidget {
-  const _ProgressPill({required this.label});
+/// Registers only the cards that the lazy sliver has mounted. Its render box
+/// gives the real reading position even when narrations have different heights.
+class _VisibleHadithCard extends StatefulWidget {
+  const _VisibleHadithCard({
+    required this.hadith,
+    required this.onMount,
+    required this.onUnmount,
+    required this.onLayoutChanged,
+    required this.child,
+  });
 
-  final String label;
+  final HadithItem hadith;
+  final ValueChanged<_VisibleHadithCardState> onMount;
+  final ValueChanged<_VisibleHadithCardState> onUnmount;
+  final VoidCallback onLayoutChanged;
+  final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    return RotatedBox(
-      quarterTurns: 1,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary,
-          borderRadius: BorderRadius.circular(QuranTheme.radiusPill),
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.onPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
+  State<_VisibleHadithCard> createState() => _VisibleHadithCardState();
+}
+
+class _VisibleHadithCardState extends State<_VisibleHadithCard> {
+  @override
+  void initState() {
+    super.initState();
+    widget.onMount(this);
   }
+
+  @override
+  void didUpdateWidget(covariant _VisibleHadithCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.hadith != widget.hadith) widget.onLayoutChanged();
+  }
+
+  @override
+  void dispose() {
+    widget.onUnmount(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<SizeChangedLayoutNotification>(
+        onNotification: (_) {
+          widget.onLayoutChanged();
+          return false;
+        },
+        child: SizeChangedLayoutNotifier(child: widget.child),
+      );
 }
 
 class _EmptyLookup extends StatelessWidget {

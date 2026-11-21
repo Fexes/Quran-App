@@ -1,10 +1,11 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icon.dart';
 
 import '../../../../app/di/injection.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
-import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../library/data/stores/library_user_data_store.dart';
 import '../../domain/entities/divine_name.dart';
@@ -33,9 +34,9 @@ class _DivineNamesPageState extends State<DivineNamesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppPageAppBar(
         title: Text(AppLocalizations.of(context).divineNamesTitle),
-        flexibleSpace: const ArchitecturalBackdrop(),
+        flexibleSpace: const HeaderPatternBackdrop(),
       ),
       body: FutureBuilder<List<DivineName>>(
         future: _names,

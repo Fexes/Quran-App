@@ -9,6 +9,7 @@ import '../../../../core/widgets/content_share_sheet.dart';
 import '../../../azkar/domain/entities/dhikr_item.dart';
 import '../../../azkar/domain/repositories/azkar_repository.dart';
 import '../../../hadith/domain/entities/hadith_item.dart';
+import '../../../hadith/domain/services/hadith_grading.dart';
 import '../../../hadith/domain/repositories/hadith_repository.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
 import '../../domain/library_translation_language_mapper.dart';
@@ -22,11 +23,17 @@ Future<void> showHadithShareSheet(
   bool translationAvailable = true,
 }) {
   final repository = getIt<HadithRepository>();
+  final grading = HadithGrading.fromHadith(item);
   return showContentShareSheet(
     context,
     ContentShareSheet(
       title: 'Share hadith',
       heading: 'HADITH',
+      referenceRequired: true,
+      gradingNotice: grading.labelFor(
+        Localizations.localeOf(context).languageCode,
+      ),
+      gradingRequiresCaution: grading.requiresCaution,
       arabicText: item.arabic,
       script: context.read<QuranThemeCubit>().state.quranArabicScript,
       translation: translationAvailable ? item.translation : '',
@@ -38,8 +45,8 @@ Future<void> showHadithShareSheet(
           : item.collectionName,
       referenceSubtitle: [
         if (item.collectionName.isNotEmpty) item.reference,
-        if (item.grade.isNotEmpty) item.grade,
-      ].join('  /  '),
+        grading.shareSummary,
+      ].join('\n'),
       fileName: 'hadith_${_safeFileName(item.id)}.png',
       translationPickerBuilder:
           (

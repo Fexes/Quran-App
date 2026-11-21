@@ -1,0 +1,645 @@
+{
+  "corpus_counts": {
+    "azkar": 287,
+    "divine_name": 99,
+    "hadith": 30770,
+    "quran": 6236,
+    "surah": 114,
+    "tafsir": 6236
+  },
+  "database_sha256": "d536479ee7344a43cef2f72bf537f4779456e8184fa8c23ad04d4a6580f756f4",
+  "scope": "Bundled corpus retrieval only. Dynamic app-context, downloaded editions, and personal content are not included in this Python harness.",
+  "relevance_status": "Unreviewed qualitative smoke output; no human verified relevance judgments or accuracy metrics.",
+  "queries": [
+    {
+      "query": "I'm worried about my future.",
+      "timing_ms": {
+        "keyword_ms": 4.186375001154374,
+        "embedding_ms": 6.327875002170913,
+        "vector_ms": 43.58391700225184,
+        "total_ms": 54.39337500138208
+      },
+      "rankings": {
+        "semantic": [
+          {
+            "rank": 1,
+            "canonical_id": "quran:69:38",
+            "kind": "quran",
+            "reference": "69:38",
+            "title": "Al-Ḥāqqah",
+            "text": "So I swear by what you see ﴾38﴿",
+            "source_label": null
+          },
+          {
+            "rank": 2,
+            "canonical_id": "quran:89:29",
+            "kind": "quran",
+            "reference": "89:29",
+            "title": "Al-Fajr",
+            "text": "And enter among My [righteous] servants ﴾29﴿",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "quran:74:27",
+            "kind": "quran",
+            "reference": "74:27",
+            "title": "Al-Muddaththir",
+            "text": "And what can make you know what is Saqar? ﴾27﴿",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "quran:79:9",
+            "kind": "quran",
+            "reference": "79:9",
+            "title": "An-Nāzi‘āt",
+            "text": "Their eyes humbled. ﴾9﴿",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "quran:80:15",
+            "kind": "quran",
+            "reference": "80:15",
+            "title": "‘Abasa",
+            "text": "[Carried] by the hands of messenger-angels, ﴾15﴿",
+            "source_label": null
+          }
+        ],
+        "hybrid": [
+          {
+            "rank": 1,
+            "canonical_id": "hadith:nasai:4109",
+            "kind": "hadith",
+            "reference": "Sunan an-Nasa'i 144",
+            "title": "Sunan an-Nasa'i",
+            "text": "It was narrated from Shu'bah who said:\"I said to Hammad: 'I heard Mansur, and Sulaiman, and Zubaid narrating from Abu Wa'il, from 'Abdullah, that the Messenger of Allah [SAW] said: \"Defaming a Muslim is evildoing and fighting him is Kufr.\" - Who are you worried about? Are you worried about Mansur? Are you worried about Zubaid? Are you worried about Sulaiman?' He said: 'No, but I am worried about Abu Wa'il",
+            "source_label": null
+          },
+          {
+            "rank": 2,
+            "canonical_id": "quran:69:38",
+            "kind": "quran",
+            "reference": "69:38",
+            "title": "Al-Ḥāqqah",
+            "text": "So I swear by what you see ﴾38﴿",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "hadith:tirmidhi:480",
+            "kind": "hadith",
+            "reference": "Jami at-Tirmidhi 28",
+            "title": "Jami at-Tirmidhi",
+            "text": "Jabir bin Abdullah narrated:\"Allah's Messenger would teach us Al-Isthikhara for all of our affairs just as he would teach us a Surah of the Qur'an, saying: 'When one of you is worried about a matter, then let him perform two Rak'ah other than the obligatory (prayer), then let him say: (Allahumma inni astakhiruka bi'ilmika, wa astaqdiruka biqudratika, wa as'aluka min falikal-azim, fa innaka taqdiru wa la qadiru, wa ta'lami wa la a'lamu, wa anta allamul-ghayub. Allahumma in kunta ta'lamu anna hadhal-amra khairun li fi dini wa ma'ishati wa aqibati amri, or said: Fi ajili amri wa ajilihi fayassirhu li,thumma barik li fihi, wa in kunta ta'lamu anna hadhal-amra sharrun li fi dini wa ma'ishati wa aqibati amri, or said: Fi ajili amri wa ajilihi fasrifhu anni wasrifni anhu waqdur Lil-khaira haithu kana, thumma ardini bih.)\" 'O Allah! I consult Your knowledge, and seek ability from Your power, and I ask You from Your magnificent bounty, for indeed You have power and I do not have power, and You know while I do not know, and You know the unseen. O Allah! If you know that this matter is good for me in my religion or my livelihood, and for my life in the Hereafter - or he said: for my present and future - then make it easy for me, then bless me in it. If You know that this matter is bad for me in my religion and my livelihood and my life in the Hereafter - or he said: for my present and future - then divert it from me and divert me from it, enable me to find the good wherever it is, then make me pleased with it.\"He said: \"And he mentions his need",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "quran:89:29",
+            "kind": "quran",
+            "reference": "89:29",
+            "title": "Al-Fajr",
+            "text": "And enter among My [righteous] servants ﴾29﴿",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "quran:48:20",
+            "kind": "quran",
+            "reference": "48:20",
+            "title": "Al-Fatḥ",
+            "text": "Allāh has promised you much booty that you will take [in the future] and has hastened for you this [victory] and withheld the hands of people from you - that it may be a sign for the believers and [that] He may guide you to a straight path. ﴾20﴿",
+            "source_label": null
+          }
+        ]
+      }
+    },
+    {
+      "query": "مجھے اپنے مستقبل کی فکر ہے",
+      "timing_ms": {
+        "keyword_ms": 2.4048749983194284,
+        "embedding_ms": 2.375708001636667,
+        "vector_ms": 31.966750000719912,
+        "total_ms": 37.09204199913074
+      },
+      "rankings": {
+        "semantic": [
+          {
+            "rank": 1,
+            "canonical_id": "quran:86:16",
+            "kind": "quran",
+            "reference": "86:16",
+            "title": "Aṭ-Ṭāriq",
+            "text": "But I am planning a plan. ﴾16﴿",
+            "source_label": null
+          },
+          {
+            "rank": 2,
+            "canonical_id": "quran:80:10",
+            "kind": "quran",
+            "reference": "80:10",
+            "title": "‘Abasa",
+            "text": "From him you are distracted. ﴾10﴿",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "quran:69:29",
+            "kind": "quran",
+            "reference": "69:29",
+            "title": "Al-Ḥāqqah",
+            "text": "Gone from me is my authority.\" ﴾29﴿",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "quran:37:99",
+            "kind": "quran",
+            "reference": "37:99",
+            "title": "Aṣ-Ṣāffāt",
+            "text": "And [then] he said, \"Indeed, I will go to [where I am ordered by] my Lord; He will guide me. ﴾99﴿",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "tafsir:bundled:94:3",
+            "kind": "tafsir",
+            "reference": "Quran 94:3",
+            "title": "Tafsir Al-Muyassar: 94:3",
+            "text": "[3] الذي أثقل ظهرك",
+            "source_label": "Tafsir Al-Muyassar (King Fahd Complex; quran_with_tafsir 1.0.1)"
+          }
+        ],
+        "hybrid": [
+          {
+            "rank": 1,
+            "canonical_id": "quran:86:16",
+            "kind": "quran",
+            "reference": "86:16",
+            "title": "Aṭ-Ṭāriq",
+            "text": "But I am planning a plan. ﴾16﴿",
+            "source_label": null
+          },
+          {
+            "rank": 2,
+            "canonical_id": "tafsir:bundled:71:7",
+            "kind": "tafsir",
+            "reference": "Quran 71:7",
+            "title": "Tafsir Al-Muyassar: 71:7",
+            "text": "[7]  وإني كلما دعوتهم إلى الإيمان بك؛ ليكون سبباً في غفرانك ذنوبهم، وضعوا أصابعهم في آذانهم؛ كي لا يسمعوا دعوة الحق، وتغطَّوا بثيابهم؛ كي لا يروني، وأقاموا على كفرهم، واستكبروا عن قَبول الإيمان استكباراً شديداً",
+            "source_label": "Tafsir Al-Muyassar (King Fahd Complex; quran_with_tafsir 1.0.1)"
+          },
+          {
+            "rank": 3,
+            "canonical_id": "quran:20:33",
+            "kind": "quran",
+            "reference": "20:33",
+            "title": "Ṭā-Hā",
+            "text": "That we may exalt You much ﴾33﴿",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "quran:80:10",
+            "kind": "quran",
+            "reference": "80:10",
+            "title": "‘Abasa",
+            "text": "From him you are distracted. ﴾10﴿",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "quran:69:29",
+            "kind": "quran",
+            "reference": "69:29",
+            "title": "Al-Ḥāqqah",
+            "text": "Gone from me is my authority.\" ﴾29﴿",
+            "source_label": null
+          }
+        ]
+      }
+    },
+    {
+      "query": "أشعر بالقلق بشأن مستقبلي",
+      "timing_ms": {
+        "keyword_ms": 0.8612919991719536,
+        "embedding_ms": 2.43604199931724,
+        "vector_ms": 28.528208000352606,
+        "total_ms": 32.11962499699439
+      },
+      "rankings": {
+        "semantic": [
+          {
+            "rank": 1,
+            "canonical_id": "quran:20:25",
+            "kind": "quran",
+            "reference": "20:25",
+            "title": "Ṭā-Hā",
+            "text": "[Moses] said, \"My Lord, expand [i.e., relax] for me my breast [with assurance] ﴾25﴿",
+            "source_label": null
+          },
+          {
+            "rank": 2,
+            "canonical_id": "quran:26:14",
+            "kind": "quran",
+            "reference": "26:14",
+            "title": "Ash-Shu‘arā’",
+            "text": "And they have upon me a [claim due to] sin, so I fear that they will kill me.\" ﴾14﴿",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "quran:7:112",
+            "kind": "quran",
+            "reference": "7:112",
+            "title": "Al-A‘rāf",
+            "text": "Who will bring you every learned magician.\" ﴾112﴿",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "quran:56:75",
+            "kind": "quran",
+            "reference": "56:75",
+            "title": "Al-Wāqi‘ah",
+            "text": "Then I swear by the setting of the stars, ﴾75﴿",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "quran:30:2",
+            "kind": "quran",
+            "reference": "30:2",
+            "title": "Ar-Rūm",
+            "text": "The Byzantines have been defeated ﴾2﴿",
+            "source_label": null
+          }
+        ],
+        "hybrid": [
+          {
+            "rank": 1,
+            "canonical_id": "quran:20:25",
+            "kind": "quran",
+            "reference": "20:25",
+            "title": "Ṭā-Hā",
+            "text": "[Moses] said, \"My Lord, expand [i.e., relax] for me my breast [with assurance] ﴾25﴿",
+            "source_label": null
+          },
+          {
+            "rank": 2,
+            "canonical_id": "tafsir:bundled:2:72",
+            "kind": "tafsir",
+            "reference": "Quran 2:72",
+            "title": "Tafsir Al-Muyassar: 2:72",
+            "text": "[72] واذكروا إذ قتلتم نفساً فتنازعتم بشأنها، كلٌّ يدفع عن نفسه تهمة القتل، والله مخرج ما كنتم تخفون مِن قَتْل القتيل.",
+            "source_label": "Tafsir Al-Muyassar (King Fahd Complex; quran_with_tafsir 1.0.1)"
+          },
+          {
+            "rank": 3,
+            "canonical_id": "quran:26:14",
+            "kind": "quran",
+            "reference": "26:14",
+            "title": "Ash-Shu‘arā’",
+            "text": "And they have upon me a [claim due to] sin, so I fear that they will kill me.\" ﴾14﴿",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "tafsir:bundled:8:68",
+            "kind": "tafsir",
+            "reference": "Quran 8:68",
+            "title": "Tafsir Al-Muyassar: 8:68",
+            "text": "[68] لولا كتاب من الله سبق به القضاء والقدر بإباحة الغنيمة وفداء الأسرى لهذه الأمة، لنالكم عذاب عظيم بسبب أخْذكم الغنيمة والفداء قبل أن ينزل بشأنهما تشريع.",
+            "source_label": "Tafsir Al-Muyassar (King Fahd Complex; quran_with_tafsir 1.0.1)"
+          },
+          {
+            "rank": 5,
+            "canonical_id": "hadith:malik:443",
+            "kind": "hadith",
+            "reference": "Muwatta Malik 3",
+            "title": "Muwatta Malik",
+            "text": "Yahya related to me from Malik from Nafi that Abdullah ibn Umar, when asked about the fear prayer said, \"The imam and a group of people go forward and the imam prays a raka with them, while another group, who have not yet prayed, position themselves between him and the enemy. When those who are with him have prayed a raka they draw back to where those who have not prayed are, and do not say the taslim. Then those who have not prayed come forward and pray a raka with him. Then the imam leaves, as he has now prayed two rakas. Everyone else in the two groups stands and prays a raka by himself after the imam has left. In this way each of the two groups will have prayed two rakas. If the fear is greater than that, then the men pray standing on their feet or mounted, either facing the qibla or otherwise",
+            "source_label": null
+          }
+        ]
+      }
+    },
+    {
+      "query": "Mujhe apne mustaqbil ki fikar hai",
+      "timing_ms": {
+        "keyword_ms": 1.6632909973850474,
+        "embedding_ms": 2.803165996738244,
+        "vector_ms": 28.07708299951628,
+        "total_ms": 32.850499999767635
+      },
+      "rankings": {
+        "semantic": [
+          {
+            "rank": 1,
+            "canonical_id": "divine_name:61",
+            "kind": "divine_name",
+            "reference": "",
+            "title": "Al-Muḥyī",
+            "text": "The Giver of Life",
+            "source_label": "The Names are from the Qurʾān & Sunnah; Arabic + transliteration + English meaning from my-prayers/muslim-data (Apache-2.0)"
+          },
+          {
+            "rank": 2,
+            "canonical_id": "hadith:muslim:4376",
+            "kind": "hadith",
+            "reference": "Sahih Muslim 35",
+            "title": "Sahih Muslim",
+            "text": "This hadith has been narrated on the authority of A'mash",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "hadith:muslim:2033",
+            "kind": "hadith",
+            "reference": "Sahih Muslim 83",
+            "title": "Sahih Muslim",
+            "text": "Mukhawwil has narrated this hadith on the authority of Sufyan",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "hadith:muslim:4767",
+            "kind": "hadith",
+            "reference": "Sahih Muslim 65",
+            "title": "Sahih Muslim",
+            "text": "This hadith has been transmitted on the authority of A'mash",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "divine_name:14",
+            "kind": "divine_name",
+            "reference": "",
+            "title": "Al-Muṣawwir",
+            "text": "The Fashioner of Forms",
+            "source_label": "The Names are from the Qurʾān & Sunnah; Arabic + transliteration + English meaning from my-prayers/muslim-data (Apache-2.0)"
+          }
+        ],
+        "hybrid": [
+          {
+            "rank": 1,
+            "canonical_id": "divine_name:61",
+            "kind": "divine_name",
+            "reference": "",
+            "title": "Al-Muḥyī",
+            "text": "The Giver of Life",
+            "source_label": "The Names are from the Qurʾān & Sunnah; Arabic + transliteration + English meaning from my-prayers/muslim-data (Apache-2.0)"
+          },
+          {
+            "rank": 2,
+            "canonical_id": "hadith:bukhari:5941",
+            "kind": "hadith",
+            "reference": "Sahih al-Bukhari 156",
+            "title": "Sahih al-Bukhari",
+            "text": "Narrated Asma':A woman asked the Prophet (ﷺ) saying, \"O Allah's Messenger (ﷺ)! My daughter got measles and her hair fell out. Now that I got her married, may I let her use false hair?\" He said (to her), \"Allah has cursed the lady who lengthens hair artificially and the one who gets her hair lengthened artificially",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "hadith:muslim:4376",
+            "kind": "hadith",
+            "reference": "Sahih Muslim 35",
+            "title": "Sahih Muslim",
+            "text": "This hadith has been narrated on the authority of A'mash",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "hadith:muslim:6073",
+            "kind": "hadith",
+            "reference": "Sahih Muslim 131",
+            "title": "Sahih Muslim",
+            "text": "Ibn Sirin reported:Anas b. Malik was asked whether Allah's Messenger (ﷺ) dyed his hair. He said: He had not become old enough to have white hair. Ibn Idris said that he had a few white hair. Abu Bakr and Umar, however, dyed hair with hina' (henna)",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "hadith:muslim:2033",
+            "kind": "hadith",
+            "reference": "Sahih Muslim 83",
+            "title": "Sahih Muslim",
+            "text": "Mukhawwil has narrated this hadith on the authority of Sufyan",
+            "source_label": null
+          }
+        ]
+      }
+    },
+    {
+      "query": "What helps when life is difficult?",
+      "timing_ms": {
+        "keyword_ms": 9.72133300092537,
+        "embedding_ms": 2.388957997027319,
+        "vector_ms": 28.001041999232257,
+        "total_ms": 40.517207999073435
+      },
+      "rankings": {
+        "semantic": [
+          {
+            "rank": 1,
+            "canonical_id": "quran:90:12",
+            "kind": "quran",
+            "reference": "90:12",
+            "title": "Al-Balad",
+            "text": "And what can make you know what is [breaking through] the difficult pass? ﴾12﴿",
+            "source_label": null
+          },
+          {
+            "rank": 2,
+            "canonical_id": "quran:26:93",
+            "kind": "quran",
+            "reference": "26:93",
+            "title": "Ash-Shu‘arā’",
+            "text": "Other than Allāh? Can they help you or help themselves?\" ﴾93﴿",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "azkar:praising-allah:159",
+            "kind": "azkar",
+            "reference": "Ibn Hibban (Hadith no. 2427), Ibn As- Sunni (Hadith no. 351).",
+            "title": "For one whos affairs have become difficult",
+            "text": "O Allah, there is no ease other than what You make easy. If You please You ease sorrow.",
+            "source_label": "muslim_data_android"
+          },
+          {
+            "rank": 4,
+            "canonical_id": "hadith:nasai:1306",
+            "kind": "hadith",
+            "reference": "Sunan an-Nasa'i 128",
+            "title": "Sunan an-Nasa'i",
+            "text": "It was narrated that Qais bin 'Ubad said:\"Ammar bin Yasir led the people in prayer and he made the prayer short. It was as if they disliked that, so he said: 'Did I not do bowing and prostration properly?' They said: 'Yes.' He said: 'And I said a supplication that the Prophet (ﷺ) used to say:Allahumma bi 'ilmikal-ghaiba wa qudratika 'alal-khalqi ahini ma 'alimtal-hayata khairan li, wa tawaffani idha 'alimtal-wafata khairan li. Allahumma as'aluka khashyataka fil-ghaibi wash-shahadati wa as'aluka kalimatul-aqua fir-rida'i wal ghadab, wa as'alukal-qasda fil faqr wal-ghina, wa as'aluka na'iman la yanfadu wa as'aluka qurrata ainan la tanqati'u wa as'alukar-rida'i ba'dal-qada'i wa as'aluka bardal 'aishi ba'dal-mawti, wa as'aluka ladhatan-nazari ila wajhika wash-shawqa ila liqa'ika fi fitnatin mudillatin, Allahumma zayyina dizinatil-imani waj'alna hudatan muhtadin (O Allah, by Your knowledge of the unseen and Your power over creation, keep me alive so long as You know that living is good for me and cause me to die when You know that death is better for me. O Allah, cause me to fear You in secret and in public. I ask You to make me true in speech in times of pleasure and of anger. I ask You to make me moderate in times of wealth and poverty. And I ask You for everlasting delight and joy that will never cease. I ask You to make me pleased with that which You have decreed and for an easy life after death. I ask You for the sweetness of looking upon Your face and a longing to meet You in a manner that does not entail a calamity that will bring about harm or a trial that will cause deviation. O Allah, beautify us with the adornment of faith and make us among those who guide and are rightly guided)",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "quran:2:280",
+            "kind": "quran",
+            "reference": "2:280",
+            "title": "Al-Baqarah",
+            "text": "And if someone is in hardship, then [let there be] postponement until [a time of] ease. But if you give [from your right as] charity, then it is better for you, if you only knew. ﴾280﴿",
+            "source_label": null
+          }
+        ],
+        "hybrid": [
+          {
+            "rank": 1,
+            "canonical_id": "azkar:praising-allah:159",
+            "kind": "azkar",
+            "reference": "Ibn Hibban (Hadith no. 2427), Ibn As- Sunni (Hadith no. 351).",
+            "title": "For one whos affairs have become difficult",
+            "text": "O Allah, there is no ease other than what You make easy. If You please You ease sorrow.",
+            "source_label": "muslim_data_android"
+          },
+          {
+            "rank": 2,
+            "canonical_id": "quran:90:12",
+            "kind": "quran",
+            "reference": "90:12",
+            "title": "Al-Balad",
+            "text": "And what can make you know what is [breaking through] the difficult pass? ﴾12﴿",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "quran:2:45",
+            "kind": "quran",
+            "reference": "2:45",
+            "title": "Al-Baqarah",
+            "text": "And seek help through patience and prayer; and indeed, it is difficult except for the humbly submissive [to Allāh] ﴾45﴿",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "quran:79:27",
+            "kind": "quran",
+            "reference": "79:27",
+            "title": "An-Nāzi‘āt",
+            "text": "Are you a more difficult creation or is the heaven? He [i.e., Allāh] constructed it. ﴾27﴿",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "quran:41:39",
+            "kind": "quran",
+            "reference": "41:39",
+            "title": "Fuṣṣilat",
+            "text": "And of His signs is that you see the earth stilled, but when We send down upon it rain, it quivers and grows. Indeed, He who has given it life is the Giver of Life to the dead. Indeed, He is over all things competent. ﴾39﴿",
+            "source_label": null
+          }
+        ]
+      }
+    },
+    {
+      "query": "How should I treat my parents?",
+      "timing_ms": {
+        "keyword_ms": 5.592290999629768,
+        "embedding_ms": 2.2804590007581282,
+        "vector_ms": 31.055167000886286,
+        "total_ms": 39.3212909984868
+      },
+      "rankings": {
+        "semantic": [
+          {
+            "rank": 1,
+            "canonical_id": "quran:68:41",
+            "kind": "quran",
+            "reference": "68:41",
+            "title": "Al-Qalam",
+            "text": "Or do they have partners? Then let them bring their partners, if they should be truthful. ﴾41﴿",
+            "source_label": null
+          },
+          {
+            "rank": 2,
+            "canonical_id": "quran:65:6",
+            "kind": "quran",
+            "reference": "65:6",
+            "title": "Aṭ-Ṭalāq",
+            "text": "Lodge them [in a section] of where you dwell out of your means and do not harm them in order to oppress them. And if they should be pregnant, then spend on them until they give birth. And if they breastfeed for you, then give them their payment and confer among yourselves in the acceptable way; but if you are in discord, then there may breastfeed for him [i.e., the father] another woman. ﴾6﴿",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "quran:17:23",
+            "kind": "quran",
+            "reference": "17:23",
+            "title": "Al-Isrā’",
+            "text": "And your Lord has decreed that you worship not except Him, and to parents, good treatment. Whether one or both of them reach old age [while] with you, say not to them [so much as], \"uff,\" and do not repel them but speak to them a noble word. ﴾23﴿",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "quran:29:8",
+            "kind": "quran",
+            "reference": "29:8",
+            "title": "Al-‘Ankabūt",
+            "text": "And We have enjoined upon man goodness to parents. But if they endeavor to make you associate with Me that of which you have no knowledge, do not obey them. To Me is your return, and I will inform you about what you used to do. ﴾8﴿",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "quran:38:28",
+            "kind": "quran",
+            "reference": "38:28",
+            "title": "Ṣād",
+            "text": "Or should We treat those who believe and do righteous deeds like corrupters in the land? Or should We treat those who fear Allāh like the wicked? ﴾28﴿",
+            "source_label": null
+          }
+        ],
+        "hybrid": [
+          {
+            "rank": 1,
+            "canonical_id": "quran:17:23",
+            "kind": "quran",
+            "reference": "17:23",
+            "title": "Al-Isrā’",
+            "text": "And your Lord has decreed that you worship not except Him, and to parents, good treatment. Whether one or both of them reach old age [while] with you, say not to them [so much as], \"uff,\" and do not repel them but speak to them a noble word. ﴾23﴿",
+            "source_label": null
+          },
+          {
+            "rank": 2,
+            "canonical_id": "quran:38:28",
+            "kind": "quran",
+            "reference": "38:28",
+            "title": "Ṣād",
+            "text": "Or should We treat those who believe and do righteous deeds like corrupters in the land? Or should We treat those who fear Allāh like the wicked? ﴾28﴿",
+            "source_label": null
+          },
+          {
+            "rank": 3,
+            "canonical_id": "quran:6:151",
+            "kind": "quran",
+            "reference": "6:151",
+            "title": "Al-An‘ām",
+            "text": "Say, \"Come, I will recite what your Lord has prohibited to you. [He commands] that you not associate anything with Him, and to parents, good treatment, and do not kill your children out of poverty; We will provide for you and them. And do not approach immoralities - what is apparent of them and what is concealed. And do not kill the soul which Allāh has forbidden [to be killed] except by [legal] right. This has He instructed you that you may use reason.\" ﴾151﴿",
+            "source_label": null
+          },
+          {
+            "rank": 4,
+            "canonical_id": "quran:31:14",
+            "kind": "quran",
+            "reference": "31:14",
+            "title": "Luqmān",
+            "text": "And We have enjoined upon man [care] for his parents. His mother carried him, [increasing her] in weakness upon weakness, and his weaning is in two years. Be grateful to Me and to your parents; to Me is the [final] destination. ﴾14﴿",
+            "source_label": null
+          },
+          {
+            "rank": 5,
+            "canonical_id": "quran:2:215",
+            "kind": "quran",
+            "reference": "2:215",
+            "title": "Al-Baqarah",
+            "text": "They ask you, [O Muḥammad], what they should spend. Say, \"Whatever you spend of good is [to be] for parents and relatives and orphans and the needy and the traveler. And whatever you do of good - indeed, Allāh is Knowing of it.\" ﴾215﴿",
+            "source_label": null
+          }
+        ]
+      }
+    }
+  ]
+}

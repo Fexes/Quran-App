@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -6,7 +7,7 @@ import '../../../../app/di/injection.dart';
 import '../../../../app/router/app_routes.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
-import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../core/widgets/note_editor_sheet.dart';
 import '../../../../core/widgets/premium_surface.dart';
 import '../../data/stores/quran_user_data_store.dart';
@@ -192,21 +193,35 @@ class _QuranNotesPageState extends State<QuranNotesPage> {
     );
     assert(filtered.every((note) => _notes.contains(note)));
     final hasFilters = _query.isNotEmpty || _filter != _NoteFilter.all;
+    final compactNoteAction =
+        MediaQuery.sizeOf(context).width < 320 ||
+        MediaQuery.textScalerOf(context).scale(14) > 21;
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
+      appBar: AppPageAppBar(
         title: const Text('Notes'),
-        flexibleSpace: const ArchitecturalBackdrop(),
+        flexibleSpace: const HeaderPatternBackdrop(),
         leading: IconButton(
           tooltip: 'Back',
           icon: const AppIcon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         tooltip: 'New note',
         onPressed: _deleting ? null : () => _openNoteEditor(),
-        child: const AppIcon(Icons.edit_note_rounded),
+        isExtended: !compactNoteAction,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 2,
+        focusElevation: 3,
+        hoverElevation: 3,
+        highlightElevation: 1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(QuranTheme.radiusControl),
+        ),
+        icon: const AppIcon(Icons.add_rounded, size: 22),
+        label: const Text('New note'),
       ),
       body: SafeArea(
         top: false,
@@ -230,86 +245,91 @@ class _QuranNotesPageState extends State<QuranNotesPage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '${_notes.length} notes  /  $linkedCount linked to ayahs',
+                        _notes.isEmpty
+                            ? 'A space for your thoughts and Quran reflections.'
+                            : '${_notes.length} notes  /  $linkedCount linked to ayahs',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: QuranTheme.subText(context, 0.65),
                         ),
                       ),
-                      const SizedBox(height: 22),
-                      TextField(
-                        controller: _searchController,
-                        textInputAction: TextInputAction.search,
-                        onChanged: (value) =>
-                            setState(() => _query = value.trim().toLowerCase()),
-                        decoration: InputDecoration(
-                          hintText: 'Search notes or ayah',
-                          prefixIcon: const AppIcon(Icons.search_rounded),
-                          suffixIcon: _searchController.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Clear search',
-                                  icon: const AppIcon(Icons.close_rounded),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _query = '');
-                                  },
-                                ),
+                      if (_notes.isNotEmpty) ...[
+                        const SizedBox(height: 22),
+                        TextField(
+                          controller: _searchController,
+                          textInputAction: TextInputAction.search,
+                          onChanged: (value) => setState(
+                            () => _query = value.trim().toLowerCase(),
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Search notes or ayah',
+                            prefixIcon: const AppIcon(Icons.search_rounded),
+                            suffixIcon: _searchController.text.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: 'Clear search',
+                                    icon: const AppIcon(Icons.close_rounded),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _query = '');
+                                    },
+                                  ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          for (final filter in _NoteFilter.values)
-                            ChoiceChip(
-                              showCheckmark: false,
-                              label: Text(switch (filter) {
-                                _NoteFilter.all => 'All (${_notes.length})',
-                                _NoteFilter.ayahs => 'Ayahs ($linkedCount)',
-                                _NoteFilter.personal =>
-                                  'Personal (${_notes.length - linkedCount})',
-                              }),
-                              selected: _filter == filter,
-                              onSelected: (_) =>
-                                  setState(() => _filter = filter),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              hasFilters
-                                  ? '${filtered.length} matching notes'
-                                  : 'All notes',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            for (final filter in _NoteFilter.values)
+                              ChoiceChip(
+                                showCheckmark: false,
+                                label: Text(switch (filter) {
+                                  _NoteFilter.all => 'All (${_notes.length})',
+                                  _NoteFilter.ayahs => 'Ayahs ($linkedCount)',
+                                  _NoteFilter.personal =>
+                                    'Personal (${_notes.length - linkedCount})',
+                                }),
+                                selected: _filter == filter,
+                                onSelected: (_) =>
+                                    setState(() => _filter = filter),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                hasFilters
+                                    ? '${filtered.length} matching notes'
+                                    : 'All notes',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
-                          ),
-                          PopupMenuButton<bool>(
-                            tooltip: 'Sort notes',
-                            icon: const AppIcon(Icons.sort_rounded),
-                            initialValue: _newestFirst,
-                            onSelected: (value) =>
-                                setState(() => _newestFirst = value),
-                            itemBuilder: (_) => [
-                              CheckedPopupMenuItem(
-                                value: true,
-                                checked: _newestFirst,
-                                child: const Text('Recently edited'),
-                              ),
-                              CheckedPopupMenuItem(
-                                value: false,
-                                checked: !_newestFirst,
-                                child: const Text('Oldest first'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                            PopupMenuButton<bool>(
+                              tooltip: 'Sort notes',
+                              icon: const AppIcon(Icons.sort_rounded),
+                              initialValue: _newestFirst,
+                              onSelected: (value) =>
+                                  setState(() => _newestFirst = value),
+                              itemBuilder: (_) => [
+                                CheckedPopupMenuItem(
+                                  value: true,
+                                  checked: _newestFirst,
+                                  child: const Text('Recently edited'),
+                                ),
+                                CheckedPopupMenuItem(
+                                  value: false,
+                                  checked: !_newestFirst,
+                                  child: const Text('Oldest first'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -318,41 +338,17 @@ class _QuranNotesPageState extends State<QuranNotesPage> {
                 SliverFillRemaining(
                   hasScrollBody: false,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(28, 24, 28, 96),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        AppIcon(
-                          hasFilters
-                              ? Icons.search_off_rounded
-                              : Icons.edit_note_rounded,
-                          size: 44,
-                          color: QuranTheme.subText(context, 0.55),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          hasFilters
-                              ? 'No matching notes'
-                              : 'A place for reflection',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: hasFilters
-                              ? _clearFilters
-                              : () => _openNoteEditor(),
-                          child: Text(
-                            hasFilters ? 'Show all notes' : 'Write a note',
-                          ),
-                        ),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 112),
+                    child: _NotesEmptyState(
+                      hasNotes: _notes.isNotEmpty,
+                      onWrite: _deleting ? null : () => _openNoteEditor(),
+                      onClearFilters: _clearFilters,
                     ),
                   ),
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 112),
                   sliver: SliverList.builder(
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
@@ -394,6 +390,113 @@ class _QuranNotesPageState extends State<QuranNotesPage> {
                     },
                   ),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotesEmptyState extends StatelessWidget {
+  const _NotesEmptyState({
+    required this.hasNotes,
+    required this.onWrite,
+    required this.onClearFilters,
+  });
+
+  final bool hasNotes;
+  final VoidCallback? onWrite;
+  final VoidCallback onClearFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: PremiumSurface(
+          borderColor: QuranTheme.outline(context),
+          borderWidth: 0.8,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: QuranTheme.surfaceVariant(context),
+                    borderRadius: BorderRadius.circular(
+                      QuranTheme.radiusControl,
+                    ),
+                  ),
+                  child: AppIcon(
+                    hasNotes
+                        ? Icons.search_off_rounded
+                        : Icons.edit_note_rounded,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                hasNotes ? 'No matching notes' : 'Your first reflection',
+                style: theme.textTheme.headlineSmall?.copyWith(fontSize: 22),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                hasNotes
+                    ? 'Try another word or clear your filters to see all your notes.'
+                    : 'Capture a thought, a lesson from your reading, or a '
+                          'reminder you want to return to.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: QuranTheme.subText(context),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: hasNotes ? onClearFilters : onWrite,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(48, 50),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                ),
+                icon: AppIcon(
+                  hasNotes ? Icons.filter_alt_off_outlined : Icons.add_rounded,
+                  size: 20,
+                ),
+                label: Text(hasNotes ? 'Show all notes' : 'Write a note'),
+              ),
+              if (!hasNotes) ...[
+                const Divider(height: 36),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppIcon(
+                      Icons.menu_book_outlined,
+                      size: 20,
+                      color: QuranTheme.subText(context),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'You can also attach a note to an ayah while reading '
+                        'the Quran. All your notes will appear here.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: QuranTheme.subText(context),
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

@@ -1,0 +1,30 @@
+{
+  "archived_on": "2026-11-21",
+  "restoration_only": true,
+  "files": [
+    {
+      "original_path": "lib/features/search/data/repositories/offline_search_repository_impl.dart",
+      "archive_path": "tool/semantic_search_disabled/lib/features/search/data/repositories/offline_search_repository_impl.dart.disabled",
+      "sha256": "aacbb6cce38711b8893baea0891580c62c1aa99fab09d28c3513f5e4d070854a",
+      "bytes": 33575
+    },
+    {
+      "original_path": "lib/features/search/data/services/e5_embedder.dart",
+      "archive_path": "tool/semantic_search_disabled/lib/features/search/data/services/e5_embedder.dart.disabled",
+      "sha256": "a34302d1ce5b85236884c8b52f5bc85f3ba4ef3a1e7ab0e5304ed223e52d7fb5",
+      "bytes": 5129
+    },
+    {
+      "original_path": "lib/features/search/data/services/offline_search_database.dart",
+      "archive_path": "tool/semantic_search_disabled/lib/features/search/data/services/offline_search_database.dart.disabled",
+      "sha256": "ebbafe3109c6ccfe4e3a6e269245729db7fb05950c1fadacbfcf8e80f176b118",
+      "bytes": 12065
+    },
+    {
+      "original_path": "test/features/search/data/offline_search_engine_test.dart",
+      "archive_path": "tool/semantic_search_disabled/test/features/search/data/offline_search_engine_test.dart.disabled",
+      "sha256": "6578d4c2b0c60381bc2bfdc212e3f52c5fa26b0009859beec04ae5c3ab67d63f",
+      "bytes": 22858
+    }
+  ]
+}

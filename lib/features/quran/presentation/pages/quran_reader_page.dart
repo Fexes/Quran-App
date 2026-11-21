@@ -1,8 +1,11 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
+import '../../../../core/widgets/app_settings_button.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/animated_expansion.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +17,7 @@ import '../../../../app/router/app_routes.dart';
 import '../../../../app/di/injection.dart';
 import '../../../../core/storage/settings_store.dart';
 import '../../../../core/navigation/app_route_observer.dart';
+import '../../../../core/search/search_text_normalizer.dart';
 import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/theme/quran_theme_cubit.dart';
 import '../../../../core/theme/quran_theme_state.dart';
@@ -24,6 +28,7 @@ import '../../../../core/widgets/content_share_sheet.dart';
 import '../../../../core/widgets/note_editor_sheet.dart';
 import '../../../../core/widgets/reader_text_size_control.dart';
 import '../../../../core/widgets/premium_surface.dart';
+import '../../../../core/widgets/scroll_under_header_shadow.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../domain/entities/quran_audio_reciter.dart';
 import '../../domain/entities/quran_ayah.dart';
@@ -60,11 +65,15 @@ class QuranReaderPage extends StatelessWidget {
     required this.surahNumber,
     this.initialAyahNumber,
     this.initialTranslationResourceId,
+    this.initialTafsirResourceId,
+    this.initialShowBundledTafsir = false,
   });
 
   final int surahNumber;
   final int? initialAyahNumber;
   final int? initialTranslationResourceId;
+  final int? initialTafsirResourceId;
+  final bool initialShowBundledTafsir;
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +100,8 @@ class QuranReaderPage extends StatelessWidget {
       child: _QuranReaderView(
         surahNumber: surahNumber,
         initialAyahNumber: initialAyahNumber,
+        initialTafsirResourceId: initialTafsirResourceId,
+        initialShowBundledTafsir: initialShowBundledTafsir,
       ),
     );
   }
@@ -100,10 +111,14 @@ class _QuranReaderView extends StatefulWidget {
   const _QuranReaderView({
     required this.surahNumber,
     required this.initialAyahNumber,
+    this.initialTafsirResourceId,
+    this.initialShowBundledTafsir = false,
   });
 
   final int surahNumber;
   final int? initialAyahNumber;
+  final int? initialTafsirResourceId;
+  final bool initialShowBundledTafsir;
 
   String? get initialVerseKey =>
       initialAyahNumber == null ? null : '$surahNumber:$initialAyahNumber';
@@ -137,6 +152,7 @@ class _QuranReaderViewState extends State<_QuranReaderView>
   QuranAyahTextLayout? _lastRenderedAyahLayout;
   int? _scrubberAyahNumber;
   bool _didInitialScroll = false;
+  bool _didOpenInitialTafsir = false;
   bool _didResolveInitialAudioFollow = false;
   String? _suppressedInitialAudioFocusVerseKey;
   var _programmaticScroll = false;
@@ -1121,16 +1137,48 @@ class _QuranReaderViewState extends State<_QuranReaderView>
     );
   }
 
+  void _scheduleInitialTafsir(QuranReaderState state) {
+    final resourceId = widget.initialTafsirResourceId;
+    if (_didOpenInitialTafsir ||
+        (resourceId == null && !widget.initialShowBundledTafsir) ||
+        state.status != QuranReaderStatus.success) {
+      return;
+    }
+    for (final ayah in state.ayahs) {
+      if (ayah.number != widget.initialAyahNumber) continue;
+      _didOpenInitialTafsir = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showTafsirSheet(
+          context,
+          ayah: ayah,
+          readerState: state,
+          resourceId: resourceId,
+          bundled: widget.initialShowBundledTafsir,
+        );
+      });
+      break;
+    }
+  }
+
   Future<void> _showTafsirSheet(
     BuildContext context, {
     required QuranAyah ayah,
     required QuranReaderState readerState,
+    int? resourceId,
+    bool bundled = false,
   }) async {
-    final tafsirLanguage = getIt.isRegistered<SettingsStore>()
+    final tafsirLanguage = bundled
+        ? 'arabic'
+        : getIt.isRegistered<SettingsStore>()
         ? getIt<SettingsStore>().tafsirLanguageName
         : 'english';
     final tafsirLanguageLabel = _displayLanguageName(tafsirLanguage);
-    final tafsirFuture = _loadTafsirDisplayData(ayah: ayah);
+    final tafsirFuture = _loadTafsirDisplayData(
+      ayah: ayah,
+      resourceId: resourceId,
+      bundled: bundled,
+    );
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: false,
@@ -1156,7 +1204,7 @@ class _QuranReaderViewState extends State<_QuranReaderView>
                 _TafsirSourcePill(data: data),
                 const SizedBox(height: 12),
                 Text(
-                  data.text,
+                  SearchTextNormalizer.cleanVisibleText(data.text),
                   textDirection: data.textDirection,
                   textAlign: data.textAlign,
                   style: QuranTheme.translationStyle(
@@ -1176,23 +1224,42 @@ class _QuranReaderViewState extends State<_QuranReaderView>
 
   Future<_TafsirDisplayData> _loadTafsirDisplayData({
     required QuranAyah ayah,
+    int? resourceId,
+    bool bundled = false,
   }) async {
+    if (bundled) {
+      final text = ayah.tafsir?.trim();
+      return text == null || text.isEmpty
+          ? const _TafsirDisplayData.empty()
+          : _TafsirDisplayData(
+              text: text,
+              sourceLabel: 'Al-Muyassar',
+              detailLabel: 'Bundled Arabic tafsir',
+              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.right,
+            );
+    }
     final preferredLanguage = getIt.isRegistered<SettingsStore>()
         ? getIt<SettingsStore>().tafsirLanguageName
         : 'english';
-    final preferredResourceId = getIt.isRegistered<SettingsStore>()
-        ? getIt<SettingsStore>().tafsirResourceId
-        : null;
+    final preferredResourceId =
+        resourceId ??
+        (getIt.isRegistered<SettingsStore>()
+            ? getIt<SettingsStore>().tafsirResourceId
+            : null);
     final preferredLanguageLabel = _displayLanguageName(preferredLanguage);
     final preferred = await _remoteTafsirFor(
       verseKey: ayah.verseKey,
       languageName: preferredLanguage,
-      requestedLanguageLabel: preferredLanguageLabel,
+      requestedLanguageLabel: resourceId == null
+          ? preferredLanguageLabel
+          : null,
       resourceId: preferredResourceId,
     );
     if (preferred != null) {
       return preferred;
     }
+    if (resourceId != null) return const _TafsirDisplayData.empty();
 
     final fallbackEnglish = preferredLanguage.toLowerCase() == 'english'
         ? null
@@ -1209,7 +1276,7 @@ class _QuranReaderViewState extends State<_QuranReaderView>
     if (localTafsir != null && localTafsir.isNotEmpty) {
       return _TafsirDisplayData(
         text: localTafsir,
-        sourceLabel: 'Offline default tafsir',
+        sourceLabel: 'Al-Muyassar',
         detailLabel: preferredLanguage.toLowerCase() == 'arabic'
             ? 'Showing bundled Arabic tafsir'
             : '$preferredLanguageLabel tafsir is not available yet',
@@ -1958,6 +2025,7 @@ class _QuranReaderViewState extends State<_QuranReaderView>
     return BlocBuilder<QuranReaderBloc, QuranReaderState>(
       builder: (context, state) {
         _latestState = state;
+        _scheduleInitialTafsir(state);
         _scheduleUrduTranslationDownload(state);
         _handleRenderedSurahChange(state);
         final surah = state.surah;
@@ -2054,82 +2122,85 @@ class _QuranReaderViewState extends State<_QuranReaderView>
                                 surah: surah,
                                 insets: insets,
                               );
-                              return Column(
-                                children: [
-                                  _buildReaderChrome(
-                                    context: context,
-                                    state: state,
-                                    title:
-                                        surah?.englishName ??
-                                        l10n.quranReaderTitle,
-                                    subtitle: _surahSubtitle(
-                                      surah?.number,
-                                      surah?.revelationType,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: LayoutBuilder(
-                                      builder: (context, constraints) => Stack(
-                                        children: [
-                                          Positioned.fill(
-                                            child: KeyedSubtree(
-                                              key: _readerViewportKey,
-                                              child: QuranSurahPullNavigation(
-                                                key: ValueKey(
-                                                  'surah-pull-${surah?.number}-${state.ayahTextLayout}',
-                                                ),
-                                                hasPrevious:
-                                                    (surah?.number ?? 1) > 1,
-                                                hasNext: hasNextSurah(surah),
-                                                bottomInset:
-                                                    insets.contentBottom,
-                                                onNavigate: (previous) =>
-                                                    _goToAdjacentSurah(
-                                                      state,
-                                                      previous: previous,
-                                                    ),
-                                                onDragStart:
-                                                    _pauseAudioFollowForDrag,
-                                                child: reader,
-                                              ),
-                                            ),
-                                          ),
-                                          _AyahScrollbar(
-                                            viewportHeight:
-                                                constraints.maxHeight,
-                                            topInset:
-                                                MediaQuery.paddingOf(
-                                                  this.context,
-                                                ).top +
-                                                _ReaderTopBar.height(context),
-                                            ayahCount: state.ayahs.length,
-                                            currentAyahNumber:
-                                                _scrollbarAyahNumber(state),
-                                            onAyahNumberChanged: (ayahNumber) =>
-                                                _scrollToAyahNumberFromScrubber(
-                                                  ayahNumber,
-                                                  state,
-                                                ),
-                                            onAyahNumberSettled: (ayahNumber) =>
-                                                _scrollToAyahNumberFromScrubber(
-                                                  ayahNumber,
-                                                  state,
-                                                  settle: true,
-                                                ),
-                                          ),
-                                          _buildFloatingControls(
-                                            state: state,
-                                            audioState: audioState,
-                                            selectedAyah: selectedAyah,
-                                            arabicFontScale:
-                                                themeState.quranArabicFontScale,
-                                            bottom: insets.actionBarBottom,
-                                          ),
-                                        ],
+                              return ScrollUnderHeaderShadow(
+                                headerExtent: _ReaderTopBar.height(context),
+                                child: Column(
+                                  children: [
+                                    _buildReaderChrome(
+                                      context: context,
+                                      state: state,
+                                      title:
+                                          surah?.englishName ??
+                                          l10n.quranReaderTitle,
+                                      subtitle: _surahSubtitle(
+                                        surah?.number,
+                                        surah?.revelationType,
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    Expanded(
+                                      child: LayoutBuilder(
+                                        builder: (context, constraints) => Stack(
+                                          children: [
+                                            Positioned.fill(
+                                              child: KeyedSubtree(
+                                                key: _readerViewportKey,
+                                                child: QuranSurahPullNavigation(
+                                                  key: ValueKey(
+                                                    'surah-pull-${surah?.number}-${state.ayahTextLayout}',
+                                                  ),
+                                                  hasPrevious:
+                                                      (surah?.number ?? 1) > 1,
+                                                  hasNext: hasNextSurah(surah),
+                                                  bottomInset:
+                                                      insets.contentBottom,
+                                                  onNavigate: (previous) =>
+                                                      _goToAdjacentSurah(
+                                                        state,
+                                                        previous: previous,
+                                                      ),
+                                                  onDragStart:
+                                                      _pauseAudioFollowForDrag,
+                                                  child: reader,
+                                                ),
+                                              ),
+                                            ),
+                                            _AyahScrollbar(
+                                              viewportHeight:
+                                                  constraints.maxHeight,
+                                              topInset:
+                                                  MediaQuery.paddingOf(
+                                                    this.context,
+                                                  ).top +
+                                                  _ReaderTopBar.height(context),
+                                              ayahCount: state.ayahs.length,
+                                              currentAyahNumber:
+                                                  _scrollbarAyahNumber(state),
+                                              onAyahNumberChanged: (ayahNumber) =>
+                                                  _scrollToAyahNumberFromScrubber(
+                                                    ayahNumber,
+                                                    state,
+                                                  ),
+                                              onAyahNumberSettled: (ayahNumber) =>
+                                                  _scrollToAyahNumberFromScrubber(
+                                                    ayahNumber,
+                                                    state,
+                                                    settle: true,
+                                                  ),
+                                            ),
+                                            _buildFloatingControls(
+                                              state: state,
+                                              audioState: audioState,
+                                              selectedAyah: selectedAyah,
+                                              arabicFontScale: themeState
+                                                  .quranArabicFontScale,
+                                              bottom: insets.actionBarBottom,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               );
                             },
                           );
@@ -2749,6 +2820,7 @@ class _ReaderTopBar extends StatelessWidget {
                   icon: Icons.tune_rounded,
                   onTap: onSettingsTap,
                 ),
+                const AppSettingsButton(),
               ],
             ),
           ],
@@ -3203,7 +3275,8 @@ class _ReaderSettingsPageState extends State<_ReaderSettingsPage> {
   Widget build(BuildContext context) {
     final state = widget.state;
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppPageAppBar(
+        flexibleSpace: const HeaderPatternBackdrop(),
         title: const Text('Reader settings'),
         leading: IconButton(
           tooltip: 'Back',

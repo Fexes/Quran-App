@@ -59,11 +59,14 @@ import '../../features/quran_audio/data/stores/quran_audio_download_store.dart';
 import '../../features/quran_audio/data/stores/quran_word_timing_store.dart';
 import '../../features/quran_audio/domain/repositories/quran_word_timing_repository.dart';
 import '../../features/search/data/repositories/local_deep_search_repository.dart';
+import '../../features/search/data/repositories/offline_search_repository_impl.dart';
+import '../../features/search/data/repositories/app_search_repository.dart';
+import '../../features/search/data/sources/app_search_sources.dart';
+import '../../features/search/data/sources/live_search_source.dart';
 import '../../features/search/domain/repositories/deep_search_repository.dart';
+import '../../features/search/domain/repositories/offline_search_repository.dart';
 import '../../features/worship_tools/data/repositories/local_divine_names_repository.dart';
-import '../../features/worship_tools/data/repositories/open_street_map_mosque_repository.dart';
 import '../../features/worship_tools/domain/repositories/divine_names_repository.dart';
-import '../../features/worship_tools/domain/repositories/mosque_locator_repository.dart';
 
 final getIt = GetIt.instance;
 
@@ -291,12 +294,6 @@ Future<void> configureDependencies({
     );
   }
 
-  if (!getIt.isRegistered<MosqueLocatorRepository>()) {
-    getIt.registerLazySingleton<MosqueLocatorRepository>(
-      () => OpenStreetMapMosqueRepository(userDataStore: getIt()),
-    );
-  }
-
   if (!getIt.isRegistered<BackupRepository>()) {
     getIt.registerLazySingleton<BackupRepository>(
       () => LocalBackupRepository(
@@ -331,6 +328,43 @@ Future<void> configureDependencies({
         hadithRepository: getIt(),
         azkarRepository: getIt(),
       ),
+    );
+  }
+
+  if (!getIt.isRegistered<AppSearchSourceRegistry>()) {
+    getIt.registerLazySingleton<AppSearchSourceRegistry>(
+      () => createAppSearchSources(
+        quran: getIt(),
+        translations: getIt(),
+        tafsirs: getIt(),
+        interlinear: getIt(),
+        quranUser: getIt(),
+        hadith: getIt(),
+        hadithTranslations: getIt(),
+        hadeethEnc: getIt(),
+        azkar: getIt(),
+        libraryUser: getIt(),
+        hifz: getIt(),
+        reading: getIt(),
+        journal: getIt(),
+        audio: getIt(),
+        settings: getIt(),
+        divineNames: getIt(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<OfflineSearchRepository>()) {
+    getIt.registerLazySingleton<OfflineSearchRepository>(
+      () => AppSearchRepository(
+        engine: LocalOfflineSearchRepository(),
+        sources: getIt(),
+        live: LiveSearchSource(
+          prayerTimes: getIt(),
+          settings: getIt(),
+          cities: getIt(),
+        ),
+      ),
+      dispose: (repository) => repository.dispose(),
     );
   }
 

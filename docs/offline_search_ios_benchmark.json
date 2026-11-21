@@ -1,0 +1,961 @@
+{
+  "platform": "ios",
+  "operating_system": "Version 27.0 (Build 24A437)",
+  "physical_device_requested": true,
+  "model": "intfloat/multilingual-e5-small INT8",
+  "corpus": {
+    "quran": 500,
+    "hadith": 1000
+  },
+  "queries": [
+    {
+      "query": "I'm worried about my future.",
+      "runs": [
+        {
+          "round_trip_ms": 10,
+          "timings_ms": {
+            "keyword": 1,
+            "embedding": 3,
+            "vector": 4,
+            "ranking": 0,
+            "total": 10
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:75:1",
+            "hadith:ibnmajah:91",
+            "quran:90:1",
+            "hadith:bukhari:20",
+            "quran:37:89",
+            "hadith:malik:120",
+            "quran:12:55",
+            "hadith:qudsi:36",
+            "quran:71:2",
+            "hadith:bukhari:7"
+          ]
+        },
+        {
+          "round_trip_ms": 6,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 6
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:75:1",
+            "hadith:ibnmajah:91",
+            "quran:90:1",
+            "hadith:bukhari:20",
+            "quran:37:89",
+            "hadith:malik:120",
+            "quran:12:55",
+            "hadith:qudsi:36",
+            "quran:71:2",
+            "hadith:bukhari:7"
+          ]
+        },
+        {
+          "round_trip_ms": 6,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 6
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:75:1",
+            "hadith:ibnmajah:91",
+            "quran:90:1",
+            "hadith:bukhari:20",
+            "quran:37:89",
+            "hadith:malik:120",
+            "quran:12:55",
+            "hadith:qudsi:36",
+            "quran:71:2",
+            "hadith:bukhari:7"
+          ]
+        },
+        {
+          "round_trip_ms": 6,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 6
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:75:1",
+            "hadith:ibnmajah:91",
+            "quran:90:1",
+            "hadith:bukhari:20",
+            "quran:37:89",
+            "hadith:malik:120",
+            "quran:12:55",
+            "hadith:qudsi:36",
+            "quran:71:2",
+            "hadith:bukhari:7"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:75:1",
+            "hadith:ibnmajah:91",
+            "quran:90:1",
+            "hadith:bukhari:20",
+            "quran:37:89",
+            "hadith:malik:120",
+            "quran:12:55",
+            "hadith:qudsi:36",
+            "quran:71:2",
+            "hadith:bukhari:7"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "مجھے اپنے مستقبل کی فکر ہے",
+      "runs": [
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:37:89",
+            "hadith:tirmidhi:11",
+            "quran:108:1",
+            "hadith:abudawud:12",
+            "quran:38:68",
+            "hadith:nasai:23",
+            "quran:53:40",
+            "hadith:ibnmajah:91",
+            "quran:23:98",
+            "hadith:bukhari:59"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:37:89",
+            "hadith:tirmidhi:11",
+            "quran:108:1",
+            "hadith:abudawud:12",
+            "quran:38:68",
+            "hadith:nasai:23",
+            "quran:53:40",
+            "hadith:ibnmajah:91",
+            "quran:23:98",
+            "hadith:bukhari:59"
+          ]
+        },
+        {
+          "round_trip_ms": 6,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 6
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:37:89",
+            "hadith:tirmidhi:11",
+            "quran:108:1",
+            "hadith:abudawud:12",
+            "quran:38:68",
+            "hadith:nasai:23",
+            "quran:53:40",
+            "hadith:ibnmajah:91",
+            "quran:23:98",
+            "hadith:bukhari:59"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:37:89",
+            "hadith:tirmidhi:11",
+            "quran:108:1",
+            "hadith:abudawud:12",
+            "quran:38:68",
+            "hadith:nasai:23",
+            "quran:53:40",
+            "hadith:ibnmajah:91",
+            "quran:23:98",
+            "hadith:bukhari:59"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:37:89",
+            "hadith:tirmidhi:11",
+            "quran:108:1",
+            "hadith:abudawud:12",
+            "quran:38:68",
+            "hadith:nasai:23",
+            "quran:53:40",
+            "hadith:ibnmajah:91",
+            "quran:23:98",
+            "hadith:bukhari:59"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "أشعر بالقلق بشأن مستقبلي",
+      "runs": [
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:20:67",
+            "hadith:bukhari:83",
+            "quran:75:1",
+            "hadith:nasai:33",
+            "quran:37:89",
+            "quran:113:1",
+            "quran:71:2",
+            "quran:89:24",
+            "quran:90:1",
+            "quran:12:55"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:20:67",
+            "hadith:bukhari:83",
+            "quran:75:1",
+            "hadith:nasai:33",
+            "quran:37:89",
+            "quran:113:1",
+            "quran:71:2",
+            "quran:89:24",
+            "quran:90:1",
+            "quran:12:55"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:20:67",
+            "hadith:bukhari:83",
+            "quran:75:1",
+            "hadith:nasai:33",
+            "quran:37:89",
+            "quran:113:1",
+            "quran:71:2",
+            "quran:89:24",
+            "quran:90:1",
+            "quran:12:55"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:20:67",
+            "hadith:bukhari:83",
+            "quran:75:1",
+            "hadith:nasai:33",
+            "quran:37:89",
+            "quran:113:1",
+            "quran:71:2",
+            "quran:89:24",
+            "quran:90:1",
+            "quran:12:55"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:20:67",
+            "hadith:bukhari:83",
+            "quran:75:1",
+            "hadith:nasai:33",
+            "quran:37:89",
+            "quran:113:1",
+            "quran:71:2",
+            "quran:89:24",
+            "quran:90:1",
+            "quran:12:55"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "Mujhe apne mustaqbil ki fikar hai",
+      "runs": [
+        {
+          "round_trip_ms": 8,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 4,
+            "ranking": 0,
+            "total": 8
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:48:27",
+            "quran:106:1",
+            "quran:75:1",
+            "hadith:nasai:11",
+            "quran:84:1",
+            "hadith:nasai:10",
+            "quran:73:1",
+            "hadith:nasai:9",
+            "quran:81:1",
+            "hadith:tirmidhi:102"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:48:27",
+            "quran:106:1",
+            "quran:75:1",
+            "hadith:nasai:11",
+            "quran:84:1",
+            "hadith:nasai:10",
+            "quran:73:1",
+            "hadith:nasai:9",
+            "quran:81:1",
+            "hadith:tirmidhi:102"
+          ]
+        },
+        {
+          "round_trip_ms": 8,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 4,
+            "ranking": 0,
+            "total": 8
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:48:27",
+            "quran:106:1",
+            "quran:75:1",
+            "hadith:nasai:11",
+            "quran:84:1",
+            "hadith:nasai:10",
+            "quran:73:1",
+            "hadith:nasai:9",
+            "quran:81:1",
+            "hadith:tirmidhi:102"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:48:27",
+            "quran:106:1",
+            "quran:75:1",
+            "hadith:nasai:11",
+            "quran:84:1",
+            "hadith:nasai:10",
+            "quran:73:1",
+            "hadith:nasai:9",
+            "quran:81:1",
+            "hadith:tirmidhi:102"
+          ]
+        },
+        {
+          "round_trip_ms": 8,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 3,
+            "vector": 4,
+            "ranking": 0,
+            "total": 8
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:48:27",
+            "quran:106:1",
+            "quran:75:1",
+            "hadith:nasai:11",
+            "quran:84:1",
+            "hadith:nasai:10",
+            "quran:73:1",
+            "hadith:nasai:9",
+            "quran:81:1",
+            "hadith:tirmidhi:102"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "What helps when life is difficult?",
+      "runs": [
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:220",
+            "quran:29:63",
+            "quran:2:28",
+            "quran:92:10",
+            "hadith:nawawi:40",
+            "quran:40:68",
+            "quran:41:16",
+            "hadith:qudsi:36",
+            "hadith:bukhari:22",
+            "hadith:bukhari:116"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 6
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:220",
+            "quran:29:63",
+            "quran:2:28",
+            "quran:92:10",
+            "hadith:nawawi:40",
+            "quran:40:68",
+            "quran:41:16",
+            "hadith:qudsi:36",
+            "hadith:bukhari:22",
+            "hadith:bukhari:116"
+          ]
+        },
+        {
+          "round_trip_ms": 6,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 6
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:220",
+            "quran:29:63",
+            "quran:2:28",
+            "quran:92:10",
+            "hadith:nawawi:40",
+            "quran:40:68",
+            "quran:41:16",
+            "hadith:qudsi:36",
+            "hadith:bukhari:22",
+            "hadith:bukhari:116"
+          ]
+        },
+        {
+          "round_trip_ms": 8,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 6
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:220",
+            "quran:29:63",
+            "quran:2:28",
+            "quran:92:10",
+            "hadith:nawawi:40",
+            "quran:40:68",
+            "quran:41:16",
+            "hadith:qudsi:36",
+            "hadith:bukhari:22",
+            "hadith:bukhari:116"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:220",
+            "quran:29:63",
+            "quran:2:28",
+            "quran:92:10",
+            "hadith:nawawi:40",
+            "quran:40:68",
+            "quran:41:16",
+            "hadith:qudsi:36",
+            "hadith:bukhari:22",
+            "hadith:bukhari:116"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "How should I treat my parents?",
+      "runs": [
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 6
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:nawawi:22",
+            "hadith:muslim:108",
+            "quran:33:51",
+            "hadith:qudsi:18",
+            "quran:24:61",
+            "hadith:muslim:173",
+            "quran:18:80",
+            "hadith:qudsi:17",
+            "quran:2:220",
+            "quran:9:1"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 3,
+            "ranking": 0,
+            "total": 6
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:nawawi:22",
+            "hadith:muslim:108",
+            "quran:33:51",
+            "hadith:qudsi:18",
+            "quran:24:61",
+            "hadith:muslim:173",
+            "quran:18:80",
+            "hadith:qudsi:17",
+            "quran:2:220",
+            "quran:9:1"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 4,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:nawawi:22",
+            "hadith:muslim:108",
+            "quran:33:51",
+            "hadith:qudsi:18",
+            "quran:24:61",
+            "hadith:muslim:173",
+            "quran:18:80",
+            "hadith:qudsi:17",
+            "quran:2:220",
+            "quran:9:1"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 4,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:nawawi:22",
+            "hadith:muslim:108",
+            "quran:33:51",
+            "hadith:qudsi:18",
+            "quran:24:61",
+            "hadith:muslim:173",
+            "quran:18:80",
+            "hadith:qudsi:17",
+            "quran:2:220",
+            "quran:9:1"
+          ]
+        },
+        {
+          "round_trip_ms": 7,
+          "timings_ms": {
+            "keyword": 0,
+            "embedding": 2,
+            "vector": 4,
+            "ranking": 0,
+            "total": 7
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:nawawi:22",
+            "hadith:muslim:108",
+            "quran:33:51",
+            "hadith:qudsi:18",
+            "quran:24:61",
+            "hadith:muslim:173",
+            "quran:18:80",
+            "hadith:qudsi:17",
+            "quran:2:220",
+            "quran:9:1"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "2 : 255",
+      "runs": [
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:255"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:255"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:255"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:255"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "quran:2:255"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "bukhari 1",
+      "runs": [
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": null,
+          "top_10": [
+            "hadith:bukhari:1"
+          ]
+        }
+      ]
+    },
+    {
+      "query": "bukhari 999999",
+      "runs": [
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is outside the selected source filter or preview dataset.",
+          "top_10": []
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is outside the selected source filter or preview dataset.",
+          "top_10": []
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is outside the selected source filter or preview dataset.",
+          "top_10": []
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is outside the selected source filter or preview dataset.",
+          "top_10": []
+        },
+        {
+          "round_trip_ms": 0,
+          "timings_ms": {
+            "reference": 0,
+            "total": 0
+          },
+          "semantic_available": true,
+          "warning": "This reference is outside the selected source filter or preview dataset.",
+          "top_10": []
+        }
+      ]
+    }
+  ],
+  "quality_judgments": "Not supplied; these are performance and execution checks.",
+  "rss_before_bytes": 72826880,
+  "initialization_ms": 1107,
+  "rss_after_initialization_bytes": 483098624,
+  "status": "passed",
+  "rss_peak_bytes": 489979904,
+  "report_scope": {
+    "historical": true,
+    "corpus": "proof_of_concept",
+    "quran_count": 500,
+    "hadith_count": 1000,
+    "vector_count": 3372,
+    "note": "Recorded before the full-corpus expansion. These measurements do not establish full-corpus or app-wide performance."
+  }
+}

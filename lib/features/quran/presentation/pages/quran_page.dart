@@ -188,32 +188,35 @@ class _QuranViewState extends State<_QuranView> {
       controller: _scrollController,
       slivers: [
         SliverPadding(
-          padding: const EdgeInsetsDirectional.fromSTEB(18, 16, 32, 20),
+          padding: const EdgeInsets.only(top: 16, bottom: 20),
           sliver: SliverToBoxAdapter(
             child: Column(
               children: [
-                TextField(
-                  onChanged: (value) => _onQueryChanged(context, value),
-                  onSubmitted: (value) {
-                    final query = value.trim();
-                    if (query.isNotEmpty) {
-                      context.push(AppRoutes.quranSearchPath(query));
-                    }
-                  },
-                  decoration: InputDecoration(
-                    hintText: l10n.quranSearchHint,
-                    prefixIcon: const AppIcon(Icons.search_rounded),
-                    filled: true,
-                    fillColor: QuranTheme.surface(context),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: QuranTheme.outline(context),
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 18, end: 32),
+                  child: TextField(
+                    onChanged: (value) => _onQueryChanged(context, value),
+                    onSubmitted: (value) {
+                      final query = value.trim();
+                      if (query.isNotEmpty) {
+                        context.push(AppRoutes.quranSearchPath(query));
+                      }
+                    },
+                    decoration: InputDecoration(
+                      hintText: l10n.quranSearchHint,
+                      prefixIcon: const AppIcon(Icons.search_rounded),
+                      filled: true,
+                      fillColor: QuranTheme.surface(context),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: QuranTheme.outline(context),
+                        ),
                       ),
                     ),
                   ),
@@ -224,29 +227,32 @@ class _QuranViewState extends State<_QuranView> {
                   onSelected: _selectBrowseKind,
                 ),
                 const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _browseKind == QuranStructureKind.surah
-                            ? 'Surahs'
-                            : _structureKindLabel(_browseKind),
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 0,
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 18, end: 32),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _browseKind == QuranStructureKind.surah
+                              ? 'Surahs'
+                              : _structureKindLabel(_browseKind),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w400,
+                                letterSpacing: 0,
+                              ),
                         ),
                       ),
-                    ),
-                    if ((_browseKind == QuranStructureKind.surah &&
-                            state.status == QuranListStatus.success) ||
-                        points != null)
-                      Text(
-                        '${_browseKind == QuranStructureKind.surah ? state.visibleSurahs.length : points!.length}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: QuranTheme.subText(context),
+                      if ((_browseKind == QuranStructureKind.surah &&
+                              state.status == QuranListStatus.success) ||
+                          points != null)
+                        Text(
+                          '${_browseKind == QuranStructureKind.surah ? state.visibleSurahs.length : points!.length}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: QuranTheme.subText(context)),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -312,7 +318,7 @@ class _QuranViewState extends State<_QuranView> {
               actions: [
                 ShellHeaderAction(
                   icon: Icons.search_rounded,
-                  tooltip: l10n.quranOpenTextSearch,
+                  tooltip: l10n.searchEverythingTitle,
                   onTap: () => context.push(AppRoutes.quranSearchPath()),
                 ),
               ],
@@ -352,6 +358,7 @@ class _StructureTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      padding: const EdgeInsetsDirectional.only(start: 18, end: 32),
       child: Row(
         children: [
           for (final kind in QuranStructureKind.values)

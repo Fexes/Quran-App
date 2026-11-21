@@ -1,0 +1,209 @@
+{
+  "records": 36108,
+  "classificationBasis": "Attributed source assessments; no independent primary-source verification",
+  "independentlyVerifiedRecords": 0,
+  "statusCounts": {
+    "scoped": 5015,
+    "differing": 2805,
+    "weak": 1859,
+    "sahih": 7701,
+    "hasan": 3514,
+    "unverified": 269,
+    "collection": 14940,
+    "fabricated": 1,
+    "critical": 4
+  },
+  "books": {
+    "abudawud": {
+      "scoped": 1278,
+      "differing": 942,
+      "weak": 588,
+      "sahih": 2002,
+      "hasan": 413,
+      "unverified": 49
+    },
+    "bukhari": {
+      "collection": 7580
+    },
+    "dehlawi": {
+      "unverified": 40
+    },
+    "ibnmajah": {
+      "sahih": 1835,
+      "scoped": 686,
+      "differing": 747,
+      "weak": 642,
+      "hasan": 422,
+      "unverified": 8
+    },
+    "malik": {
+      "sahih": 724,
+      "scoped": 1007,
+      "hasan": 27,
+      "weak": 66,
+      "fabricated": 1,
+      "critical": 3,
+      "unverified": 1
+    },
+    "muslim": {
+      "collection": 7360
+    },
+    "nasai": {
+      "sahih": 2628,
+      "hasan": 1130,
+      "scoped": 1238,
+      "differing": 501,
+      "weak": 132,
+      "unverified": 49,
+      "critical": 1
+    },
+    "nawawi": {
+      "unverified": 42
+    },
+    "qudsi": {
+      "unverified": 40
+    },
+    "tirmidhi": {
+      "sahih": 512,
+      "hasan": 1522,
+      "differing": 615,
+      "unverified": 40,
+      "scoped": 806,
+      "weak": 431
+    }
+  },
+  "examples": {
+    "scoped": [
+      "hadith:abudawud:1",
+      "hadith:abudawud:6",
+      "hadith:abudawud:8",
+      "hadith:abudawud:13",
+      "hadith:abudawud:24",
+      "hadith:abudawud:28",
+      "hadith:abudawud:30",
+      "hadith:abudawud:32"
+    ],
+    "differing": [
+      "hadith:abudawud:2",
+      "hadith:abudawud:5",
+      "hadith:abudawud:10",
+      "hadith:abudawud:11",
+      "hadith:abudawud:14",
+      "hadith:abudawud:17",
+      "hadith:abudawud:19",
+      "hadith:abudawud:22"
+    ],
+    "weak": [
+      "hadith:abudawud:3",
+      "hadith:abudawud:15",
+      "hadith:abudawud:29",
+      "hadith:abudawud:35",
+      "hadith:abudawud:42",
+      "hadith:abudawud:62",
+      "hadith:abudawud:84",
+      "hadith:abudawud:95"
+    ],
+    "sahih": [
+      "hadith:abudawud:4",
+      "hadith:abudawud:7",
+      "hadith:abudawud:9",
+      "hadith:abudawud:12",
+      "hadith:abudawud:18",
+      "hadith:abudawud:20",
+      "hadith:abudawud:21",
+      "hadith:abudawud:23"
+    ],
+    "hasan": [
+      "hadith:abudawud:16",
+      "hadith:abudawud:44",
+      "hadith:abudawud:53",
+      "hadith:abudawud:61",
+      "hadith:abudawud:64",
+      "hadith:abudawud:67",
+      "hadith:abudawud:91",
+      "hadith:abudawud:101"
+    ],
+    "unverified": [
+      "hadith:abudawud:234",
+      "hadith:abudawud:314",
+      "hadith:abudawud:392",
+      "hadith:abudawud:403",
+      "hadith:abudawud:465",
+      "hadith:abudawud:474",
+      "hadith:abudawud:502",
+      "hadith:abudawud:710"
+    ],
+    "collection": [
+      "hadith:bukhari:1",
+      "hadith:bukhari:2",
+      "hadith:bukhari:3",
+      "hadith:bukhari:4",
+      "hadith:bukhari:5",
+      "hadith:bukhari:6",
+      "hadith:bukhari:7",
+      "hadith:bukhari:8"
+    ],
+    "fabricated": [
+      "hadith:malik:453"
+    ],
+    "critical": [
+      "hadith:malik:680",
+      "hadith:malik:1062",
+      "hadith:malik:1784",
+      "hadith:nasai:4956"
+    ]
+  },
+  "unrecognizedRawAssessments": {
+    "Al-Albani: Mursal": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim (332)": 1,
+    "Zubair Ali Zai: Sahih Bukhari (1891 Mukhtasar) Sahih Muslim (11)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim": 4,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim (713)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (415) Sahih Muslim (552)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim (379 Mukhtasar)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (383) Sahih Muslim (512)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (739)": 1,
+    "Zubair Ali Zai: Isnaad Hasan Sahih Muslim (556)": 1,
+    "Al-Albani: Maqtu": 12,
+    "Muhammad Muhyi Al-Din Abdul Hamid: Maqtu": 8,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim (1780)": 2,
+    "Zubair Ali Zai: Isnaad Hasan Sahih Bukhari (1672) Sahih Muslim (1280 After  1285)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (4406) Sahih Muslim (1679)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (1560) Sahih Muslim (1211)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim (2657)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (5333) Sahih Muslim (1471)": 1,
+    "Shuaib Al Arnaut: Maqtu": 5,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim (1110)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (1933) Sahih Muslim (1155)": 1,
+    "Zubair Ali Zai: Sahih Bukhari (1971 Mukhtasar) Sahih Muslim (1157)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim (342 Mukhtasar)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (2863) Sahih Muslim (1762)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim (1807)": 1,
+    "Zubair Ali Zai: Sahih Bukhari (6178) Sahih Muslim (Through Last 1735)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (3088) Sahih Muslim (3769)": 1,
+    "Muhammad Muhyi Al-Din Abdul Hamid: Mauquf": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (6351) Sahih Muslim (2680)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (6124، 4344) Sahih Muslim (1733 After  2001)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (677) Sahih Muslim (559)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Muslim (1668)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (2379)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (5590)": 1,
+    "Zubair Ali Zai: Isnaad Hasan Sahih Bukhari (6824)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (847)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (6355) Sahih Muslim (286)": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari (6257) Sahih Muslim (2164)": 1,
+    "Muhammad Fouad Abd al-Baqi: Mursal": 1,
+    "Zubair Ali Zai: Isnaad Sahih Sahih Bukhari": 4,
+    "Al-Albani: Isnaad Malool": 1,
+    "Muhammad Fouad Abd al-Baqi: Isnaad Malool": 1,
+    "Zubair Ali Zai: Sahih - Isnaad Hasan Bukhari And Muslim": 1,
+    "Salim al-Hilali: Shadh, Sahih": 1,
+    "Abu Ghuddah: -": 35,
+    "Zubair Ali Zai: Sahih  Witness Sahih Muslim (843/ 312)": 1,
+    "Abu Ghuddah: Maqtu": 2,
+    "Zubair Ali Zai: Isnaad Sahih Bukhari And Muslim": 1,
+    "Bashar Awad Maarouf: Mauquf": 1,
+    "Zubair Ali Zai: Isnaad Hasan Sahih Muslim": 1,
+    "Ahmad Muhammad Shakir: Maqtu": 1
+  }
+}

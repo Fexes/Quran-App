@@ -1,13 +1,13 @@
 import '../../../../core/search/search_text_normalizer.dart';
 import '../entities/hadith_item.dart';
+import 'hadith_grading.dart';
 
 class HadithAuthenticityPolicy {
   const HadithAuthenticityPolicy._();
 
-  static const _trustedUngradedBooks = {'bukhari', 'muslim', 'nawawi', 'qudsi'};
-
   static bool shouldShow(HadithItem hadith) {
-    return hasNarrationChain(hadith) && hasAcceptedAuthenticity(hadith);
+    return hadith.arabic.trim().isNotEmpty ||
+        hadith.translation.trim().isNotEmpty;
   }
 
   static bool hasNarrationChain(HadithItem hadith) {
@@ -21,46 +21,7 @@ class HadithAuthenticityPolicy {
   }
 
   static bool hasAcceptedAuthenticity(HadithItem hadith) {
-    final grades = _gradeTexts(hadith).toList(growable: false);
-    if (grades.isEmpty) {
-      return _trustedUngradedBooks.contains(hadith.bookId) ||
-          _trustedUngradedBooks.contains(hadith.bookSlug);
-    }
-
-    if (grades.any(_isRejectedGrade)) {
-      return false;
-    }
-    return grades.any(_isAcceptedGrade);
-  }
-
-  static Iterable<String> _gradeTexts(HadithItem hadith) sync* {
-    for (final grade in hadith.grades) {
-      if (grade is Map) {
-        final value = grade['grade'];
-        if (value != null) {
-          yield value.toString();
-        }
-        continue;
-      }
-      final value = grade?.toString();
-      if (value != null && value.trim().isNotEmpty) {
-        yield value;
-      }
-    }
-
-    if (hadith.grades.isEmpty && hadith.grade.trim().isNotEmpty) {
-      yield hadith.grade;
-    }
-  }
-
-  static bool _isAcceptedGrade(String grade) {
-    final normalized = SearchTextNormalizer.normalize(grade);
-    return _acceptedGradeMarkers.any(normalized.contains);
-  }
-
-  static bool _isRejectedGrade(String grade) {
-    final normalized = SearchTextNormalizer.normalize(grade);
-    return _rejectedGradeMarkers.any(normalized.contains);
+    return HadithGrading.fromHadith(hadith).isSuitableForDaily;
   }
 
   static const _arabicChainMarkers = [
@@ -84,32 +45,5 @@ class HadithAuthenticityPolicy {
     'reported',
     'authority of',
     'transmitted',
-  ];
-
-  static const _acceptedGradeMarkers = [
-    'صحيح',
-    'حسن',
-    'متفق عليه',
-    'sahih',
-    'hasan',
-    'authentic',
-    'agreed upon',
-  ];
-
-  static const _rejectedGradeMarkers = [
-    'ضعيف',
-    'موضوع',
-    'منكر',
-    'ليس بصحيح',
-    'daif',
-    'daeef',
-    'weak',
-    'very daif',
-    'mawdu',
-    'munkar',
-    'shadh',
-    'batil',
-    'fabricated',
-    'not authentic',
   ];
 }

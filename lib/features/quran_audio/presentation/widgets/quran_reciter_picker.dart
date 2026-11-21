@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icon.dart';
 
@@ -5,6 +7,7 @@ import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_sheet.dart';
 import '../../../quran/domain/entities/quran_audio_reciter.dart';
 import '../../../quran/domain/services/quran_translation_audio_pairings.dart';
+import '../../data/services/reciter_image_cache.dart';
 
 Future<QuranAudioReciter?> showQuranReciterPickerSheet(
   BuildContext context, {
@@ -262,7 +265,7 @@ class QuranReciterPickerTile extends StatelessWidget {
   }
 }
 
-class QuranReciterAvatar extends StatelessWidget {
+class QuranReciterAvatar extends StatefulWidget {
   const QuranReciterAvatar({
     super.key,
     this.reciter,
@@ -279,43 +282,82 @@ class QuranReciterAvatar extends StatelessWidget {
   final bool selected;
 
   @override
+  State<QuranReciterAvatar> createState() => _QuranReciterAvatarState();
+}
+
+class _QuranReciterAvatarState extends State<QuranReciterAvatar> {
+  String? _imageUrl;
+  File? _cachedFile;
+  int _loadToken = 0;
+
+  String? get _effectiveImageUrl =>
+      (widget.imageUrl ?? widget.reciter?.effectiveImageUrl)?.trim();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant QuranReciterAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_effectiveImageUrl != _imageUrl) _loadImage();
+  }
+
+  void _loadImage() {
+    _imageUrl = _effectiveImageUrl;
+    final token = ++_loadToken;
+    final url = _imageUrl;
+    _cachedFile = url == null || url.isEmpty
+        ? null
+        : ReciterImageCache.instance.cachedFileFor(url);
+    if (url == null || url.isEmpty || _cachedFile != null) return;
+    _loadCachedImage(url, token);
+  }
+
+  Future<void> _loadCachedImage(String url, int token) async {
+    final file = await ReciterImageCache.instance.fileFor(url);
+    if (!mounted || token != _loadToken || file == null) return;
+    await precacheImage(FileImage(file), context, onError: (_, _) {});
+    if (!mounted || token != _loadToken) return;
+    setState(() => _cachedFile = file);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    final displayName = name ?? reciter?.name ?? 'Quran';
-    final url = imageUrl ?? reciter?.effectiveImageUrl;
+    final displayName = widget.name ?? widget.reciter?.name ?? 'Quran';
+    final cachedFile = _cachedFile;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      width: size,
-      height: size,
+      width: widget.size,
+      height: widget.size,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: selected ? primary : QuranTheme.softFill(context, primary),
+        color: widget.selected
+            ? primary
+            : QuranTheme.softFill(context, primary),
         shape: BoxShape.circle,
         border: Border.all(
-          color: selected ? primary : QuranTheme.outline(context),
+          color: widget.selected ? primary : QuranTheme.outline(context),
         ),
       ),
       child: ClipOval(
-        child: url == null
-            ? _ReciterAvatarFallback(name: displayName, selected: selected)
-            : Image.network(
-                url,
-                width: size,
-                height: size,
+        child: cachedFile == null
+            ? _ReciterAvatarFallback(
+                name: displayName,
+                selected: widget.selected,
+              )
+            : Image.file(
+                cachedFile,
+                width: widget.size,
+                height: widget.size,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => _ReciterAvatarFallback(
                   name: displayName,
-                  selected: selected,
+                  selected: widget.selected,
                 ),
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) {
-                    return child;
-                  }
-                  return _ReciterAvatarFallback(
-                    name: displayName,
-                    selected: selected,
-                  );
-                },
               ),
       ),
     );

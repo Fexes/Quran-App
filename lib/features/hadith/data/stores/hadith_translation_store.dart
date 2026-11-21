@@ -13,6 +13,12 @@ class HadithTranslationStore {
 
   static const boxName = 'hadith_translations';
 
+  Map<String, Object?> searchSnapshot() => {
+    for (final key
+        in (_box?.keys ?? _memory?.keys ?? const []).whereType<String>())
+      key: _read(key),
+  };
+
   static Future<HadithTranslationStore> open() async {
     await Hive.initFlutter();
     final box = await Hive.openBox<dynamic>(boxName);
@@ -58,6 +64,21 @@ class HadithTranslationStore {
         numbers.length == items.length &&
         numbers.toSet().length == numbers.length &&
         numbers.every((number) => items[number] is String);
+  }
+
+  /// Enumerate pack identities without duplicating every downloaded text map.
+  Iterable<({String bookId, String languageCode})> get cachedPackKeys sync* {
+    final keys = (_box?.keys ?? _memory?.keys ?? const [])
+        .whereType<String>()
+        .toList(growable: false);
+    for (final key in keys) {
+      final parts = key.split(':');
+      if (parts.length == 4 &&
+          parts.first == 'hadith_translation' &&
+          parts.last == 'items') {
+        yield (bookId: parts[1], languageCode: parts[2]);
+      }
+    }
   }
 
   List<({String bookId, String languageCode, Map<String, String> translations})>
@@ -128,7 +149,7 @@ class HadithTranslationStore {
           : const <String>[],
       'completedAt': DateTime.now().toIso8601String(),
     });
-    LocalSearchRevision.changed();
+    LocalSearchRevision.changed(source: 'hadith-translations');
   }
 
   Object? _read(String key) {

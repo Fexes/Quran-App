@@ -1,6 +1,8 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/animated_expansion.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -33,10 +35,12 @@ class AzkarCategoryPage extends StatelessWidget {
     super.key,
     required this.categoryId,
     this.initialItemId,
+    this.initialLanguageCode,
   });
 
   final String categoryId;
   final String? initialItemId;
+  final String? initialLanguageCode;
 
   @override
   Widget build(BuildContext context) {
@@ -45,16 +49,22 @@ class AzkarCategoryPage extends StatelessWidget {
       child: _AzkarCategoryView(
         categoryId: categoryId,
         initialItemId: initialItemId,
+        initialLanguageCode: initialLanguageCode,
       ),
     );
   }
 }
 
 class _AzkarCategoryView extends StatefulWidget {
-  const _AzkarCategoryView({required this.categoryId, this.initialItemId});
+  const _AzkarCategoryView({
+    required this.categoryId,
+    this.initialItemId,
+    this.initialLanguageCode,
+  });
 
   final String categoryId;
   final String? initialItemId;
+  final String? initialLanguageCode;
 
   @override
   State<_AzkarCategoryView> createState() => _AzkarCategoryViewState();
@@ -65,6 +75,7 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
   late final TextEditingController _jumpController;
   late final SettingsStore _settingsStore;
   late final LibraryUserDataStore _userDataStore;
+  String? _languageOverride;
   bool _showTranslation = true;
   bool _showTransliteration = true;
   QuranTranslationResource? _selectedTranslation;
@@ -86,7 +97,9 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
     super.initState();
     _settingsStore = getIt<SettingsStore>();
     _userDataStore = getIt<LibraryUserDataStore>();
-    _showTranslation = _settingsStore.libraryTranslationEnabled;
+    _languageOverride = widget.initialLanguageCode;
+    _showTranslation =
+        _languageOverride != null || _settingsStore.libraryTranslationEnabled;
     _showTransliteration = _settingsStore.libraryTransliterationEnabled;
     _scrollController = ScrollController()..addListener(_onScroll);
     _jumpController = TextEditingController();
@@ -112,7 +125,8 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
       final resource = await getIt<QuranTranslationRepository>()
           .selectedTranslation();
       final shared = libraryLanguageFromQuranTranslation(resource);
-      final stored = _settingsStore.azkarLanguageCodeOrNull;
+      final stored =
+          _languageOverride ?? _settingsStore.azkarLanguageCodeOrNull;
       final language = stored == null
           ? shared
           : libraryLanguageFromCode(
@@ -169,9 +183,8 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
       builder: (context, themeState) {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          appBar: AppBar(
-            elevation: 0,
-            scrolledUnderElevation: 0,
+          appBar: AppPageAppBar(
+            flexibleSpace: const HeaderPatternBackdrop(),
             titleSpacing: 0,
             title: BlocBuilder<AzkarLibraryCubit, AzkarLibraryState>(
               buildWhen: (previous, current) =>
@@ -567,6 +580,7 @@ class _AzkarCategoryViewState extends State<_AzkarCategoryView> {
         return;
       }
     }
+    _languageOverride = null;
     await _settingsStore.setAzkarLanguageCode(selected);
     await _loadContentLanguage();
   }

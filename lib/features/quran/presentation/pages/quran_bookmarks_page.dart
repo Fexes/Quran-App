@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +10,7 @@ import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../../core/widgets/app_sheet.dart';
-import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../core/widgets/premium_surface.dart';
 import '../../domain/entities/quran_bookmark.dart';
 import '../../domain/repositories/quran_repository.dart';
@@ -122,7 +123,10 @@ class _QuranBookmarksViewState extends State<_QuranBookmarksView> {
                 contentPadding: EdgeInsets.zero,
                 leading: AppIcon(
                   bookmarkCollectionIcon(collection.iconCodePoint),
-                  color: bookmarkCollectionColor(context, collection.colorValue),
+                  color: bookmarkCollectionColor(
+                    context,
+                    collection.colorValue,
+                  ),
                 ),
                 title: Text(collection.name),
                 selected: collection.id == bookmark.collectionId,
@@ -201,9 +205,9 @@ class _QuranBookmarksViewState extends State<_QuranBookmarksView> {
             .firstOrNull;
         return Scaffold(
           backgroundColor: theme.colorScheme.surface,
-          appBar: AppBar(
+          appBar: AppPageAppBar(
             title: const Text('Bookmarks'),
-            flexibleSpace: const ArchitecturalBackdrop(),
+            flexibleSpace: const HeaderPatternBackdrop(),
             leading: IconButton(
               tooltip: 'Back',
               icon: const AppIcon(Icons.arrow_back_rounded),

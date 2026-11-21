@@ -14,8 +14,11 @@ class HifzDashboardCubit extends Cubit<HifzDashboardState> {
 
   final HifzRepository _repository;
   final QuranRepository _quranRepository;
+  int _loadGeneration = 0;
 
   Future<void> load() async {
+    if (isClosed) return;
+    final generation = ++_loadGeneration;
     emit(
       HifzDashboardState(
         status: HifzDashboardStatus.loading,
@@ -24,7 +27,7 @@ class HifzDashboardCubit extends Cubit<HifzDashboardState> {
     );
     try {
       final dashboard = await _repository.dashboard();
-      if (!isClosed) {
+      if (!isClosed && generation == _loadGeneration) {
         emit(
           HifzDashboardState(
             status: HifzDashboardStatus.success,
@@ -33,12 +36,12 @@ class HifzDashboardCubit extends Cubit<HifzDashboardState> {
         );
       }
     } catch (_) {
-      if (!isClosed) {
+      if (!isClosed && generation == _loadGeneration) {
         emit(
           HifzDashboardState(
             status: HifzDashboardStatus.failure,
             dashboard: state.dashboard,
-            errorMessage: 'Hifz progress could not be loaded.',
+            errorMessage: 'Memorization progress could not be loaded.',
           ),
         );
       }
@@ -51,15 +54,18 @@ class HifzDashboardCubit extends Cubit<HifzDashboardState> {
     required int startAyah,
     required int endAyah,
   }) async {
+    if (title.trim().isEmpty || startAyah < 1 || endAyah < startAyah) {
+      throw ArgumentError('Choose a title and a valid ayah range.');
+    }
     final ayahs = await _quranRepository.getAyahs(surahNumber);
     final keys = [
       for (final ayah in ayahs)
         if (ayah.number >= startAyah && ayah.number <= endAyah) ayah.verseKey,
     ];
-    if (keys.isEmpty) {
-      return;
+    if (keys.length != endAyah - startAyah + 1) {
+      throw ArgumentError('The ayah range is outside this Surah.');
     }
-    await _repository.saveCollection(title: title, verseKeys: keys);
+    await _repository.saveCollection(title: title.trim(), verseKeys: keys);
     await load();
   }
 

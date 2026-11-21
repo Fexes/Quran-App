@@ -8,6 +8,7 @@ import WidgetKit
   private var qiblaHeadingChannel: FlutterEventChannel?
   private var qiblaHeadingHandler: QiblaHeadingStreamHandler?
   private var audioStorageChannel: FlutterMethodChannel?
+  private var offlineSearchAssetsChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -67,6 +68,54 @@ import WidgetKit
       }
     }
     audioStorageChannel = storageChannel
+
+    let searchAssetsChannel = FlutterMethodChannel(
+      name: "quran/offline_search_assets",
+      binaryMessenger: registrar.messenger()
+    )
+    let filenames = [
+      "manifest.json", "search.sqlite",
+    ]
+    let assetKeys = filenames.map { filename in
+      (filename, registrar.lookupKey(forAsset: "assets/keyword_search/\(filename)"))
+    }
+    let appBundleURL = Bundle.main.bundleURL
+    searchAssetsChannel.setMethodCallHandler { call, result in
+      guard call.method == "prepare" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      DispatchQueue.global(qos: .userInitiated).async {
+        let frameworkURL = appBundleURL.appendingPathComponent("Frameworks/App.framework")
+        let assetBundleURL = Bundle(url: frameworkURL)?.bundleURL ?? frameworkURL
+        var paths: [String: String] = [:]
+        for (filename, key) in assetKeys {
+          let candidates = [
+            assetBundleURL.appendingPathComponent(key),
+            assetBundleURL.appendingPathComponent("flutter_assets/\(key)"),
+            assetBundleURL.appendingPathComponent("flutter_assets/assets/keyword_search/\(filename)"),
+          ]
+          guard let assetURL = candidates.first(where: { url in
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+              && !isDirectory.boolValue && FileManager.default.isReadableFile(atPath: url.path)
+          }) else {
+            DispatchQueue.main.async {
+              result(FlutterError(
+                code: "offline_search_assets_unavailable",
+                message: "Offline search assets could not be located.",
+                details: nil
+              ))
+            }
+            return
+          }
+          paths[filename] = assetURL.path
+        }
+        let preparedPaths = paths
+        DispatchQueue.main.async { result(preparedPaths) }
+      }
+    }
+    offlineSearchAssetsChannel = searchAssetsChannel
   }
 }
 

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_icon.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,7 +10,6 @@ import '../../../../core/widgets/adaptive_inset_area.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../../core/widgets/premium_surface.dart';
-import '../../../../core/widgets/app_sheet.dart';
 import '../../../quran_audio/presentation/widgets/quran_floating_audio_player.dart';
 import '../../../quran/presentation/widgets/quran_translation_text.dart';
 import '../../../../core/widgets/section_header.dart';
@@ -27,7 +24,6 @@ import '../../../hadith/domain/entities/hadith_item.dart';
 import '../../../hadith/domain/repositories/hadith_repository.dart';
 import '../../../hadith/presentation/bloc/hadith_library_cubit.dart';
 import '../../../hadith/presentation/bloc/hadith_library_state.dart';
-import '../../../hadith/presentation/widgets/hadith_translation_sheet.dart';
 
 import '../../../learn/presentation/widgets/learning_guide_sections.dart';
 
@@ -90,24 +86,11 @@ class _LibraryViewState extends State<_LibraryView> {
                   _ => 'Hadith collections and daily remembrance.',
                 },
                 actions: [
-                  if (_section == _LibrarySection.hadith)
-                    ShellHeaderAction(
-                      icon: Icons.translate_rounded,
-                      tooltip: 'Hadith translations',
-                      onTap: () => _showHadithTranslations(context),
-                    ),
-                  if (_section == _LibrarySection.hadith || _section == _LibrarySection.azkar)
-                    ShellHeaderAction(
-                      icon: Icons.refresh_rounded,
-                      tooltip: 'Refresh library',
-                      onTap: () {
-                        if (_section == _LibrarySection.hadith) {
-                          context.read<HadithLibraryCubit>().load();
-                        } else {
-                          context.read<AzkarLibraryCubit>().load();
-                        }
-                      },
-                    ),
+                  ShellHeaderAction(
+                    icon: Icons.search_rounded,
+                    tooltip: 'Search everything',
+                    onTap: () => context.push(AppRoutes.searchPath()),
+                  ),
                 ],
               ),
             ),
@@ -159,27 +142,6 @@ class _LibraryViewState extends State<_LibraryView> {
       ),
     );
   }
-
-  void _showHadithTranslations(BuildContext context) {
-    showHadithTranslationSheet(
-      context,
-      onHadeethEncTap: () => _showHadeethEncDownloads(context),
-    );
-  }
-
-  void _showHadeethEncDownloads(BuildContext context) {
-    final cubit = context.read<HadithLibraryCubit>()..loadHadeethEncLanguages();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider.value(
-        value: cubit,
-        child: const _HadeethEncDownloadSheet(),
-      ),
-    );
-  }
 }
 
 class _HadithSection extends StatefulWidget {
@@ -191,7 +153,6 @@ class _HadithSection extends StatefulWidget {
 
 class _HadithSectionState extends State<_HadithSection> {
   late final TextEditingController _searchController;
-  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -201,37 +162,18 @@ class _HadithSectionState extends State<_HadithSection> {
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged(String value) {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      if (mounted) {
-        context.read<HadithLibraryCubit>().search(value);
-      }
-    });
-    setState(() {});
-  }
-
   void _clearSearch() {
-    _searchDebounce?.cancel();
     _searchController.clear();
-    context.read<HadithLibraryCubit>().load();
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<HadithLibraryCubit, HadithLibraryState>(
-      listener: (context, state) {
-        if (state.query.isEmpty && _searchController.text.isNotEmpty) {
-          _searchController.clear();
-          setState(() {});
-        }
-      },
+    return BlocBuilder<HadithLibraryCubit, HadithLibraryState>(
       builder: (context, state) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,10 +181,14 @@ class _HadithSectionState extends State<_HadithSection> {
             TextField(
               controller: _searchController,
               textInputAction: TextInputAction.search,
-              onChanged: _onSearchChanged,
+              onChanged: (_) => setState(() {}),
               onSubmitted: (value) {
-                _searchDebounce?.cancel();
-                context.read<HadithLibraryCubit>().search(value);
+                if (value.trim().isNotEmpty) {
+                  FocusScope.of(context).unfocus();
+                  context.push(
+                    AppRoutes.searchPath(query: value, filter: 'hadith'),
+                  );
+                }
               },
               decoration: InputDecoration(
                 hintText: 'Search all hadith',
@@ -278,7 +224,7 @@ class _HadithSectionState extends State<_HadithSection> {
                 message: state.query.isEmpty
                     ? 'No hadith collections found.'
                     : 'No hadith found for “${state.query}”.',
-                onRefresh: _clearSearch,
+                onRefresh: context.read<HadithLibraryCubit>().load,
               ),
               HadithLibraryStatus.success => _HadithContent(state: state),
             },
@@ -341,144 +287,6 @@ class _HadithContent extends StatelessWidget {
     }
 
     return const SizedBox.shrink();
-  }
-}
-
-class _HadeethEncDownloadSheet extends StatelessWidget {
-  const _HadeethEncDownloadSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return AppSheet(
-      title: 'HadeethEnc downloads',
-      scrollableChild: true,
-      child: BlocBuilder<HadithLibraryCubit, HadithLibraryState>(
-        builder: (context, state) {
-          final cubit = context.read<HadithLibraryCubit>();
-          if (state.hadeethEncLanguages.isEmpty) {
-            return ListView(
-              shrinkWrap: true,
-              padding: EdgeInsets.zero,
-              children: [
-                if (state.hadeethEncLoading)
-                  const AppLoadingView(label: 'Loading languages')
-                else if (state.hadeethEncErrorMessage != null)
-                  AppErrorView(
-                    title: 'Translations could not be loaded',
-                    message: state.hadeethEncErrorMessage!,
-                    onRetry: cubit.loadHadeethEncLanguages,
-                  )
-                else
-                  _EmptyState(
-                    icon: Icons.translate_rounded,
-                    message: 'No translation languages found.',
-                    onRefresh: cubit.loadHadeethEncLanguages,
-                  ),
-              ],
-            );
-          }
-
-          final selectedCode =
-              state.selectedHadeethEncLanguageCode ??
-              state.hadeethEncLanguages.first.code;
-          final selectedLanguage = state.hadeethEncLanguages.firstWhere(
-            (language) => language.code == selectedCode,
-            orElse: () => state.hadeethEncLanguages.first,
-          );
-          final progress = state.hadeethEncDownloadProgress;
-
-          return ListView(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            children: [
-              Text(
-                'A separate selection of translated hadiths, not full book translations.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: QuranTheme.subText(context, 0.72),
-                ),
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: selectedLanguage.code,
-                isExpanded: true,
-                itemHeight: null,
-                decoration: const InputDecoration(
-                  labelText: 'Language',
-                  prefixIcon: AppIcon(Icons.language_rounded),
-                ),
-                items: [
-                  for (final language in state.hadeethEncLanguages)
-                    DropdownMenuItem(
-                      value: language.code,
-                      child: Text('${language.nativeName} (${language.code})'),
-                    ),
-                ],
-                onChanged: state.hadeethEncLoading
-                    ? null
-                    : (value) {
-                        if (value == null) {
-                          return;
-                        }
-                        cubit.selectHadeethEncLanguage(value);
-                      },
-              ),
-              const SizedBox(height: 14),
-              if (state.hadeethEncLoading) ...[
-                LinearProgressIndicator(
-                  value:
-                      progress?.totalItems == 0 &&
-                          progress?.downloadProgress == null
-                      ? null
-                      : progress?.percent,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  progress == null || progress.totalItems == 0
-                      ? '${progress?.stage ?? 'Downloading'} ${selectedLanguage.nativeName} hadith'
-                            ' · ${((progress?.percent ?? 0) * 100).round()}%'
-                      : 'Downloaded ${progress.completedItems} of ${progress.totalItems}',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: QuranTheme.subText(context, 0.72),
-                  ),
-                ),
-              ] else if (!state.selectedHadeethEncLanguageDownloaded) ...[
-                FilledButton.icon(
-                  onPressed: () async {
-                    await cubit.downloadSelectedHadeethEncLanguage();
-                    if (context.mounted &&
-                        ModalRoute.of(context)?.isCurrent == true &&
-                        cubit.state.selectedHadeethEncLanguageDownloaded) {
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  icon: const AppIcon(Icons.download_rounded),
-                  label: Text('Download ${selectedLanguage.nativeName} hadith'),
-                ),
-              ] else ...[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const AppIcon(Icons.check_circle_outline_rounded),
-                  title: Text('${selectedLanguage.nativeName} downloaded'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Done'),
-                ),
-              ],
-              if (state.hadeethEncErrorMessage != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  state.hadeethEncErrorMessage!,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                ),
-              ],
-            ],
-          );
-        },
-      ),
-    );
   }
 }
 
@@ -708,9 +516,9 @@ class _WorshipToolsSection extends StatelessWidget {
       ),
       (
         l10n.ramadanTitle,
-        'Suhoor, Iftar, fasting & Quran goal',
+        'Suhoor, Iftar, your fasting log & daily goals',
         Icons.nightlight_outlined,
-        AppRoutes.ramadan,
+        AppRoutes.fastingPlan,
       ),
       (
         l10n.achievementsTitle,
@@ -720,7 +528,7 @@ class _WorshipToolsSection extends StatelessWidget {
       ),
       (
         l10n.mosquesTitle,
-        'OpenStreetMap search & map handoff',
+        'Find nearby mosques in your maps app',
         Icons.location_on_outlined,
         AppRoutes.mosques,
       ),

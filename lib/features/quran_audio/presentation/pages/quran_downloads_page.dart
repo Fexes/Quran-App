@@ -1,3 +1,4 @@
+import '../../../../core/widgets/app_page_app_bar.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -9,7 +10,7 @@ import '../../../../core/theme/quran_theme.dart';
 import '../../../../core/widgets/app_error_view.dart';
 import '../../../../core/widgets/app_loading_view.dart';
 import '../../../../core/widgets/app_sheet.dart';
-import '../../../../core/widgets/architectural_backdrop.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../core/storage/settings_store.dart';
 import '../../../quran/domain/entities/quran_tafsir.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
@@ -129,9 +130,9 @@ class _QuranDownloadsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppPageAppBar(
         title: const Text('Downloads'),
-        flexibleSpace: const ArchitecturalBackdrop(),
+        flexibleSpace: const HeaderPatternBackdrop(),
       ),
       body: Stack(
         children: [

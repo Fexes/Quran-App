@@ -1,0 +1,71 @@
+{
+  "database": {
+    "before_raw_bytes": 435286016,
+    "after_raw_bytes": 328220672,
+    "before_deflate9_bytes": 215877154,
+    "after_deflate9_bytes": 202227096
+  },
+  "legacy_hadith_index": {
+    "before_raw_bytes": 78157971,
+    "after_raw_bytes": 3388,
+    "before_deflate9_bytes": 15026422,
+    "after_deflate9_bytes": 1412
+  },
+  "total_saved_raw_bytes": 185219927,
+  "total_saved_deflate9_bytes": 28675068,
+  "limitation": "Identical local source corpus and compression method; not store-reported download size.",
+  "native_search_before_after": {
+    "queries": 6,
+    "all_top_10_ids_identical": true
+  },
+  "android_release": {
+    "release_apk_bytes": 372958073,
+    "legacy_jsonl_excluded": true,
+    "compact_index_bundled": true,
+    "model_bundled": true,
+    "database_bundled": true,
+    "artifacts": [
+      {
+        "file": "assets/flutter_assets/assets/data/hadith/search_index.compact.json",
+        "raw_bytes": 3388,
+        "compressed_bytes": 1412
+      },
+      {
+        "file": "assets/flutter_assets/assets/offline_search/model.int8.onnx",
+        "raw_bytes": 118346824,
+        "compressed_bytes": 83633205
+      },
+      {
+        "file": "assets/flutter_assets/assets/offline_search/search.sqlite",
+        "raw_bytes": 328220672,
+        "compressed_bytes": 202800795
+      }
+    ]
+  },
+  "validation": {
+    "analyzer": "passed",
+    "offline_search_flutter_checks": "passed",
+    "python_storage_model_checks": "passed",
+    "existing_outdated_assertions": [
+      "Hadith book/count expectations",
+      "Hadith authenticity/visibility policy expectations"
+    ],
+    "model_and_tokenizer_unchanged": true,
+    "no_vector_precision_change": true,
+    "offline_assets_bundled": true,
+    "no_new_tests_written": true,
+    "no_simulators_run": true
+  },
+  "ios_release": {
+    "build": "passed",
+    "codesigned": false,
+    "legacy_jsonl_excluded": true,
+    "compact_index_bundled": true,
+    "database_hash_matches": true,
+    "model_hash_matches": true
+  },
+  "tradeoffs": {
+    "legacy_first_index_load": "Reconstructs the same records from one canonical book at a time; adds first-load CPU work. Main E5 search uses the already built database.",
+    "excluded_changes": "No FP16/INT8 vector rounding, required download, corpus pruning, or model replacement."
+  }
+}

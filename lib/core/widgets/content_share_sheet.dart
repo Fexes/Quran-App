@@ -59,6 +59,9 @@ class ContentShareSheet extends StatefulWidget {
     this.initialIncludeTransliteration = false,
     this.referenceLabel = 'Reference',
     this.initialIncludeTranslation = true,
+    this.referenceRequired = false,
+    this.gradingNotice = '',
+    this.gradingRequiresCaution = false,
   });
 
   final String title;
@@ -76,6 +79,9 @@ class ContentShareSheet extends StatefulWidget {
   final String transliteration;
   final bool initialIncludeTransliteration;
   final bool initialIncludeTranslation;
+  final bool referenceRequired;
+  final String gradingNotice;
+  final bool gradingRequiresCaution;
 
   @override
   State<ContentShareSheet> createState() => _ContentShareSheetState();
@@ -223,7 +229,10 @@ class _ContentShareSheetState extends State<ContentShareSheet> {
                       script: widget.script,
                       includeArabic: _includeArabic,
                       includeTranslation: _includeTranslation,
-                      includeReference: _includeReference,
+                      includeReference:
+                          widget.referenceRequired || _includeReference,
+                      gradingNotice: widget.gradingNotice,
+                      gradingRequiresCaution: widget.gradingRequiresCaution,
                       includeBackground: _includeBackground,
                       backgroundImage: _backgroundImages[_backgroundIndex],
                     ),
@@ -277,14 +286,15 @@ class _ContentShareSheetState extends State<ContentShareSheet> {
                   ? null
                   : (value) => setState(() => _includeTransliteration = value),
             ),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: Text(widget.referenceLabel),
-            value: _includeReference,
-            onChanged: _sharing
-                ? null
-                : (value) => setState(() => _includeReference = value),
-          ),
+          if (!widget.referenceRequired)
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: Text(widget.referenceLabel),
+              value: _includeReference,
+              onChanged: _sharing
+                  ? null
+                  : (value) => setState(() => _includeReference = value),
+            ),
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             title: const Text('Background image'),
@@ -358,6 +368,8 @@ class _ContentArtwork extends StatelessWidget {
     required this.includeReference,
     required this.includeBackground,
     required this.backgroundImage,
+    required this.gradingNotice,
+    required this.gradingRequiresCaution,
   });
 
   final String heading;
@@ -374,6 +386,8 @@ class _ContentArtwork extends StatelessWidget {
   final bool includeReference;
   final bool includeBackground;
   final String backgroundImage;
+  final String gradingNotice;
+  final bool gradingRequiresCaution;
 
   static const _ink = Color(0xFF193C34);
   static const _gold = Color(0xFF967849);
@@ -449,6 +463,36 @@ class _ContentArtwork extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 26),
+                    ],
+                    if (gradingNotice.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: gradingRequiresCaution
+                              ? const Color(0xFFFFF0ED)
+                              : const Color(0xFFF0F3F1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: gradingRequiresCaution
+                                ? const Color(0xFF9C2B24)
+                                : _ink,
+                          ),
+                        ),
+                        child: Text(
+                          gradingNotice,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Manrope',
+                            fontFamilyFallback: const ['NotoSansArabic'],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: gradingRequiresCaution
+                                ? const Color(0xFF9C2B24)
+                                : _ink,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
                     ],
                     if (includeArabic)
                       Text(

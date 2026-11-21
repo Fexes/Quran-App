@@ -10,6 +10,8 @@ import '../../domain/entities/hadith_book.dart';
 import '../../domain/entities/hadith_chapter.dart';
 import '../../domain/entities/hadith_item.dart';
 import '../../domain/services/hadith_authenticity_policy.dart';
+import '../../domain/services/hadith_grading.dart';
+import 'compact_hadith_search_index.dart';
 
 class LocalHadithDataSource {
   LocalHadithDataSource({
@@ -29,7 +31,8 @@ class LocalHadithDataSource {
   static const _manifestPath = 'assets/data/hadith/manifest.json';
   static const _sourcesPath =
       'assets/data/content_sources/hadith_azkar_sources.json';
-  static const _searchIndexPath = 'assets/data/hadith/search_index.jsonl';
+  static const _searchIndexPath =
+      'assets/data/hadith/search_index.compact.json';
 
   final AssetBundle _assetBundle;
   final List<ContentSource>? _manualSources;
@@ -42,7 +45,6 @@ class LocalHadithDataSource {
   Future<List<HadithBook>>? _booksFuture;
   Future<List<ContentSource>>? _sourcesFuture;
   Future<List<DeepSearchIndexRecord>>? _searchIndexFuture;
-  Future<String>? _searchIndexSourceFuture;
   Future<Map<String, dynamic>>? _visibilityFuture;
 
   Future<Map<String, dynamic>> _visibility() => _visibilityFuture ??= () async {
@@ -309,18 +311,35 @@ class LocalHadithDataSource {
   }
 
   Future<List<DeepSearchIndexRecord>> _loadSearchIndex() async {
-    final raw = await _loadSearchIndexSource();
+    final raw = await _assetBundle.loadString(_searchIndexPath, cache: false);
+    final index = await compute(_decodeJsonObject, raw);
+    if (index['version'] != 1) {
+      throw FormatException('Unsupported compact Hadith search index');
+    }
     final visibility = await _visibility();
-    return compute(_decodeVisibleSearchIndex, {
-      'source': raw,
-      'visibility': visibility,
-    });
-  }
-
-  Future<String> _loadSearchIndexSource() {
-    return _searchIndexSourceFuture ??= _assetBundle.loadString(
-      _searchIndexPath,
-    );
+    final books = visibility['books'] as Map;
+    final records = <DeepSearchIndexRecord>[];
+    for (final group
+        in (index['groups'] as List).cast<Map<String, dynamic>>()) {
+      final slug = group['book'] as String;
+      final visibleIds = (books[slug] as Map?)?['ids'] as List? ?? const [];
+      if (visibleIds.isEmpty) {
+        continue;
+      }
+      final bookSource = await _assetBundle.loadString(
+        'assets/data/hadith/books/$slug.json',
+        cache: false,
+      );
+      records.addAll(
+        await compute(decodeCompactHadithSearchGroup, {
+          'group': group,
+          'normalization': index['normalization'] as Map<String, dynamic>,
+          'bookSource': bookSource,
+          'visibleIds': visibleIds,
+        }),
+      );
+    }
+    return records;
   }
 
   DeepSearchIndexRecord _recordFromHadith(HadithItem hadith) {
@@ -328,7 +347,7 @@ class LocalHadithDataSource {
       id: 'hadith:${hadith.id}',
       category: 'hadith',
       title: hadith.reference,
-      subtitle: hadith.grade,
+      subtitle: HadithGrading.fromHadith(hadith).summaryLabel,
       primaryPreview: hadith.arabic,
       secondaryPreview: hadith.translation,
       normalizedText: SearchTextNormalizer.normalize(
@@ -443,26 +462,6 @@ Map<String, dynamic> _decodeJsonObject(String source) {
 
 _HadithBookAsset _decodeHadithBookAsset(String source) {
   return _HadithBookAsset.fromMap(_decodeJsonObject(source));
-}
-
-List<DeepSearchIndexRecord> _decodeSearchIndex(String source) {
-  return [
-    for (final line in source.split('\n'))
-      if (line.trim().isNotEmpty)
-        DeepSearchIndexRecord.fromMap(jsonDecode(line) as Map<String, dynamic>),
-  ];
-}
-
-List<DeepSearchIndexRecord> _decodeVisibleSearchIndex(
-  Map<String, Object> args,
-) {
-  final books = (args['visibility'] as Map)['books'] as Map;
-  final ids = <String>{
-    for (final book in books.values) ...(book['ids'] as List).cast<String>(),
-  };
-  return _decodeSearchIndex(
-    args['source'] as String,
-  ).where((record) => ids.contains(record.targetId)).toList();
 }
 
 List<String> _searchIndexMatches(Map<String, Object> arguments) {

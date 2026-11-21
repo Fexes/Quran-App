@@ -1,0 +1,27 @@
+{
+  "corpus_counts": {
+    "azkar": 287,
+    "divine_name": 99,
+    "hadith": 30770,
+    "quran": 6236,
+    "surah": 114,
+    "tafsir": 6236
+  },
+  "vector_count": 91272,
+  "database_bytes": 373276672,
+  "database_sha256": "d536479ee7344a43cef2f72bf537f4779456e8184fa8c23ad04d4a6580f756f4",
+  "initial_37392_passage_build_seconds": 2232.623,
+  "initial_reused_vectors": 4944,
+  "expanded_cached_build_seconds": 74.812,
+  "expanded_reused_vectors": 84822,
+  "asset_files": [
+    "NOTICE.txt",
+    "manifest.json",
+    "model.int8.onnx",
+    "search.sqlite",
+    "tokenizer.json",
+    "tokenizer_parity.json"
+  ],
+  "validation": "Every manifest artifact hash and size verified; SQLite integrity and foreign keys verified; all 43742 source rows present. Separate pipeline checks verify every vector is finite and normalized.",
+  "limitation": "Build measurements are from the development host; they do not measure phone retrieval or expert relevance."
+}

@@ -554,84 +554,103 @@ void main() {
     expect(find.text('Follow audio'), findsOneWidget);
   });
 
-  testWidgets('opening a specific ayah is not hijacked by playing audio', (
-    tester,
-  ) async {
-    final repository = _FakeQuranRepository(ayahCount: 8);
-    final settingsStore = SettingsStore.memory();
-    final downloadStore = QuranAudioDownloadStore.memory();
-    final playbackPort = _FakePlaybackPort();
-    final audioCubit = QuranAudioCubit(
-      audioHandler: playbackPort,
-      quranRepository: repository,
-      downloadRepository: QuranAudioDownloadRepository(
-        quranRepository: repository,
-        store: downloadStore,
-        supportDirectoryProvider: () async =>
-            Directory.systemTemp.createTemp('quran_reader_page_test_'),
-      ),
-      downloadService: QuranAudioDownloadService(store: downloadStore),
-      settingsStore: settingsStore,
-      wordTimingRepository: const _EmptyWordTimingRepository(),
+  for (final bundledTafsir in [false, true]) {
+    testWidgets(
+      bundledTafsir
+          ? 'opens bundled tafsir for the requested ayah'
+          : 'opening a specific ayah is not hijacked by playing audio',
+      (tester) async {
+        final repository = _FakeQuranRepository(ayahCount: 8);
+        final settingsStore = SettingsStore.memory();
+        final downloadStore = QuranAudioDownloadStore.memory();
+        final playbackPort = _FakePlaybackPort();
+        final audioCubit = QuranAudioCubit(
+          audioHandler: playbackPort,
+          quranRepository: repository,
+          downloadRepository: QuranAudioDownloadRepository(
+            quranRepository: repository,
+            store: downloadStore,
+            supportDirectoryProvider: () async =>
+                Directory.systemTemp.createTemp('quran_reader_page_test_'),
+          ),
+          downloadService: QuranAudioDownloadService(store: downloadStore),
+          settingsStore: settingsStore,
+          wordTimingRepository: const _EmptyWordTimingRepository(),
+        );
+        final themeCubit = QuranThemeCubit(settingsStore: settingsStore);
+        addTearDown(audioCubit.close);
+        addTearDown(themeCubit.close);
+
+        getIt
+          ..registerSingleton<QuranRepository>(repository)
+          ..registerSingleton<QuranInterlinearRepository>(
+            const _EmptyInterlinearRepository(),
+          )
+          ..registerSingleton<QuranTranslationRepository>(
+            const _EmptyTranslationRepository(),
+          );
+
+        final ayahs = await repository.getAyahs(1);
+        final surah = await repository.getSurah(1);
+        final reciter = (await repository.getAudioReciters()).first;
+        playbackPort.emitPlaying(
+          QuranAudioQueueItem.fromAyah(
+            ayah: ayahs[5],
+            surah: surah,
+            reciter: reciter,
+          ),
+        );
+
+        await tester.pumpWidget(
+          MultiBlocProvider(
+            providers: [
+              BlocProvider<QuranThemeCubit>.value(value: themeCubit),
+              BlocProvider<QuranAudioCubit>.value(value: audioCubit),
+            ],
+            child: MaterialApp(
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: QuranReaderPage(
+                surahNumber: 1,
+                initialAyahNumber: 3,
+                initialShowBundledTafsir: bundledTafsir,
+              ),
+            ),
+          ),
+        );
+
+        for (var index = 0; index < 10; index++) {
+          await tester.pump(const Duration(milliseconds: 100));
+          if (find.byTooltip('Reader settings').evaluate().isNotEmpty) {
+            break;
+          }
+        }
+        await tester.pump(const Duration(milliseconds: 300));
+
+        if (bundledTafsir) {
+          await tester.pumpAndSettle();
+          expect(find.text('Tafsir 1:3'), findsOneWidget);
+          expect(find.text('Bundled tafsir 3.'), findsOneWidget);
+          expect(find.text('Al-Muyassar'), findsOneWidget);
+          expect(find.text('Bundled Arabic tafsir'), findsOneWidget);
+          Navigator.of(tester.element(find.text('Tafsir 1:3'))).pop();
+          await tester.pumpAndSettle();
+        }
+
+        final readerBloc = tester
+            .element(find.byTooltip('Reader settings'))
+            .read<QuranReaderBloc>();
+        expect(readerBloc.state.currentVerseKey, '1:3');
+        expect(readerBloc.state.selectedVerseKey, '1:3');
+        expect(readerBloc.state.followAudio, false);
+      },
     );
-    final themeCubit = QuranThemeCubit(settingsStore: settingsStore);
-    addTearDown(audioCubit.close);
-    addTearDown(themeCubit.close);
-
-    getIt
-      ..registerSingleton<QuranRepository>(repository)
-      ..registerSingleton<QuranInterlinearRepository>(
-        const _EmptyInterlinearRepository(),
-      )
-      ..registerSingleton<QuranTranslationRepository>(
-        const _EmptyTranslationRepository(),
-      );
-
-    final ayahs = await repository.getAyahs(1);
-    final surah = await repository.getSurah(1);
-    final reciter = (await repository.getAudioReciters()).first;
-    playbackPort.emitPlaying(
-      QuranAudioQueueItem.fromAyah(
-        ayah: ayahs[5],
-        surah: surah,
-        reciter: reciter,
-      ),
-    );
-
-    await tester.pumpWidget(
-      MultiBlocProvider(
-        providers: [
-          BlocProvider<QuranThemeCubit>.value(value: themeCubit),
-          BlocProvider<QuranAudioCubit>.value(value: audioCubit),
-        ],
-        child: const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: QuranReaderPage(surahNumber: 1, initialAyahNumber: 3),
-        ),
-      ),
-    );
-
-    for (var index = 0; index < 10; index++) {
-      await tester.pump(const Duration(milliseconds: 100));
-      if (find.byTooltip('Reader settings').evaluate().isNotEmpty) {
-        break;
-      }
-    }
-    await tester.pump(const Duration(milliseconds: 300));
-
-    final readerBloc = tester
-        .element(find.byTooltip('Reader settings'))
-        .read<QuranReaderBloc>();
-    expect(readerBloc.state.currentVerseKey, '1:3');
-    expect(readerBloc.state.selectedVerseKey, '1:3');
-    expect(readerBloc.state.followAudio, false);
-  });
+  }
 
   testWidgets(
     'ayah combined layout renders continuous book text instead of cards',
@@ -1658,6 +1677,7 @@ class _FakeQuranRepository implements QuranRepository {
               ? 'بسم الله الرحمن الرحيم'
               : 'الحمد لله رب العالمين',
           translation: 'Translation $index.',
+          tafsir: 'Bundled tafsir $index.',
           page: 1 + (index - 1) ~/ 13,
           isPageStart: (index - 1) % 13 == 0,
           isJuzStart: index == 1,

@@ -1,0 +1,473 @@
+{
+  "environment": {
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.12.14",
+    "threads": 4,
+    "repeats": 5,
+    "candidates": 75
+  },
+  "model_sha256": "dd476dd0c2514e9b9be83aeb3853fac0763e0bdf4a71645407587d77c48a2d88",
+  "database_sha256": "d536479ee7344a43cef2f72bf537f4779456e8184fa8c23ad04d4a6580f756f4",
+  "initialize_ms": 720.3459999982442,
+  "process_peak_rss_bytes": 1248444416,
+  "corpus_counts": {
+    "azkar": 287,
+    "divine_name": 99,
+    "hadith": 30770,
+    "quran": 6236,
+    "surah": 114,
+    "tafsir": 6236
+  },
+  "vectors": 91272,
+  "queries": [
+    {
+      "language": "en",
+      "query": "I'm worried about my future.",
+      "timing_ms": {
+        "keyword_ms": {
+          "median": 0.36537500272970647,
+          "p95": 0.37895800051046535
+        },
+        "embedding_ms": {
+          "median": 4.848125001444714,
+          "p95": 5.1754170017375145
+        },
+        "vector_ms": {
+          "median": 31.575666998833185,
+          "p95": 36.34174999751849
+        },
+        "total_ms": {
+          "median": 37.31129199877614,
+          "p95": 41.19087499930174
+        }
+      },
+      "keyword_ids": [
+        "hadith:nasai:4109",
+        "hadith:tirmidhi:480",
+        "quran:48:20",
+        "hadith:bukhari:3732",
+        "hadith:bukhari:3340",
+        "hadith:bukhari:2334",
+        "hadith:bukhari:1412",
+        "hadith:muslim:2890",
+        "hadith:ibnmajah:1419",
+        "hadith:ibnmajah:1420"
+      ],
+      "semantic_ids": [
+        "quran:69:38",
+        "quran:89:29",
+        "quran:74:27",
+        "quran:79:9",
+        "quran:80:15",
+        "quran:74:11",
+        "quran:20:25",
+        "quran:100:4",
+        "quran:26:87",
+        "quran:75:1"
+      ],
+      "hybrid_ids": [
+        "hadith:nasai:4109",
+        "quran:69:38",
+        "hadith:tirmidhi:480",
+        "quran:89:29",
+        "quran:48:20",
+        "quran:74:27",
+        "hadith:bukhari:3732",
+        "quran:79:9",
+        "hadith:bukhari:3340",
+        "quran:80:15"
+      ]
+    },
+    {
+      "language": "ur",
+      "query": "مجھے اپنے مستقبل کی فکر ہے",
+      "timing_ms": {
+        "keyword_ms": {
+          "median": 0.5395410007622559,
+          "p95": 0.7100840011844411
+        },
+        "embedding_ms": {
+          "median": 3.817291002633283,
+          "p95": 4.035416997794528
+        },
+        "vector_ms": {
+          "median": 31.575375000102213,
+          "p95": 35.08999999758089
+        },
+        "total_ms": {
+          "median": 36.15837499819463,
+          "p95": 40.032291999523295
+        }
+      },
+      "keyword_ids": [
+        "tafsir:bundled:71:7",
+        "quran:20:33",
+        "tafsir:bundled:20:33",
+        "tafsir:bundled:74:6",
+        "tafsir:bundled:74:26",
+        "tafsir:bundled:78:7",
+        "tafsir:bundled:15:17",
+        "tafsir:bundled:26:114",
+        "tafsir:bundled:17:32",
+        "tafsir:bundled:21:61"
+      ],
+      "semantic_ids": [
+        "quran:86:16",
+        "quran:80:10",
+        "quran:69:29",
+        "quran:37:99",
+        "tafsir:bundled:94:3",
+        "quran:56:28",
+        "quran:38:46",
+        "quran:69:20",
+        "quran:37:89",
+        "quran:52:3"
+      ],
+      "hybrid_ids": [
+        "quran:86:16",
+        "tafsir:bundled:71:7",
+        "quran:20:33",
+        "quran:80:10",
+        "quran:69:29",
+        "tafsir:bundled:20:33",
+        "quran:37:99",
+        "tafsir:bundled:74:6",
+        "tafsir:bundled:74:26",
+        "tafsir:bundled:94:3"
+      ]
+    },
+    {
+      "language": "ar",
+      "query": "أشعر بالقلق بشأن مستقبلي",
+      "timing_ms": {
+        "keyword_ms": {
+          "median": 0.34095799856004305,
+          "p95": 0.463542000943562
+        },
+        "embedding_ms": {
+          "median": 3.8017499973648228,
+          "p95": 3.98358299935353
+        },
+        "vector_ms": {
+          "median": 31.707125002867542,
+          "p95": 33.14108300037333
+        },
+        "total_ms": {
+          "median": 36.16433299976052,
+          "p95": 37.68158299862989
+        }
+      },
+      "keyword_ids": [
+        "tafsir:bundled:2:72",
+        "tafsir:bundled:8:68",
+        "hadith:malik:443",
+        "hadith:bukhari:4535",
+        "hadith:ibnmajah:3770",
+        "hadith:bukhari:6294",
+        "hadith:muslim:5258",
+        "hadith:nasai:2772",
+        "hadith:malik:394",
+        "hadith:nasai:2773"
+      ],
+      "semantic_ids": [
+        "quran:20:25",
+        "quran:26:14",
+        "quran:7:112",
+        "quran:56:75",
+        "quran:30:2",
+        "quran:20:67",
+        "quran:79:9",
+        "tafsir:bundled:20:31",
+        "quran:100:4",
+        "quran:20:95"
+      ],
+      "hybrid_ids": [
+        "quran:20:25",
+        "tafsir:bundled:2:72",
+        "quran:26:14",
+        "tafsir:bundled:8:68",
+        "hadith:malik:443",
+        "quran:7:112",
+        "hadith:bukhari:4535",
+        "quran:56:75",
+        "hadith:ibnmajah:3770",
+        "quran:30:2"
+      ]
+    },
+    {
+      "language": "roman_ur",
+      "query": "Mujhe apne mustaqbil ki fikar hai",
+      "timing_ms": {
+        "keyword_ms": {
+          "median": 1.8252080008096527,
+          "p95": 2.2992920021351893
+        },
+        "embedding_ms": {
+          "median": 4.868042000452988,
+          "p95": 5.316916998708621
+        },
+        "vector_ms": {
+          "median": 31.938291002006736,
+          "p95": 34.0447500020673
+        },
+        "total_ms": {
+          "median": 38.82754199730698,
+          "p95": 41.72854200078291
+        }
+      },
+      "keyword_ids": [
+        "hadith:bukhari:5941",
+        "hadith:muslim:6073",
+        "hadith:muslim:6074",
+        "hadith:abudawud:4209",
+        "hadith:bukhari:5934",
+        "hadith:muslim:3146",
+        "hadith:bukhari:5895",
+        "hadith:bukhari:5935",
+        "hadith:ibnmajah:3629",
+        "hadith:bukhari:3558"
+      ],
+      "semantic_ids": [
+        "divine_name:61",
+        "hadith:muslim:4376",
+        "hadith:muslim:2033",
+        "hadith:muslim:4767",
+        "divine_name:14",
+        "quran:106:1",
+        "hadith:muslim:5412",
+        "divine_name:86",
+        "hadith:muslim:3756",
+        "hadith:muslim:1210"
+      ],
+      "hybrid_ids": [
+        "divine_name:61",
+        "hadith:bukhari:5941",
+        "hadith:muslim:4376",
+        "hadith:muslim:6073",
+        "hadith:muslim:2033",
+        "hadith:muslim:6074",
+        "hadith:abudawud:4209",
+        "hadith:muslim:4767",
+        "divine_name:14",
+        "hadith:bukhari:5934"
+      ]
+    },
+    {
+      "language": "en",
+      "query": "What helps when life is difficult?",
+      "timing_ms": {
+        "keyword_ms": {
+          "median": 10.690041999623645,
+          "p95": 15.984207999281352
+        },
+        "embedding_ms": {
+          "median": 3.811040998698445,
+          "p95": 4.056457997648977
+        },
+        "vector_ms": {
+          "median": 30.226167000364512,
+          "p95": 30.776208997849608
+        },
+        "total_ms": {
+          "median": 45.536166999227135,
+          "p95": 51.01070800083107
+        }
+      },
+      "keyword_ids": [
+        "hadith:tirmidhi:1930",
+        "quran:20:124",
+        "hadith:nasai:3151",
+        "hadith:bukhari:2972",
+        "hadith:abudawud:5117",
+        "hadith:abudawud:2932",
+        "azkar:praising-allah:159",
+        "quran:92:10",
+        "azkar:sickness-and-death:170",
+        "quran:2:28"
+      ],
+      "semantic_ids": [
+        "quran:90:12",
+        "quran:26:93",
+        "azkar:praising-allah:159",
+        "hadith:nasai:1306",
+        "quran:2:280",
+        "hadith:muslim:7249",
+        "quran:94:5",
+        "hadith:nasai:1305",
+        "quran:75:40",
+        "quran:2:45"
+      ],
+      "hybrid_ids": [
+        "azkar:praising-allah:159",
+        "quran:90:12",
+        "quran:2:45",
+        "quran:79:27",
+        "quran:41:39",
+        "quran:50:3",
+        "quran:9:38",
+        "quran:30:50",
+        "hadith:tirmidhi:1930",
+        "quran:20:124"
+      ]
+    },
+    {
+      "language": "en",
+      "query": "Dua when leaving the house",
+      "timing_ms": {
+        "keyword_ms": {
+          "median": 10.873874998651445,
+          "p95": 12.021999998978572
+        },
+        "embedding_ms": {
+          "median": 3.358166999532841,
+          "p95": 3.6409170024853665
+        },
+        "vector_ms": {
+          "median": 30.588459001592128,
+          "p95": 32.302083000104176
+        },
+        "total_ms": {
+          "median": 45.62904200065532,
+          "p95": 47.89412500031176
+        }
+      },
+      "keyword_ids": [
+        "hadith:malik:509",
+        "hadith:malik:508",
+        "hadith:malik:451",
+        "hadith:nasai:3546",
+        "azkar:home-and-family:163",
+        "azkar:morning-and-evening:124",
+        "hadith:malik:495",
+        "hadith:malik:506",
+        "hadith:nasai:3528",
+        "hadith:malik:501"
+      ],
+      "semantic_ids": [
+        "quran:86:6",
+        "quran:92:21",
+        "quran:80:16",
+        "quran:100:1",
+        "quran:80:15",
+        "quran:93:7",
+        "quran:88:5",
+        "quran:26:218",
+        "hadith:bukhari:6282",
+        "hadith:bukhari:6283"
+      ],
+      "hybrid_ids": [
+        "hadith:malik:509",
+        "quran:86:6",
+        "hadith:malik:508",
+        "quran:92:21",
+        "hadith:malik:451",
+        "quran:80:16",
+        "hadith:nasai:3546",
+        "quran:100:1",
+        "azkar:home-and-family:163",
+        "quran:80:15"
+      ]
+    },
+    {
+      "language": "en",
+      "query": "Names of Allah about compassion and mercy",
+      "timing_ms": {
+        "keyword_ms": {
+          "median": 21.22195799893234,
+          "p95": 23.5012920020381
+        },
+        "embedding_ms": {
+          "median": 4.483500000787899,
+          "p95": 4.685916999733308
+        },
+        "vector_ms": {
+          "median": 29.83808299904922,
+          "p95": 31.790042001375696
+        },
+        "total_ms": {
+          "median": 57.387708002352156,
+          "p95": 57.82374999762396
+        }
+      },
+      "keyword_ids": [
+        "hadith:ibnmajah:4293",
+        "hadith:ibnmajah:4294",
+        "hadith:abudawud:4941",
+        "hadith:muslim:6106",
+        "hadith:abudawud:1694",
+        "hadith:muslim:6108",
+        "quran:57:27",
+        "divine_name:2",
+        "hadith:muslim:6869",
+        "hadith:nasai:1868"
+      ],
+      "semantic_ids": [
+        "azkar:travel:226",
+        "hadith:nasai:1064",
+        "quran:87:19",
+        "hadith:ibnmajah:3728",
+        "hadith:abudawud:4949",
+        "azkar:prayer:21",
+        "hadith:muslim:6108",
+        "hadith:abudawud:788",
+        "hadith:bukhari:1202",
+        "hadith:ibnmajah:708"
+      ],
+      "hybrid_ids": [
+        "hadith:muslim:6108",
+        "hadith:abudawud:1694",
+        "hadith:ibnmajah:4294",
+        "hadith:abudawud:4941",
+        "hadith:ibnmajah:4293",
+        "hadith:ibnmajah:3728",
+        "hadith:abudawud:788",
+        "hadith:abudawud:4949",
+        "hadith:muslim:5599",
+        "azkar:travel:226"
+      ]
+    },
+    {
+      "language": "exact",
+      "query": "2:255",
+      "timing_ms": {
+        "exact_ms": {
+          "median": 0.010749998182291165,
+          "p95": 0.09629200212657452
+        }
+      },
+      "keyword_ids": [
+        "quran:2:255",
+        "tafsir:bundled:2:255"
+      ],
+      "semantic_ids": [
+        "quran:2:255",
+        "tafsir:bundled:2:255"
+      ],
+      "hybrid_ids": [
+        "quran:2:255",
+        "tafsir:bundled:2:255"
+      ]
+    },
+    {
+      "language": "exact",
+      "query": "Sahih al-Bukhari 1",
+      "timing_ms": {
+        "exact_ms": {
+          "median": 0.008208000508602709,
+          "p95": 0.015542002074653283
+        }
+      },
+      "keyword_ids": [
+        "hadith:bukhari:1"
+      ],
+      "semantic_ids": [
+        "hadith:bukhari:1"
+      ],
+      "hybrid_ids": [
+        "hadith:bukhari:1"
+      ]
+    }
+  ],
+  "limitations": "Development-host CPU measurements, not representative phone measurements. Python vector loading and NumPy retrieval differ from Flutter. Retrieved IDs are smoke evidence, not verified relevance judgments. No Recall/Precision/MRR/nDCG claims are made."
+}

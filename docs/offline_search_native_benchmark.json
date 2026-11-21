@@ -1,0 +1,276 @@
+{
+  "platform": "macos Version 27.0 (Build 26A428)",
+  "runtime": "1.15.1",
+  "database_sha_model": "dd476dd0c2514e9b9be83aeb3853fac0763e0bdf4a71645407587d77c48a2d88",
+  "initialization_ms": 1482,
+  "rss_before_bytes": 153108480,
+  "rss_after_initialization_bytes": 552026112,
+  "corpus": {
+    "quran_count": 6236,
+    "hadith_count": 36108,
+    "azkar_count": 287,
+    "divine_name_count": 99,
+    "tafsir_count": 6236,
+    "surah_count": 114,
+    "vector_count": 103719,
+    "languages": [
+      "ar",
+      "en"
+    ],
+    "sha256": "98751df5c6f365edb4a370554441069d05e606546dfcadaf0ae7a5fb2fd2bec8"
+  },
+  "queries": [
+    {
+      "query": "I'm worried about my future.",
+      "keyword_us": 30691,
+      "embedding_us": 14133,
+      "vector_us": 170884,
+      "total_us_including_parity_verification": 365788,
+      "top_10": [
+        "quran:76:10",
+        "quran:69:38",
+        "hadith:bukhari:20",
+        "quran:89:29",
+        "hadith:tirmidhi:480",
+        "quran:74:27",
+        "hadith:abudawud:2389",
+        "quran:79:9",
+        "hadith:bukhari:3340",
+        "quran:80:15"
+      ]
+    },
+    {
+      "query": "مجھے اپنے مستقبل کی فکر ہے",
+      "keyword_us": 2912,
+      "embedding_us": 4091,
+      "vector_us": 142272,
+      "total_us_including_parity_verification": 289509,
+      "top_10": [
+        "quran:86:16",
+        "hadith:malik:443",
+        "quran:80:10",
+        "hadith:bukhari:4535",
+        "hadith:dehlawi:34",
+        "hadith:nasai:1553",
+        "quran:69:29",
+        "hadith:ibnmajah:1259",
+        "quran:37:99",
+        "hadith:bukhari:4131"
+      ]
+    },
+    {
+      "query": "أشعر بالقلق بشأن مستقبلي",
+      "keyword_us": 2496,
+      "embedding_us": 3922,
+      "vector_us": 152359,
+      "total_us_including_parity_verification": 295388,
+      "top_10": [
+        "azkar:joy-and-distress:154",
+        "quran:20:25",
+        "hadith:malik:443",
+        "quran:26:14",
+        "hadith:bukhari:4535",
+        "quran:7:112",
+        "azkar:joy-and-distress:141",
+        "hadith:dehlawi:10",
+        "azkar:joy-and-distress:140",
+        "quran:56:75"
+      ]
+    },
+    {
+      "query": "Mujhe apne mustaqbil ki fikar hai",
+      "keyword_us": 2517,
+      "embedding_us": 4901,
+      "vector_us": 132932,
+      "total_us_including_parity_verification": 273033,
+      "top_10": [
+        "azkar:joy-and-distress:141",
+        "divine_name:61",
+        "hadith:muslim:4376",
+        "azkar:joy-and-distress:140",
+        "hadith:muslim:2033",
+        "azkar:joy-and-distress:223",
+        "quran:106:4",
+        "hadith:muslim:4767",
+        "hadith:abudawud:1518",
+        "divine_name:14"
+      ]
+    },
+    {
+      "query": "What helps when life is difficult?",
+      "keyword_us": 3332,
+      "embedding_us": 3238,
+      "vector_us": 149946,
+      "total_us_including_parity_verification": 297405,
+      "top_10": [
+        "quran:2:280",
+        "quran:2:220",
+        "quran:18:73",
+        "quran:90:12",
+        "quran:26:93",
+        "hadith:tirmidhi:1930",
+        "quran:54:8",
+        "azkar:praising-allah:159",
+        "quran:92:10",
+        "hadith:nasai:1306"
+      ]
+    },
+    {
+      "query": "How should I treat my parents?",
+      "keyword_us": 7463,
+      "embedding_us": 3331,
+      "vector_us": 134001,
+      "total_us_including_parity_verification": 275702,
+      "top_10": [
+        "quran:17:23",
+        "hadith:muslim:6501",
+        "quran:6:151",
+        "hadith:muslim:3690",
+        "hadith:ibnmajah:2858",
+        "quran:68:41",
+        "hadith:muslim:6507",
+        "quran:65:6",
+        "hadith:muslim:6500",
+        "quran:29:8"
+      ]
+    }
+  ],
+  "device_measurement": false,
+  "quality_judgments": "Not supplied; retrieval parity is not relevance evaluation.",
+  "peak_rss_native_core_bytes": 554221568,
+  "federated_queries": [
+    {
+      "query": "I'm worried about my future.",
+      "timings_ms": {
+        "keyword": 3,
+        "embedding": 3,
+        "vector": 134,
+        "ranking": 56,
+        "total": 197
+      },
+      "top_10": [
+        "quran:76:10",
+        "hadith:bukhari:3340",
+        "hadith:tirmidhi:480",
+        "hadith:ibnmajah:4312",
+        "hadith:bukhari:7440",
+        "hadith:tirmidhi:2434",
+        "hadith:bukhari:5191",
+        "azkar:joy-and-distress:141",
+        "azkar:joy-and-distress:140",
+        "azkar:joy-and-distress:223"
+      ]
+    },
+    {
+      "query": "مجھے اپنے مستقبل کی فکر ہے",
+      "timings_ms": {
+        "keyword": 3,
+        "embedding": 3,
+        "vector": 133,
+        "ranking": 29,
+        "total": 170
+      },
+      "top_10": [
+        "hadith:nasai:1553",
+        "hadith:ibnmajah:1259",
+        "hadith:bukhari:4131",
+        "azkar:joy-and-distress:141",
+        "azkar:joy-and-distress:140",
+        "azkar:joy-and-distress:223",
+        "hadith:malik:443",
+        "hadith:bukhari:4535",
+        "quran:106:4",
+        "hadith:abudawud:1518"
+      ]
+    },
+    {
+      "query": "أشعر بالقلق بشأن مستقبلي",
+      "timings_ms": {
+        "keyword": 2,
+        "embedding": 3,
+        "vector": 137,
+        "ranking": 28,
+        "total": 172
+      },
+      "top_10": [
+        "hadith:bukhari:4535",
+        "hadith:malik:443",
+        "azkar:joy-and-distress:141",
+        "azkar:joy-and-distress:140",
+        "azkar:joy-and-distress:223",
+        "quran:106:4",
+        "hadith:abudawud:1518",
+        "quran:76:10",
+        "quran:10:62",
+        "quran:13:12"
+      ]
+    },
+    {
+      "query": "Mujhe apne mustaqbil ki fikar hai",
+      "timings_ms": {
+        "keyword": 2,
+        "embedding": 3,
+        "vector": 132,
+        "ranking": 25,
+        "total": 164
+      },
+      "top_10": [
+        "azkar:joy-and-distress:141",
+        "azkar:joy-and-distress:140",
+        "azkar:joy-and-distress:223",
+        "quran:106:4",
+        "hadith:abudawud:1518",
+        "quran:76:10",
+        "quran:10:62",
+        "quran:13:12",
+        "hadith:bukhari:1034",
+        "quran:43:68"
+      ]
+    },
+    {
+      "query": "What helps when life is difficult?",
+      "timings_ms": {
+        "keyword": 3,
+        "embedding": 3,
+        "vector": 134,
+        "ranking": 50,
+        "total": 191
+      },
+      "top_10": [
+        "quran:2:280",
+        "quran:2:220",
+        "quran:20:124",
+        "hadith:tirmidhi:1930",
+        "hadith:muslim:7438",
+        "hadith:bukhari:4099",
+        "hadith:muslim:7088",
+        "hadith:nasai:3151",
+        "hadith:bukhari:2972",
+        "quran:18:73"
+      ]
+    },
+    {
+      "query": "How should I treat my parents?",
+      "timings_ms": {
+        "keyword": 8,
+        "embedding": 5,
+        "vector": 134,
+        "ranking": 292,
+        "total": 441
+      },
+      "top_10": [
+        "quran:17:23",
+        "quran:6:151",
+        "hadith:abudawud:5143",
+        "hadith:muslim:6501",
+        "hadith:ibnmajah:3661",
+        "hadith:ibnmajah:2858",
+        "hadith:muslim:3690",
+        "hadith:muslim:6514",
+        "hadith:ibnmajah:3466",
+        "quran:46:15"
+      ]
+    }
+  ],
+  "peak_rss_test_process_bytes": 951762944
+}

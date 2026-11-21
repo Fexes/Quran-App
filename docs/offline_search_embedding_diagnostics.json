@@ -1,0 +1,233 @@
+{
+  "purpose": "Diagnose base semantic retrieval; these are source-level smoke observations, not reviewed relevance scores or current app-wide rankings.",
+  "corpus_passages": 43742,
+  "vectors": 91272,
+  "database_sha256": "d536479ee7344a43cef2f72bf537f4779456e8184fa8c23ad04d4a6580f756f4",
+  "alignment_samples": 21,
+  "stored_batch_to_fresh_single_cosine_range": [
+    0.9926130175590515,
+    0.9984531998634338
+  ],
+  "alignment": [
+    {
+      "id": "quran:69:38",
+      "lang": "ar",
+      "token_count": 32,
+      "stored_fresh_cosine": 0.995520293712616,
+      "stored_query_cosine": 0.8651909828186035,
+      "fresh_query_cosine": 0.8600984811782837
+    },
+    {
+      "id": "quran:69:38",
+      "lang": "en",
+      "token_count": 16,
+      "stored_fresh_cosine": 0.9960444569587708,
+      "stored_query_cosine": 0.8009214401245117,
+      "fresh_query_cosine": 0.8085142374038696
+    },
+    {
+      "id": "quran:89:29",
+      "lang": "ar",
+      "token_count": 25,
+      "stored_fresh_cosine": 0.996733546257019,
+      "stored_query_cosine": 0.8636293411254883,
+      "fresh_query_cosine": 0.8552801609039307
+    },
+    {
+      "id": "quran:89:29",
+      "lang": "en",
+      "token_count": 19,
+      "stored_fresh_cosine": 0.9984531998634338,
+      "stored_query_cosine": 0.7947201728820801,
+      "fresh_query_cosine": 0.7958933115005493
+    },
+    {
+      "id": "quran:74:27",
+      "lang": "ar",
+      "token_count": 28,
+      "stored_fresh_cosine": 0.9945960640907288,
+      "stored_query_cosine": 0.861574649810791,
+      "fresh_query_cosine": 0.8582475185394287
+    },
+    {
+      "id": "quran:74:27",
+      "lang": "en",
+      "token_count": 19,
+      "stored_fresh_cosine": 0.9973028898239136,
+      "stored_query_cosine": 0.7761908769607544,
+      "fresh_query_cosine": 0.7842044830322266
+    },
+    {
+      "id": "quran:2:286",
+      "lang": "ar",
+      "token_count": 350,
+      "stored_fresh_cosine": 0.9961795210838318,
+      "stored_query_cosine": 0.796072244644165,
+      "fresh_query_cosine": 0.7925304174423218
+    },
+    {
+      "id": "quran:2:286",
+      "lang": "en",
+      "token_count": 160,
+      "stored_fresh_cosine": 0.9970803260803223,
+      "stored_query_cosine": 0.7382442951202393,
+      "fresh_query_cosine": 0.7412746548652649
+    },
+    {
+      "id": "quran:13:28",
+      "lang": "ar",
+      "token_count": 95,
+      "stored_fresh_cosine": 0.9959319829940796,
+      "stored_query_cosine": 0.8018184900283813,
+      "fresh_query_cosine": 0.7979763746261597
+    },
+    {
+      "id": "quran:13:28",
+      "lang": "en",
+      "token_count": 50,
+      "stored_fresh_cosine": 0.9972971677780151,
+      "stored_query_cosine": 0.792693018913269,
+      "fresh_query_cosine": 0.7871086597442627
+    },
+    {
+      "id": "quran:2:45",
+      "lang": "ar",
+      "token_count": 82,
+      "stored_fresh_cosine": 0.9963505268096924,
+      "stored_query_cosine": 0.8029459714889526,
+      "fresh_query_cosine": 0.8030906915664673
+    },
+    {
+      "id": "quran:2:45",
+      "lang": "en",
+      "token_count": 37,
+      "stored_fresh_cosine": 0.9971228837966919,
+      "stored_query_cosine": 0.7861361503601074,
+      "fresh_query_cosine": 0.7840594053268433
+    },
+    {
+      "id": "quran:65:3",
+      "lang": "ar",
+      "token_count": 145,
+      "stored_fresh_cosine": 0.9955555200576782,
+      "stored_query_cosine": 0.7915570735931396,
+      "fresh_query_cosine": 0.7924234867095947
+    },
+    {
+      "id": "quran:65:3",
+      "lang": "en",
+      "token_count": 65,
+      "stored_fresh_cosine": 0.9969936013221741,
+      "stored_query_cosine": 0.7770780324935913,
+      "fresh_query_cosine": 0.7781878709793091
+    },
+    {
+      "id": "quran:86:6",
+      "lang": "ar",
+      "token_count": 24,
+      "stored_fresh_cosine": 0.9926130175590515,
+      "stored_query_cosine": 0.8479156494140625,
+      "fresh_query_cosine": 0.8428835868835449
+    },
+    {
+      "id": "quran:86:6",
+      "lang": "en",
+      "token_count": 19,
+      "stored_fresh_cosine": 0.9972840547561646,
+      "stored_query_cosine": 0.7626909017562866,
+      "fresh_query_cosine": 0.7689470052719116
+    },
+    {
+      "id": "hadith:bukhari:1",
+      "lang": "ar",
+      "token_count": 487,
+      "stored_fresh_cosine": 0.9944878220558167,
+      "stored_query_cosine": 0.7956651449203491,
+      "fresh_query_cosine": 0.7950536012649536
+    },
+    {
+      "id": "hadith:bukhari:1",
+      "lang": "en",
+      "token_count": 85,
+      "stored_fresh_cosine": 0.9968535900115967,
+      "stored_query_cosine": 0.7874824404716492,
+      "fresh_query_cosine": 0.7895082831382751
+    },
+    {
+      "id": "azkar:praising-allah:159",
+      "lang": "ar",
+      "token_count": 83,
+      "stored_fresh_cosine": 0.9964032173156738,
+      "stored_query_cosine": 0.8162758350372314,
+      "fresh_query_cosine": 0.8169869184494019
+    },
+    {
+      "id": "azkar:praising-allah:159",
+      "lang": "en",
+      "token_count": 37,
+      "stored_fresh_cosine": 0.9967976808547974,
+      "stored_query_cosine": 0.816059947013855,
+      "fresh_query_cosine": 0.8158573508262634
+    },
+    {
+      "id": "tafsir:bundled:2:255",
+      "lang": "ar",
+      "token_count": 234,
+      "stored_fresh_cosine": 0.9967936873435974,
+      "stored_query_cosine": 0.739836573600769,
+      "fresh_query_cosine": 0.7396596670150757
+    }
+  ],
+  "controlled_batch_check": [
+    {
+      "model": "model.int8.onnx",
+      "single_repeat_cosine": 1.0,
+      "single_mixed_batch_cosine": 0.9951081275939941
+    },
+    {
+      "model": "quran-e5-float32-reference.onnx",
+      "single_repeat_cosine": 1.0,
+      "single_mixed_batch_cosine": 1.0
+    }
+  ],
+  "float32_reference": {
+    "source": "https://huggingface.co/intfloat/multilingual-e5-small/resolve/614241f622f53c4eeff9890bdc4f31cfecc418b3/onnx/model.onnx",
+    "bytes": 470268510,
+    "sha256": "ca456c06b3a9505ddfd9131408916dd79290368331e7d76bb621f1cba6bc8665",
+    "shipped": false,
+    "temporary_file_removed_after_comparison": true
+  },
+  "observed_problem": "Isolated short vocalized Arabic fragments can rank above topically relevant longer source texts. English-only and averaged language scoring also produced poor results. Roman Urdu retrieval was particularly weak.",
+  "precision_comparison": [
+    {
+      "query": "I'm worried about my future.",
+      "canonical_id": "quran:69:38",
+      "language": "ar",
+      "int8_fresh_cosine": 0.8600984811782837,
+      "float32_fresh_cosine": 0.8585904836654663
+    },
+    {
+      "query": "I'm worried about my future.",
+      "canonical_id": "quran:13:28",
+      "language": "en",
+      "int8_fresh_cosine": 0.7871087789535522,
+      "float32_fresh_cosine": 0.7869516611099243
+    },
+    {
+      "query": "Dua when leaving the house",
+      "canonical_id": "quran:86:6",
+      "language": "ar",
+      "int8_fresh_cosine": 0.856994092464447,
+      "float32_fresh_cosine": 0.8537430763244629
+    }
+  ],
+  "diagnosis": "Fresh vectors and the official FP32 reference preserve the poor relative ordering. There is no evidence of source-ID alignment corruption. INT8 dynamic quantization is batch-sensitive, confirmed in the controlled check; the FP32 single/mixed comparison is effectively identical. Precision changes alone do not resolve source retrieval quality.",
+  "not_applied": [
+    "corpus mean centering",
+    "language mean scoring",
+    "English-only vectors",
+    "FP32 shipping model",
+    "alteration of original source text"
+  ],
+  "limitation": "No accuracy percentage can be inferred. The app-wide runtime combines local providers, lexical coverage and context and must be measured independently."
+}

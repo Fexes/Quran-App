@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "normalization_version": 1,
+  "model_id": "intfloat/multilingual-e5-small",
+  "model_revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+  "dimensions": 384,
+  "max_length": 512,
+  "pooling": "attention_mask_mean_l2",
+  "vector_encoding": "float32_little_endian",
+  "corpus": {
+    "quran_count": 6236,
+    "hadith_count": 36108,
+    "azkar_count": 287,
+    "divine_name_count": 99,
+    "tafsir_count": 6236,
+    "surah_count": 114,
+    "vector_count": 103719,
+    "languages": [
+      "ar",
+      "en"
+    ],
+    "sha256": "98751df5c6f365edb4a370554441069d05e606546dfcadaf0ae7a5fb2fd2bec8"
+  },
+  "build_seconds": 420.109,
+  "reused_vector_count": 91308,
+  "artifacts": {
+    "model.int8.onnx": {
+      "sha256": "dd476dd0c2514e9b9be83aeb3853fac0763e0bdf4a71645407587d77c48a2d88",
+      "bytes": 118346824
+    },
+    "tokenizer.json": {
+      "sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+      "bytes": 17082730
+    },
+    "search.sqlite": {
+      "sha256": "82488a119de802f833be9c0af0d6cd19390b5167836cdeab857ec113158dc71b",
+      "bytes": 328220672
+    },
+    "tokenizer_parity.json": {
+      "sha256": "cafbfa0e3263447f0c23ae12ee47e12e9d2001202ec034411517a32bed92c287",
+      "bytes": 65244
+    }
+  },
+  "limits": {
+    "quran": 0,
+    "hadith": 0
+  },
+  "source_policy": "All nonempty reader records, including weak, disputed and ungraded Hadith; original attributed assessments preserved; no independent authentication",
+  "translation_coverage": "Bundled Arabic and English reader sources; downloaded language packs are indexed on-device separately",
+  "vector_storage": "blocks_v1",
+  "vector_block_size": 128
+}
