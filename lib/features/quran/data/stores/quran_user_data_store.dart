@@ -146,6 +146,7 @@ class QuranUserDataStore {
       _memory?.addAll(values);
     }
     _lastReadChanges.value++;
+    LocalSearchRevision.changed(source: 'quran-user');
   }
 
   Future<void> saveNavigationContext({
@@ -270,11 +271,13 @@ class QuranUserDataStore {
       }
     }
     _lastReadChanges.value++;
+    LocalSearchRevision.changed(source: 'quran-user');
   }
 
   Future<void> clearAll() async {
     await _clear();
     _lastReadChanges.value++;
+    LocalSearchRevision.changed(source: 'quran-user');
   }
 
   T _readEnum<T extends Enum>(String key, List<T> values, T fallback) {
@@ -312,7 +315,12 @@ class QuranUserDataStore {
     } else {
       _memory?[key] = value;
     }
-    if (key == _notesKey) LocalSearchRevision.changed();
+    if (key == _notesKey ||
+        key == _bookmarksKey ||
+        key == _bookmarkEntriesKey ||
+        key == _bookmarkCollectionsKey) {
+      LocalSearchRevision.changed(source: 'quran-user');
+    }
   }
 
   Iterable<String> _keys() {
@@ -330,7 +338,7 @@ class QuranUserDataStore {
     } else {
       _memory?.clear();
     }
-    LocalSearchRevision.changed();
+    LocalSearchRevision.changed(source: 'quran-user');
   }
 
   QuranNote? _parseNote(Object? raw) {

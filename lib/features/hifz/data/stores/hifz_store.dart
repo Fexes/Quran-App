@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/search/local_search_revision.dart';
 
 import '../../domain/entities/hifz_models.dart';
 
@@ -87,6 +88,7 @@ class HifzStore {
     } else {
       _memory?[key] = value;
     }
+    LocalSearchRevision.changed(source: 'hifz');
   }
 
   Iterable<String> _keys() {
@@ -104,5 +106,6 @@ class HifzStore {
     } else {
       _memory?.clear();
     }
+    LocalSearchRevision.changed(source: 'hifz');
   }
 }

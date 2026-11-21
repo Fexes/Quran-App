@@ -102,9 +102,11 @@ flutter:
     - assets/fonts/Manrope-OFL.txt
     - assets/images/prayers/
     - assets/images/prayer_banners/
+    - assets/widgets/drawable-nodpi/
     - assets/images/architecture/
     - assets/images/companions/
     - assets/images/surah_cover/
+    - assets/images/learn/
     - assets/data/content_sources/
     - assets/data/hadith/
     - assets/data/hadith/books/

@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum ShellDestination { home, quran, prayer, library, settings }
+enum ShellDestination { home, quran, prayer, library }
 
 class ShellState extends Equatable {
   const ShellState({

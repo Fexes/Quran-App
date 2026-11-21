@@ -13,6 +13,9 @@ import 'package:quran/features/hadith/domain/repositories/hadith_repository.dart
 import 'package:quran/features/library/data/stores/library_user_data_store.dart';
 import 'package:quran/features/home/domain/entities/home_tile.dart';
 import 'package:quran/features/home/presentation/pages/home_page.dart';
+import 'package:quran/features/home_screen_widgets/home_widget_content.dart';
+import 'package:quran/features/home_screen_widgets/home_widget_snapshot_service.dart';
+import 'package:quran/features/prayer_times/domain/repositories/prayer_times_repository.dart';
 import 'package:quran/features/quran/data/repositories/quran_interlinear_repository_impl.dart';
 import 'package:quran/features/quran/data/stores/quran_interlinear_words_store.dart';
 import 'package:quran/features/quran/data/stores/quran_tafsir_store.dart';
@@ -76,6 +79,49 @@ void main() {
     expect(find.text('Sahih al-Bukhari'), findsOneWidget);
 
     expect(find.text('Azkar'), findsWidgets);
+    expect(find.text('Learn'), findsNothing);
+    await tester.tap(find.text('Guide'));
+    await _pumpStable(tester);
+    expect(find.text('Wudu'), findsOneWidget);
+  });
+
+  test('home screen widgets have current content and destinations', () async {
+    final snapshot = await HomeWidgetSnapshotService().load();
+    final now = DateTime.now();
+
+    expect(snapshot.timelines.keys.toSet(), HomeWidgetKind.values.toSet());
+    for (final timeline in snapshot.timelines.values) {
+      expect(timeline, isNotEmpty);
+      for (var index = 1; index < timeline.length; index++) {
+        expect(
+          timeline[index].start.isAfter(timeline[index - 1].start),
+          isTrue,
+        );
+      }
+    }
+
+    final nextPrayer = snapshot.contentAt(HomeWidgetKind.prayer, now);
+    final prayerDay = await getIt<PrayerTimesRepository>().getDailyPrayerTimes(
+      date: now,
+    );
+    expect(nextPrayer.footer, prayerDay.location.name);
+    expect(nextPrayer.detail, isNotEmpty);
+    expect(nextPrayer.toJson().containsKey('schedule'), isFalse);
+    expect(nextPrayer.path, HomeWidgetSnapshotService.prayerPath);
+
+    final dailyAyah = snapshot.contentAt(HomeWidgetKind.ayah, now);
+    expect(dailyAyah.arabic, isNotEmpty);
+    expect(dailyAyah.path, matches(r'^/quran/\d+\?ayah=\d+'));
+
+    expect(
+      snapshot.timelines.keys.map((kind) => kind.id),
+      isNot(contains('today')),
+    );
+    final fasting = snapshot.contentAt(HomeWidgetKind.fasting, now);
+    expect(fasting.label, HomeWidgetKind.fasting.label(snapshot.language));
+    expect(HomeWidgetKind.fasting.label('en'), 'Fasting');
+    expect(fasting.path, AppRoutes.ramadan);
+    expect(fasting.footerPath, isNotEmpty);
   });
 
   testWidgets('search screen accepts a deep search query', (tester) async {

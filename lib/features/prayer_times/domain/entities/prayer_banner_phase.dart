@@ -9,6 +9,8 @@ enum PrayerBannerPhase {
   maghrib,
   isha;
 
+  static const sunsetWindow = Duration(minutes: 20);
+
   String get assetPath => 'assets/images/prayer_banners/$name.jpg';
 
   static PrayerBannerPhase at({
@@ -29,7 +31,7 @@ enum PrayerBannerPhase {
     if (current?.name == PrayerTimeName.asr &&
         maghribTime != null &&
         now.isBefore(maghribTime) &&
-        !now.isBefore(maghribTime.subtract(const Duration(minutes: 20)))) {
+        !now.isBefore(maghribTime.subtract(sunsetWindow))) {
       return sunset;
     }
 

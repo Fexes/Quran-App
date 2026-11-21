@@ -107,13 +107,6 @@ class _PrayerView extends StatelessWidget {
                         tooltip: l10n.commonRefresh,
                         onTap: context.read<PrayerTimesCubit>().load,
                       ),
-                      ShellHeaderAction(
-                        icon: Icons.tune_rounded,
-                        tooltip: 'Prayer settings',
-                        onTap: () => context.read<ShellCubit>().setDestination(
-                          ShellDestination.settings,
-                        ),
-                      ),
                     ],
                   ),
                 ),

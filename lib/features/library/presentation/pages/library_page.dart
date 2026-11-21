@@ -29,7 +29,9 @@ import '../../../hadith/presentation/bloc/hadith_library_cubit.dart';
 import '../../../hadith/presentation/bloc/hadith_library_state.dart';
 import '../../../hadith/presentation/widgets/hadith_translation_sheet.dart';
 
-enum _LibrarySection { hadith, azkar, tools }
+import '../../../learn/presentation/widgets/learning_guide_sections.dart';
+
+enum _LibrarySection { hadith, azkar, tools, guide }
 
 class LibraryPage extends StatelessWidget {
   const LibraryPage({super.key});
@@ -64,6 +66,11 @@ class _LibraryViewState extends State<_LibraryView> {
 
   @override
   Widget build(BuildContext context) {
+    final guideLabel = switch (Localizations.localeOf(context).languageCode) {
+      'ar' => 'دليل',
+      'ur' => 'رہنمائی',
+      _ => 'Guide',
+    };
     return DefaultTabController(
       length: _LibrarySection.values.length,
       child: AdaptiveInsetArea(
@@ -76,9 +83,12 @@ class _LibraryViewState extends State<_LibraryView> {
               child: ShellScreenHeader(
                 icon: Icons.local_library_rounded,
                 title: 'Library',
-                subtitle: _section == _LibrarySection.tools
-                    ? 'Private worship tools and learning utilities.'
-                    : 'Hadith collections and daily remembrance.',
+                subtitle: switch (_section) {
+                  _LibrarySection.tools =>
+                    'Private worship tools and learning utilities.',
+                  _LibrarySection.guide => 'Illustrated guides to worship.',
+                  _ => 'Hadith collections and daily remembrance.',
+                },
                 actions: [
                   if (_section == _LibrarySection.hadith)
                     ShellHeaderAction(
@@ -86,7 +96,7 @@ class _LibraryViewState extends State<_LibraryView> {
                       tooltip: 'Hadith translations',
                       onTap: () => _showHadithTranslations(context),
                     ),
-                  if (_section != _LibrarySection.tools)
+                  if (_section == _LibrarySection.hadith || _section == _LibrarySection.azkar)
                     ShellHeaderAction(
                       icon: Icons.refresh_rounded,
                       tooltip: 'Refresh library',
@@ -111,23 +121,35 @@ class _LibraryViewState extends State<_LibraryView> {
                 ),
                 children: [
                   TabBar(
+                    isScrollable: MediaQuery.textScalerOf(context).scale(16) > 22,
                     labelColor: QuranTheme.text(context),
                     unselectedLabelColor: QuranTheme.subText(context),
                     indicatorColor: QuranTheme.text(context),
-                    tabs: const [
-                      Tab(text: 'Hadith'),
-                      Tab(text: 'Azkar'),
-                      Tab(text: 'Tools'),
+                    tabs: [
+                      const Tab(text: 'Hadith'),
+                      const Tab(text: 'Azkar'),
+                      const Tab(text: 'Tools'),
+                      Tab(text: guideLabel),
                     ],
                     onTap: (index) {
                       setState(() => _section = _LibrarySection.values[index]);
                     },
                   ),
                   const SizedBox(height: 16),
-                  switch (_section) {
-                    _LibrarySection.hadith => const _HadithSection(),
-                    _LibrarySection.azkar => const _AzkarSection(),
-                    _LibrarySection.tools => const _WorshipToolsSection(),
+                  ...switch (_section) {
+                    _LibrarySection.hadith => const [_HadithSection()],
+                    _LibrarySection.azkar => const [_AzkarSection()],
+                    _LibrarySection.tools => const [_WorshipToolsSection()],
+                    _LibrarySection.guide => [
+                      for (
+                        var index = 0;
+                        index < LearningGuideSectionView.sectionCount;
+                        index++
+                      ) ...[
+                        if (index > 0) const SizedBox(height: 30),
+                        LearningGuideSectionView(index: index),
+                      ],
+                    ],
                   },
                 ],
               ),

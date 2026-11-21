@@ -1,6 +1,7 @@
 package com.coreinfinite.quran
 
 import android.content.Context
+import android.content.Intent
 import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -11,12 +12,45 @@ import android.view.Surface
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
+    private var widgetChannel: MethodChannel? = null
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.hasExtra(WIDGET_PATH)) {
+            setIntent(intent)
+            widgetChannel?.invokeMethod("linkAvailable", null)
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, "quran/qibla_heading")
             .setStreamHandler(QiblaHeadingStreamHandler(this))
+        val appContext = applicationContext
+        widgetChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "quran/home_screen_widgets")
+        widgetChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "publish" -> {
+                    QuranWidgets.publish(appContext, call.arguments as? String)
+                    result.success(null)
+                }
+                "clear" -> {
+                    QuranWidgets.publish(appContext, null)
+                    result.success(null)
+                }
+                "canPin" -> result.success(QuranWidgets.canPin(this))
+                "pin" -> result.success(QuranWidgets.pin(this, call.argument("kind"), call.argument("size")))
+                "takeLink" -> {
+                    val path = intent.getStringExtra(WIDGET_PATH)
+                    intent.removeExtra(WIDGET_PATH)
+                    result.success(path)
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 }
 

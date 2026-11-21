@@ -2,6 +2,8 @@ class AppRoutes {
   const AppRoutes._();
 
   static const shell = '/';
+  static const settings = '/settings';
+  static const homeScreenWidgets = '/settings/home-screen-widgets';
   static const onboarding = '/onboarding';
   static const quranReader = '/quran/:surahNumber';
   static const quranSearch = '/quran-search';
@@ -20,6 +22,7 @@ class AppRoutes {
   static const divineNames = '/worship-tools/names';
   static const zakat = '/worship-tools/zakat';
   static const ramadan = '/worship-tools/ramadan';
+  static const fastingPlan = ramadan;
   static const achievements = '/worship-tools/achievements';
   static const mosques = '/worship-tools/mosques';
   static const hadithBook = '/library/hadith/:bookId';
@@ -89,7 +92,15 @@ class AppRoutes {
 
   static String qiblaPath() => qibla;
 
-  static String fastingJournalPath() => fastingJournal;
+  static String fastingJournalPath({DateTime? date}) {
+    if (date == null) return fastingJournal;
+    final key = DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).toIso8601String().split('T').first;
+    return Uri(path: fastingJournal, queryParameters: {'date': key}).toString();
+  }
 
   static String duasPath() => duas;
 
@@ -98,6 +109,8 @@ class AppRoutes {
   static String zakatPath() => zakat;
 
   static String ramadanPath() => ramadan;
+
+  static String fastingPlanPath() => fastingPlan;
 
   static String achievementsPath() => achievements;
 

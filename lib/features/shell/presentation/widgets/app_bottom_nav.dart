@@ -26,6 +26,18 @@ class AppBottomNav extends StatelessWidget {
       decoration: BoxDecoration(
         color: QuranTheme.surface(context),
         border: Border(top: BorderSide(color: QuranTheme.outline(context))),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? 0.12
+                  : 0.035,
+            ),
+            blurRadius: 10,
+            spreadRadius: -2,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
@@ -73,11 +85,6 @@ class AppBottomNav extends StatelessWidget {
         destination: ShellDestination.library,
         icon: Icons.local_library_outlined,
         label: l10n.tabLibrary,
-      ),
-      _BottomNavItemData(
-        destination: ShellDestination.settings,
-        icon: Icons.tune_outlined,
-        label: l10n.tabSettings,
       ),
     ];
   }
@@ -159,6 +166,21 @@ class _BottomNavItem extends StatelessWidget {
                     fontSize: 12,
                     height: 1.4,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                AnimatedOpacity(
+                  opacity: selected ? 1 : 0,
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  child: Container(
+                    width: 3,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.secondary,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
               ],

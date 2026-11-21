@@ -1,3 +1,4 @@
+import '../search/local_search_revision.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/foundation.dart';
 
@@ -17,6 +18,7 @@ class SettingsStore {
   final Map<String, Object?>? _memory;
   final bool _isFreshInstall;
   final prayerLocationChanges = ValueNotifier(0);
+  final translationVisibilityChanges = ValueNotifier(0);
   bool get prayerLocationUsesDevice => _readBool(
     'prayer_location_uses_device',
     _read(_prayerLatitudeKey) is num && _read(_prayerLongitudeKey) is num,
@@ -454,18 +456,22 @@ class SettingsStore {
     final box = _box;
     if (box != null) {
       await box.put(key, value);
-      return;
+    } else {
+      _memory?[key] = value;
     }
-    _memory?[key] = value;
+    LocalSearchRevision.changed(source: 'settings');
+    _notifyTranslationVisibility(key);
   }
 
   Future<void> _delete(String key) async {
     final box = _box;
     if (box != null) {
       await box.delete(key);
-      return;
+    } else {
+      _memory?.remove(key);
     }
-    _memory?.remove(key);
+    LocalSearchRevision.changed(source: 'settings');
+    _notifyTranslationVisibility(key);
   }
 
   Iterable<String> _keys() {
@@ -482,6 +488,15 @@ class SettingsStore {
       await box.clear();
     } else {
       _memory?.clear();
+    }
+    LocalSearchRevision.changed(source: 'settings');
+    translationVisibilityChanges.value++;
+  }
+
+  void _notifyTranslationVisibility(String key) {
+    if (key == _quranTranslationVisibleKey ||
+        key == _libraryTranslationEnabledKey) {
+      translationVisibilityChanges.value++;
     }
   }
 }

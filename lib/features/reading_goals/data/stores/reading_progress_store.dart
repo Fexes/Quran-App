@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/search/local_search_revision.dart';
 
 import '../../domain/entities/reading_progress.dart';
 
@@ -121,6 +122,7 @@ class ReadingProgressStore {
     } else {
       _memory?[key] = value;
     }
+    LocalSearchRevision.changed(source: 'reading');
   }
 
   Future<void> _delete(String key) async {
@@ -130,6 +132,7 @@ class ReadingProgressStore {
     } else {
       _memory?.remove(key);
     }
+    LocalSearchRevision.changed(source: 'reading');
   }
 
   Iterable<String> _keys() {
@@ -147,5 +150,6 @@ class ReadingProgressStore {
     } else {
       _memory?.clear();
     }
+    LocalSearchRevision.changed(source: 'reading');
   }
 }

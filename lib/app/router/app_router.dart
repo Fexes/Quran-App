@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/shell/presentation/pages/shell_page.dart';
+import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/home_screen_widgets/home_widget_gallery_page.dart';
 import '../../features/onboarding/presentation/pages/onboarding_page.dart';
 import '../../features/hifz/presentation/pages/hifz_dashboard_page.dart';
 import '../../features/hifz/presentation/pages/hifz_review_page.dart';
@@ -16,6 +18,7 @@ import '../../features/quran/presentation/pages/search/quran_search_page.dart';
 import '../../features/quran_audio/presentation/pages/quran_downloads_page.dart';
 import '../../features/reading_goals/presentation/pages/reading_goals_page.dart';
 import '../../features/prayer_tracking/presentation/pages/prayer_tracking_page.dart';
+import '../../features/prayer_tracking/presentation/pages/fasting_journal_page.dart';
 import '../../features/qibla/presentation/pages/qibla_page.dart';
 import '../../features/worship_tools/presentation/pages/achievements_page.dart';
 import '../../features/worship_tools/presentation/pages/divine_names_page.dart';
@@ -58,6 +61,17 @@ final appRouter = GoRouter(
       path: AppRoutes.shell,
       name: 'shell',
       builder: (context, state) => const ShellPage(),
+    ),
+    GoRoute(
+      path: AppRoutes.settings,
+      name: 'settings',
+      builder: (context, state) => const SettingsPage(),
+      routes: [
+        GoRoute(
+          path: 'home-screen-widgets',
+          builder: (context, state) => const HomeWidgetGalleryPage(),
+        ),
+      ],
     ),
     GoRoute(
       path: AppRoutes.quranReader,
@@ -145,7 +159,9 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.fastingJournal,
       name: 'fasting-journal',
-      builder: (context, state) => const PrayerTrackingPage(fastingOnly: true),
+      builder: (context, state) => FastingJournalPage(
+        initialDate: DateTime.tryParse(state.uri.queryParameters['date'] ?? ''),
+      ),
     ),
     GoRoute(
       path: AppRoutes.duas,

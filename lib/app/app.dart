@@ -11,6 +11,7 @@ import '../core/theme/quran_theme.dart';
 import '../core/theme/quran_theme_cubit.dart';
 import '../core/theme/quran_theme_state.dart';
 import '../features/shell/presentation/bloc/shell_cubit.dart';
+import '../features/home_screen_widgets/home_widget_host.dart';
 import '../features/quran/domain/repositories/quran_repository.dart';
 import '../features/quran/domain/repositories/quran_translation_repository.dart';
 import '../features/quran_audio/data/repositories/quran_audio_download_repository.dart';
@@ -48,7 +49,7 @@ class QuranApp extends StatelessWidget {
           ),
         ),
       ],
-      child: const _QuranAppView(),
+      child: const HomeWidgetHost(child: _QuranAppView()),
     );
   }
 }

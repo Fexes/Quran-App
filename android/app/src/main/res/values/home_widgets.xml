@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_prayer">Next Prayer</string>
+    <string name="widget_prayer_medium">Next Prayer (Medium)</string>
+    <string name="widget_reading">Continue Reading</string>
+    <string name="widget_ayah">Ayah of the Day</string>
+    <string name="widget_azkar">Morning &amp; Evening Azkar</string>
+    <string name="widget_fasting">Fasting</string>
+    <string name="widget_hifz">Hifz Review</string>
+    <string name="widget_goal">Daily Reading Goal</string>
+    <string name="widget_setup">Open Quran to set up</string>
+</resources>

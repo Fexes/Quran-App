@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_prayer">الصلاة التالية</string>
+    <string name="widget_prayer_medium">الصلاة التالية (متوسط)</string>
+    <string name="widget_reading">متابعة القراءة</string>
+    <string name="widget_ayah">آية اليوم</string>
+    <string name="widget_azkar">أذكار الصباح والمساء</string>
+    <string name="widget_fasting">الصيام</string>
+    <string name="widget_hifz">مراجعة الحفظ</string>
+    <string name="widget_goal">هدف القراءة اليومي</string>
+    <string name="widget_setup">افتح القرآن للإعداد</string>
+</resources>

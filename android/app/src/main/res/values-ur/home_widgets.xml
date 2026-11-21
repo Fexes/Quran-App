@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_prayer">اگلی نماز</string>
+    <string name="widget_prayer_medium">اگلی نماز (درمیانہ)</string>
+    <string name="widget_reading">مطالعہ جاری رکھیں</string>
+    <string name="widget_ayah">آج کی آیت</string>
+    <string name="widget_azkar">صبح و شام کے اذکار</string>
+    <string name="widget_fasting">روزہ</string>
+    <string name="widget_hifz">حفظ کی دہرائی</string>
+    <string name="widget_goal">روزانہ مطالعے کا ہدف</string>
+    <string name="widget_setup">ترتیب دینے کے لیے قرآن کھولیں</string>
+</resources>

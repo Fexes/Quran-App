@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import workmanager_apple
+import WidgetKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -29,6 +30,7 @@ import workmanager_apple
     guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "QiblaHeadingStream") else {
       return
     }
+    HomeWidgetBridge.register(with: registrar.messenger())
     let channel = FlutterEventChannel(
       name: "quran/qibla_heading",
       binaryMessenger: registrar.messenger()
@@ -65,5 +67,62 @@ import workmanager_apple
       }
     }
     audioStorageChannel = storageChannel
+  }
+}
+
+enum HomeWidgetBridge {
+  private static let group = "group.com.coreinfinite.quran.widgets"
+  private static var channel: FlutterMethodChannel?
+  private static var pendingPath: String?
+
+  static func register(with messenger: FlutterBinaryMessenger) {
+    let bridge = FlutterMethodChannel(name: "quran/home_screen_widgets", binaryMessenger: messenger)
+    channel = bridge
+    bridge.setMethodCallHandler { call, result in
+      switch call.method {
+      case "takeLink":
+        let path = pendingPath
+        pendingPath = nil
+        result(path)
+      case "canPin", "pin":
+        result(false)
+      case "publish", "clear":
+        do {
+          try save(call.method == "publish" ? call.arguments as? String : nil)
+          result(nil)
+        } catch {
+          result(FlutterError(code: "widget_storage", message: error.localizedDescription, details: nil))
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  static func accept(_ url: URL) {
+    guard
+      url.scheme == "quranwidget",
+      url.host == "open",
+      let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+      parts.percentEncodedPath.hasPrefix("/")
+    else { return }
+    pendingPath = parts.percentEncodedPath + (parts.percentEncodedQuery.map { "?\($0)" } ?? "")
+    channel?.invokeMethod("linkAvailable", arguments: nil)
+  }
+
+  private static func save(_ value: String?) throws {
+    guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else {
+      if value == nil { return }
+      throw CocoaError(.fileWriteNoPermission)
+    }
+    let url = container.appendingPathComponent("widgets.json")
+    if let value {
+      let data = Data(value.utf8)
+      if (try? Data(contentsOf: url)) == data { return }
+      try data.write(to: url, options: .atomic)
+    } else if FileManager.default.fileExists(atPath: url.path) {
+      try FileManager.default.removeItem(at: url)
+    }
+    WidgetCenter.shared.reloadAllTimelines()
   }
 }

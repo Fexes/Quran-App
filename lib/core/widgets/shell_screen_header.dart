@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_icon.dart';
+import 'app_settings_button.dart';
 
 import '../theme/quran_theme.dart';
 
@@ -92,6 +93,7 @@ class ShellScreenHeader extends StatelessWidget {
               ],
             ),
           ],
+          const AppSettingsButton(),
         ],
       ),
     );

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/search/local_search_revision.dart';
 
 import '../../../../core/content/content_cache_policy.dart';
 import '../../domain/entities/quran_translation.dart';
@@ -471,18 +472,25 @@ class QuranTranslationStore {
     final box = _box;
     if (box != null) {
       await box.put(key, value);
-      return;
+    } else {
+      _memory?[key] = value;
     }
-    _memory?[key] = value;
+    if (key.startsWith('translation:') ||
+        key == _contentRevisionKey ||
+        key.startsWith('translation_catalog') ||
+        key == 'selected_translation_resource') {
+      LocalSearchRevision.changed(source: 'quran-translations');
+    }
   }
 
   Future<void> _delete(String key) async {
     final box = _box;
     if (box != null) {
       await box.delete(key);
-      return;
+    } else {
+      _memory?.remove(key);
     }
-    _memory?.remove(key);
+    LocalSearchRevision.changed(source: 'quran-translations');
   }
 
   Iterable<String> _keys() {

@@ -21,15 +21,15 @@ class AdhanPrayerCalculationService {
     final parameters = _parameters(settings);
     final timeZone = _timeZone(location.timeZone);
     final locationDate = tz.TZDateTime.from(date, timeZone);
-    final prayerTimes = adhan.PrayerTimes(
-      date: tz.TZDateTime(
+    final prayerTimes = _timesForCivilDay(
+      tz.TZDateTime(
         timeZone,
         locationDate.year,
         locationDate.month,
         locationDate.day,
       ),
-      coordinates: adhan.Coordinates(location.latitude, location.longitude),
-      calculationParameters: parameters,
+      location,
+      parameters,
     );
     final entries = [
       PrayerTimeEntry(
@@ -57,15 +57,15 @@ class AdhanPrayerCalculationService {
         time: tz.TZDateTime.from(prayerTimes.isha, timeZone),
       ),
     ];
-    final tomorrow = adhan.PrayerTimes(
-      date: tz.TZDateTime(
+    final tomorrow = _timesForCivilDay(
+      tz.TZDateTime(
         timeZone,
         locationDate.year,
         locationDate.month,
         locationDate.day + 1,
       ),
-      coordinates: adhan.Coordinates(location.latitude, location.longitude),
-      calculationParameters: parameters,
+      location,
+      parameters,
     );
     final nextDayFajr = PrayerTimeEntry(
       name: PrayerTimeName.fajr,
@@ -78,6 +78,33 @@ class AdhanPrayerCalculationService {
       entries: entries,
       nextPrayer: _nextPrayer(entries, now ?? DateTime.now(), nextDayFajr),
       nextDayFajr: nextDayFajr,
+    );
+  }
+
+  /// Adhan's UTC solar day can differ from the civil date near the date line.
+  /// Align by the calculated solar noon, not by adding 24 hours to a result.
+  adhan.PrayerTimes _timesForCivilDay(
+    tz.TZDateTime civilDate,
+    PrayerLocation location,
+    adhan.CalculationParameters parameters,
+  ) {
+    final target = DateTime.utc(civilDate.year, civilDate.month, civilDate.day);
+    var solarDate = target;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final result = adhan.PrayerTimes(
+        date: solarDate,
+        coordinates: adhan.Coordinates(location.latitude, location.longitude),
+        calculationParameters: parameters,
+      );
+      final noon = tz.TZDateTime.from(result.dhuhr, civilDate.location);
+      final offset = target
+          .difference(DateTime.utc(noon.year, noon.month, noon.day))
+          .inDays;
+      if (offset == 0) return result;
+      solarDate = solarDate.add(Duration(days: offset));
+    }
+    throw StateError(
+      'Prayer calculation could not resolve the selected local date.',
     );
   }
 

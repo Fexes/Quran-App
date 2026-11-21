@@ -94,13 +94,6 @@ class _HomeView extends StatelessWidget {
                         tooltip: 'Search Quran',
                         onTap: () => context.push(AppRoutes.quranSearchPath()),
                       ),
-                      ShellHeaderAction(
-                        icon: Icons.tune_rounded,
-                        tooltip: 'Settings',
-                        onTap: () => context.read<ShellCubit>().setDestination(
-                          ShellDestination.settings,
-                        ),
-                      ),
                     ],
                   ),
                 ),

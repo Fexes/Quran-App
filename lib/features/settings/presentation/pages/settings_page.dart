@@ -11,11 +11,9 @@ import '../../../../core/localization/locale_state.dart';
 import '../../../../core/storage/settings_store.dart';
 import '../../../../core/theme/quran_theme_cubit.dart';
 import '../../../../core/theme/quran_theme_state.dart';
-import '../../../../core/widgets/adaptive_inset_area.dart';
 import '../../../../core/widgets/animated_expansion.dart';
 import '../../../../core/widgets/app_sheet.dart';
-import '../../../../core/widgets/section_header.dart';
-import '../../../../core/widgets/shell_screen_header.dart';
+import '../../../../core/widgets/header_pattern_backdrop.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../quran_audio/presentation/widgets/quran_floating_audio_player.dart';
 import '../../../azkar/domain/repositories/azkar_repository.dart';
@@ -23,10 +21,12 @@ import '../../../hadith/presentation/widgets/hadith_translation_sheet.dart';
 import '../../../library/domain/library_translation_language_mapper.dart';
 import '../../../quran/domain/entities/quran_tafsir.dart';
 import '../../../quran/domain/entities/quran_translation.dart';
-import '../../../quran/domain/repositories/quran_repository.dart';
 import '../../../quran/domain/repositories/quran_tafsir_repository.dart';
 import '../../../quran/domain/repositories/quran_translation_repository.dart';
+import '../widgets/content_credits_sheet.dart';
 import '../widgets/prayer_calculation_settings_tile.dart';
+import '../widgets/settings_section_card.dart';
+import '../widgets/translation_visibility_settings.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -34,155 +34,262 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return AdaptiveInsetArea(
-      top: true,
-      bottom: true,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-            child: ShellScreenHeader(
-              icon: Icons.tune_rounded,
-              title: l10n.settingsTitle,
-              subtitle: l10n.settingsSubtitle,
-            ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.settingsTitle),
+        flexibleSpace: const HeaderPatternBackdrop(),
+        leading: BackButton(
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go(AppRoutes.shell),
+        ),
+        actions: [
+          IconButton(
+            tooltip: l10n.searchEverythingTitle,
+            icon: const AppIcon(Icons.search_rounded),
+            onPressed: () => context.push(AppRoutes.quranSearchPath()),
           ),
-          Expanded(
-            child: ListView(
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: Stack(
+          children: [
+            ListView(
               padding: EdgeInsets.fromLTRB(
                 18,
-                0,
+                16,
                 18,
                 QuranFloatingAudioPlayer.scrollInset(context),
               ),
               children: [
-                SectionHeader(title: l10n.appearanceTitle),
-                const SizedBox(height: 10),
-                const _ThemeSelector(),
-                const SizedBox(height: 14),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const AppIcon(Icons.format_size_rounded),
-                  title: Text(l10n.textAppearanceTitle),
-                  trailing: const AppIcon(Icons.chevron_right_rounded),
-                  onTap: () => showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    useSafeArea: true,
-                    builder: (_) => AppSheet(
-                      title: l10n.textAppearanceTitle,
-                      child: BlocProvider.value(
-                        value: context.read<QuranThemeCubit>(),
-                        child: const _FontControls(),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: Text(l10n.settingsSubtitle),
+                ),
+                SettingsSectionCard(
+                  title: l10n.appearanceTitle,
+                  description: _settingsText(
+                    context,
+                    'Make the app comfortable to read and use.',
+                    'ایپ کو پڑھنے اور استعمال کرنے میں آسان بنائیں۔',
+                    'اجعل القراءة واستخدام التطبيق أكثر راحة.',
+                  ),
+                  icon: Icons.palette_outlined,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            l10n.themeTitle,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                          const SizedBox(height: 12),
+                          const _ThemeSelector(),
+                        ],
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 22),
-                SectionHeader(title: l10n.readingPreferencesTitle),
-                const _LanguageSelector(),
-                const _ArabicScriptSetting(),
-                const _ReadingListeningSetting(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const AppIcon(Icons.translate_rounded),
-                  title: const Text('More reading preferences'),
-                  subtitle: const Text(
-                    'Tafsir, word meanings, Hadith and Azkar',
-                  ),
-                  trailing: const AppIcon(Icons.chevron_right_rounded),
-                  onTap: () => showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    useSafeArea: true,
-                    builder: (_) => AppSheet(
-                      title: 'More reading preferences',
-                      child: const _ReadingDetailSettings(),
+                    const _LanguageSelector(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const SettingsItemIcon(
+                        Icons.format_size_rounded,
+                      ),
+                      title: Text(l10n.textAppearanceTitle),
+                      subtitle: Text(
+                        '${l10n.fontSizeTitle} · ${l10n.fontWeightTitle}',
+                      ),
+                      trailing: const AppIcon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
+                      ),
+                      onTap: () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        builder: (_) => AppSheet(
+                          title: l10n.textAppearanceTitle,
+                          child: BlocProvider.value(
+                            value: context.read<QuranThemeCubit>(),
+                            child: const _FontControls(),
+                          ),
+                        ),
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 26),
+                SettingsSectionCard(
+                  title: l10n.readingPreferencesTitle,
+                  description: _settingsText(
+                    context,
+                    'Choose what you see and hear while reading.',
+                    'پڑھتے وقت نظر آنے والا اور سنائی دینے والا مواد منتخب کریں۔',
+                    'اختر ما تراه وتسمعه أثناء القراءة.',
                   ),
+                  icon: Icons.menu_book_outlined,
+                  children: [
+                    const TranslationVisibilitySettings(),
+                    const _ReadingListeningSetting(),
+                    const _ArabicScriptSetting(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const SettingsItemIcon(Icons.translate_rounded),
+                      title: Text(
+                        _settingsText(
+                          context,
+                          'More reading preferences',
+                          'مطالعے کی مزید ترجیحات',
+                          'المزيد من تفضيلات القراءة',
+                        ),
+                      ),
+                      subtitle: Text(
+                        _settingsText(
+                          context,
+                          'Tafsir, word meanings, Hadith and Azkar',
+                          'تفسیر، الفاظ کے معنی، حدیث اور اذکار',
+                          'التفسير ومعاني الكلمات والحديث والأذكار',
+                        ),
+                      ),
+                      trailing: const AppIcon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
+                      ),
+                      onTap: () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        builder: (_) => AppSheet(
+                          title: _settingsText(
+                            context,
+                            'More reading preferences',
+                            'مطالعے کی مزید ترجیحات',
+                            'المزيد من تفضيلات القراءة',
+                          ),
+                          child: const _ReadingDetailSettings(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 22),
-                const SectionHeader(title: 'Prayer preferences'),
-                const PrayerCalculationSettingsTile(),
-                const SizedBox(height: 22),
-                SectionHeader(title: l10n.downloadsDataTitle),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const AppIcon(Icons.download_for_offline_outlined),
-                  title: Text(l10n.offlineDownloadsTitle),
-                  subtitle: Text(l10n.offlineDownloadsSubtitle),
-                  trailing: const AppIcon(Icons.chevron_right_rounded),
-                  onTap: () => context.push(AppRoutes.quranDownloadsPath()),
+                const SizedBox(height: 26),
+                SettingsSectionCard(
+                  title: _settingsText(
+                    context,
+                    'Prayer preferences',
+                    'نماز کی ترجیحات',
+                    'تفضيلات الصلاة',
+                  ),
+                  description: _settingsText(
+                    context,
+                    'Keep prayer times aligned with your method.',
+                    'اپنے طریقے کے مطابق نماز کے اوقات طے کریں۔',
+                    'اضبط أوقات الصلاة حسب طريقة الحساب.',
+                  ),
+                  icon: Icons.schedule_outlined,
+                  children: const [PrayerCalculationSettingsTile()],
                 ),
-                const _BackupSettingsTile(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const AppIcon(Icons.verified_outlined),
-                  title: Text(l10n.contentSourcesTitle),
-                  trailing: const AppIcon(Icons.chevron_right_rounded),
-                  onTap: () => _showContentSources(context),
+                const SizedBox(height: 26),
+                SettingsSectionCard(
+                  title: _settingsText(
+                    context,
+                    'Home Screen Widgets',
+                    'ہوم اسکرین ویجٹس',
+                    'أدوات الشاشة الرئيسية',
+                  ),
+                  description: _settingsText(
+                    context,
+                    'Preview widgets and add them to your phone.',
+                    'ویجٹس کا پیش منظر دیکھیں اور انہیں فون پر شامل کریں۔',
+                    'عاين الأدوات وأضفها إلى هاتفك.',
+                  ),
+                  icon: Icons.widgets_outlined,
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const SettingsItemIcon(
+                        Icons.dashboard_customize_outlined,
+                      ),
+                      title: Text(
+                        _settingsText(
+                          context,
+                          'Browse widgets',
+                          'ویجٹس دیکھیں',
+                          'تصفّح الأدوات',
+                        ),
+                      ),
+                      trailing: const AppIcon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
+                      ),
+                      onTap: () => context.push(AppRoutes.homeScreenWidgets),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 26),
+                SettingsSectionCard(
+                  title: l10n.downloadsDataTitle,
+                  description: _settingsText(
+                    context,
+                    'Manage offline content and your personal data.',
+                    'آف لائن مواد اور اپنے ذاتی ڈیٹا کا انتظام کریں۔',
+                    'إدارة المحتوى دون اتصال وبياناتك الشخصية.',
+                  ),
+                  icon: Icons.cloud_download_outlined,
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const SettingsItemIcon(
+                        Icons.download_for_offline_outlined,
+                      ),
+                      title: Text(l10n.offlineDownloadsTitle),
+                      subtitle: Text(l10n.offlineDownloadsSubtitle),
+                      trailing: const AppIcon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
+                      ),
+                      onTap: () => context.push(AppRoutes.quranDownloadsPath()),
+                    ),
+                    const _BackupSettingsTile(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const SettingsItemIcon(Icons.verified_outlined),
+                      title: Text(ContentCreditsSheet.titleFor(context)),
+                      trailing: const AppIcon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
+                      ),
+                      onTap: () => _showContentSources(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
               ],
             ),
-          ),
-        ],
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: QuranFloatingAudioPlayer(bottomInset: 16),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Future<void> _showContentSources(BuildContext context) {
-    final sources = getIt<QuranRepository>().getContentSources();
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => AppSheet(
-        title: 'Quran content sources',
-        child: FutureBuilder(
-          future: sources,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text('Content sources could not be loaded.'),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final source in snapshot.data!) ...[
-                  const Divider(height: 24),
-                  Text(
-                    source.name,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    [
-                      if (source.edition?.isNotEmpty == true) source.edition!,
-                      if (source.provider?.isNotEmpty == true) source.provider!,
-                      if (source.license?.isNotEmpty == true) source.license!,
-                      if (source.cachePolicy.maxAge != null)
-                        'Offline cache: up to ${source.cachePolicy.maxAge!.inDays} days',
-                      'Release review: ${source.reviewStatus.name}',
-                      source.attribution,
-                    ].join('\n'),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ],
-            );
-          },
-        ),
-      ),
-    );
+    return ContentCreditsSheet.show(context);
   }
+}
+
+String _settingsText(BuildContext context, String en, String ur, String ar) {
+  return switch (Localizations.localeOf(context).languageCode) {
+    'ur' => ur,
+    'ar' => ar,
+    _ => en,
+  };
 }
 
 class _BackupSettingsTile extends StatelessWidget {
@@ -193,10 +300,10 @@ class _BackupSettingsTile extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: const AppIcon(Icons.lock_person_rounded),
+      leading: const SettingsItemIcon(Icons.lock_person_rounded),
       title: Text(l10n.backupPrivacyTitle),
       subtitle: Text(l10n.backupPrivacySubtitle),
-      trailing: const AppIcon(Icons.chevron_right_rounded),
+      trailing: const AppIcon(Icons.chevron_right_rounded, size: 20),
       onTap: () => context.push(AppRoutes.backupPath()),
     );
   }
@@ -212,10 +319,10 @@ class _ArabicScriptSetting extends StatelessWidget {
           previous.quranArabicScript != current.quranArabicScript,
       builder: (context, state) => ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: const AppIcon(Icons.text_fields_rounded),
+        leading: const SettingsItemIcon(Icons.text_fields_rounded),
         title: Text(AppLocalizations.of(context).arabicScriptTitle),
         subtitle: Text(state.quranArabicScript.label),
-        trailing: const AppIcon(Icons.chevron_right_rounded),
+        trailing: const AppIcon(Icons.chevron_right_rounded, size: 20),
         onTap: () => showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
@@ -291,16 +398,38 @@ class _ReadingListeningSettingState extends State<_ReadingListeningSetting> {
       future: _selection,
       builder: (context, snapshot) => ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: const AppIcon(Icons.headphones_rounded),
-        title: const Text('Reading & listening'),
+        leading: const SettingsItemIcon(Icons.headphones_rounded),
+        title: Text(
+          _settingsText(
+            context,
+            'Reading & listening',
+            'مطالعہ اور سماعت',
+            'القراءة والاستماع',
+          ),
+        ),
         subtitle: Text(
           snapshot.connectionState != ConnectionState.done || snapshot.hasError
-              ? 'Translation language and reciter'
+              ? _settingsText(
+                  context,
+                  'Translation language and reciter',
+                  'ترجمے کی زبان اور قاری',
+                  'لغة الترجمة والقارئ',
+                )
               : snapshot.data == null
-              ? 'Bundled English translation and reciter'
-              : '${snapshot.data!.displayLanguage} translation and reciter',
+              ? _settingsText(
+                  context,
+                  'Bundled English translation and reciter',
+                  'شامل انگریزی ترجمہ اور قاری',
+                  'الترجمة الإنجليزية المضمنة والقارئ',
+                )
+              : _settingsText(
+                  context,
+                  '${snapshot.data!.displayLanguage} translation and reciter',
+                  '${snapshot.data!.displayLanguage} ترجمہ اور قاری',
+                  'ترجمة ${snapshot.data!.displayLanguage} والقارئ',
+                ),
         ),
-        trailing: const AppIcon(Icons.chevron_right_rounded),
+        trailing: const AppIcon(Icons.chevron_right_rounded, size: 20),
         onTap: () async {
           await context.push(AppRoutes.quranTranslationsPath());
           _refresh();
@@ -663,16 +792,23 @@ class _LanguageSelector extends StatelessWidget {
     return BlocBuilder<LocaleCubit, LocaleState>(
       builder: (context, state) => ListTile(
         contentPadding: EdgeInsets.zero,
-        leading: const AppIcon(Icons.language_rounded),
-        title: Text(l10n.languageTitle),
+        leading: const SettingsItemIcon(Icons.language_rounded),
+        title: Text(
+          _settingsText(context, 'App language', 'ایپ کی زبان', 'لغة التطبيق'),
+        ),
         subtitle: Text(languages[state.preferenceCode] ?? l10n.systemLanguage),
-        trailing: const AppIcon(Icons.chevron_right_rounded),
+        trailing: const AppIcon(Icons.chevron_right_rounded, size: 20),
         onTap: () => showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
           useSafeArea: true,
           builder: (sheetContext) => AppSheet(
-            title: l10n.languageTitle,
+            title: _settingsText(
+              context,
+              'App language',
+              'ایپ کی زبان',
+              'لغة التطبيق',
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
